@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -26,6 +27,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/go-logr/zapr"
+	metalgo "github.com/metal-stack/metal-go"
+	"github.com/metal-stack/metal-lib/pkg/tag"
+	"github.com/metal-stack/metal-lib/rest"
 	"github.com/metal-stack/v"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -91,6 +95,11 @@ func main() {
 
 	ctrl.SetLogger(zapr.NewLogger(l))
 
+	clusterID := os.Getenv(metalClusterIDEnvVar)
+	if clusterID == "" {
+		return nil, fmt.Errorf("environment variable %q is required", metalClusterIDEnvVar)
+	}
+
 	restConfig := ctrl.GetConfigOrDie()
 
 	disabledTimeout := time.Duration(-1) // wait for all runnables to finish before dying
@@ -125,11 +134,20 @@ func main() {
 		}
 	}
 
+	mclient, err := getMetalClient()
+	if err != nil {
+		setupLog.Error(err, "unable to create metal client")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.Reconciler{
-		Seed:      mgr.GetClient(),
-		Shoot:     shootClient,
-		Log:       ctrl.Log.WithName("controllers").WithName("firewall"),
-		Namespace: namespace,
+		Seed:       mgr.GetClient(),
+		Shoot:      shootClient,
+		Metal:      mclient,
+		Log:        ctrl.Log.WithName("controllers").WithName("firewall"),
+		Namespace:  namespace,
+		ClusterID:  clusterID,
+		ClusterTag: fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "firewall")
 		os.Exit(1)
@@ -141,4 +159,53 @@ func main() {
 		setupLog.Error(err, "problem running firewall-controller-manager")
 		os.Exit(1)
 	}
+}
+
+const (
+	metalAPIUrlEnvVar = "METAL_API_URL"
+	//nolint
+	metalAuthTokenEnvVar   = "METAL_AUTH_TOKEN"
+	metalAuthHMACEnvVar    = "METAL_AUTH_HMAC"
+	metalProjectIDEnvVar   = "METAL_PROJECT_ID"
+	metalPartitionIDEnvVar = "METAL_PARTITION_ID"
+	metalClusterIDEnvVar   = "METAL_CLUSTER_ID"
+)
+
+func getMetalClient() (metalgo.Client, error) {
+	url := os.Getenv(metalAPIUrlEnvVar)
+	token := os.Getenv(metalAuthTokenEnvVar)
+	hmac := os.Getenv(metalAuthHMACEnvVar)
+	projectID := os.Getenv(metalProjectIDEnvVar)
+	partitionID := os.Getenv(metalPartitionIDEnvVar)
+
+	if projectID == "" {
+		return nil, fmt.Errorf("environment variable %q is required", metalProjectIDEnvVar)
+	}
+
+	if partitionID == "" {
+		return nil, fmt.Errorf("environment variable %q is required", metalPartitionIDEnvVar)
+	}
+
+	if url == "" {
+		return nil, fmt.Errorf("environment variable %q is required", metalAPIUrlEnvVar)
+	}
+
+	if (token == "") == (hmac == "") {
+		return nil, fmt.Errorf("environment variable %q or %q is required", metalAuthTokenEnvVar, metalAuthHMACEnvVar)
+	}
+
+	var err error
+	client, err := metalgo.NewDriver(url, token, hmac)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize metal ccm:%w", err)
+	}
+
+	resp, err := client.Health().Health(nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("metal-api health endpoint not reachable:%w", err)
+	}
+	if resp.Payload != nil && resp.Payload.Status != nil && *resp.Payload.Status != string(rest.HealthStatusHealthy) {
+		return nil, fmt.Errorf("metal-api not healthy, restarting")
+	}
+	return client, nil
 }
