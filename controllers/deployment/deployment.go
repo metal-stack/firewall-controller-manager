@@ -89,6 +89,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func validate(firewalldeployment *firewallcontrollerv1.FirewallDeployment) error {
+	if firewalldeployment.Spec.Replicas > 1 {
+		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
+	}
+
 	return nil
 }
 
@@ -340,9 +344,6 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v1.FirewallD
 			Template: deploy.Spec.Template,
 		},
 	}
-
-	// TODO: for backwards-compatibility create firewall object in the shoot cluster as well
-	// maybe deploy v1 and create v2 api to manage in the new manner
 
 	err = r.Seed.Create(ctx, fw, &client.CreateOptions{})
 	if err != nil {
