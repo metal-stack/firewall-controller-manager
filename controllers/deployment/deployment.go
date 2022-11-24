@@ -196,8 +196,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1
 	for _, s := range sets.Items {
 		s := s
 
-		ref := metav1.GetControllerOf(&s)
-		if ref == nil || ref.Name != deploy.Name {
+		if !metav1.IsControlledBy(&s, deploy) {
 			continue
 		}
 
@@ -205,7 +204,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1
 	}
 
 	// FIXME: implement
-	// goal: always have one set is doing it's job properly (most recent), try to scale down / delete the rest according to strategy
+	// goal: always have one set doing it's job properly (most recent), try to scale down / delete the rest according to strategy
 	if len(ownedSets) == 0 {
 		_, err := r.createFirewallSet(ctx, deploy)
 		if err != nil {
@@ -226,8 +225,7 @@ func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v1.FirewallDeplo
 	for _, s := range sets.Items {
 		s := s
 
-		ref := metav1.GetControllerOf(&s)
-		if ref == nil || ref.Name != deploy.Name {
+		if !metav1.IsControlledBy(&s, deploy) {
 			continue
 		}
 
@@ -240,7 +238,7 @@ func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v1.FirewallDeplo
 	return nil
 }
 
-func (r *Reconciler) requiresRollingUpdate(ctx context.Context, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
+func (r *Reconciler) isNewSetRequired(ctx context.Context, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
 	ok, err := sizeHasChanged(fwd, fw)
 	if err != nil {
 		return false, err
@@ -333,7 +331,9 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v1.FirewallD
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: deploy.Namespace,
-			// TODO: Do we need to set OwnerReferences by ourselves?
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(deploy, v1.GroupVersion.WithKind("FirewallDeployment")),
+			},
 		},
 		Spec: v1.FirewallSetSpec{
 			Replicas: deploy.Spec.Replicas,

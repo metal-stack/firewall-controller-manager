@@ -174,8 +174,7 @@ func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v1.Firewall
 	for _, fw := range firewalls.Items {
 		fw := fw
 
-		ref := metav1.GetControllerOf(&fw)
-		if ref == nil || ref.Name != set.Name {
+		if metav1.IsControlledBy(&fw, set) {
 			continue
 		}
 
@@ -200,8 +199,7 @@ func (r *Reconciler) deleteAllFirewallsFromSet(ctx context.Context, set *v1.Fire
 	for _, fw := range firewalls.Items {
 		fw := fw
 
-		ref := metav1.GetControllerOf(&fw)
-		if ref == nil || ref.Name != set.Name {
+		if metav1.IsControlledBy(&fw, set) {
 			continue
 		}
 
@@ -292,7 +290,9 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v1.FirewallSet) (*
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: set.Namespace,
-			// TODO: Do we need to set OwnerReferences by ourselves?
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(set, v1.GroupVersion.WithKind("FirewallSet")),
+			},
 		},
 		Spec: set.Spec.Template.Spec,
 	}
