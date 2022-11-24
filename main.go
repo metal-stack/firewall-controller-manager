@@ -39,7 +39,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
+	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	firewallcontrollerv1 "github.com/metal-stack/firewall-controller/api/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -97,7 +98,13 @@ func main() {
 
 	clusterID := os.Getenv(metalClusterIDEnvVar)
 	if clusterID == "" {
-		return nil, fmt.Errorf("environment variable %q is required", metalClusterIDEnvVar)
+		setupLog.Error(fmt.Errorf("environment variable %q is required", metalClusterIDEnvVar), "error during controller init")
+		os.Exit(1)
+	}
+	apiURL := os.Getenv(metalClusterAPIURLEnvVar)
+	if apiURL == "" {
+		setupLog.Error(fmt.Errorf("environment variable %q is required", metalClusterAPIURLEnvVar), "error during controller init")
+		os.Exit(1)
 	}
 
 	restConfig := ctrl.GetConfigOrDie()
@@ -140,7 +147,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.Reconciler{
+	if err = (&deployment.Reconciler{
+		Seed:          mgr.GetClient(),
+		Shoot:         shootClient,
+		Metal:         mclient,
+		Log:           ctrl.Log.WithName("controllers").WithName("deployment"),
+		Namespace:     namespace,
+		ClusterID:     clusterID,
+		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		ClusterAPIURL: apiURL,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "deployment")
+		os.Exit(1)
+	}
+
+	if err = (&firewall.Reconciler{
 		Seed:       mgr.GetClient(),
 		Shoot:      shootClient,
 		Metal:      mclient,
@@ -152,6 +173,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "firewall")
 		os.Exit(1)
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting firewall-controller-manager", "version", v.V)
@@ -164,11 +186,12 @@ func main() {
 const (
 	metalAPIUrlEnvVar = "METAL_API_URL"
 	//nolint
-	metalAuthTokenEnvVar   = "METAL_AUTH_TOKEN"
-	metalAuthHMACEnvVar    = "METAL_AUTH_HMAC"
-	metalProjectIDEnvVar   = "METAL_PROJECT_ID"
-	metalPartitionIDEnvVar = "METAL_PARTITION_ID"
-	metalClusterIDEnvVar   = "METAL_CLUSTER_ID"
+	metalAuthTokenEnvVar     = "METAL_AUTH_TOKEN"
+	metalAuthHMACEnvVar      = "METAL_AUTH_HMAC"
+	metalProjectIDEnvVar     = "METAL_PROJECT_ID"
+	metalPartitionIDEnvVar   = "METAL_PARTITION_ID"
+	metalClusterIDEnvVar     = "METAL_CLUSTER_ID"
+	metalClusterAPIURLEnvVar = "METAL_CLUSTER_API_URL"
 )
 
 func getMetalClient() (metalgo.Client, error) {
