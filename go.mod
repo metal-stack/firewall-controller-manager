@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
 	github.com/google/uuid v1.3.0
-	github.com/metal-stack/firewall-controller v1.1.6-0.20221124152548-48b269fc2fb1
+	github.com/metal-stack/firewall-controller v1.1.6-0.20221124161846-2117aa658f42
 	github.com/metal-stack/metal-go v0.21.4
 	github.com/metal-stack/metal-lib v0.11.2
 	github.com/metal-stack/v v1.0.3
@@ -18,8 +18,6 @@ require (
 	k8s.io/utils v0.0.0-20221108210102-8e77b1f39fe2
 	sigs.k8s.io/controller-runtime v0.13.1
 )
-
-// replace github.com/metal-stack/firewall-controller => ../firewall-controller
 
 require (
 	cloud.google.com/go/compute v1.12.1 // indirect

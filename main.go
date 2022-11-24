@@ -41,6 +41,7 @@ import (
 
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
+	"github.com/metal-stack/firewall-controller-manager/controllers/set"
 	firewallcontrollerv1 "github.com/metal-stack/firewall-controller/api/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -158,6 +159,20 @@ func main() {
 		ClusterAPIURL: apiURL,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
+		os.Exit(1)
+	}
+
+	if err = (&set.Reconciler{
+		Seed:          mgr.GetClient(),
+		Shoot:         shootClient,
+		Metal:         mclient,
+		Log:           ctrl.Log.WithName("controllers").WithName("set"),
+		Namespace:     namespace,
+		ClusterID:     clusterID,
+		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		ClusterAPIURL: apiURL,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "set")
 		os.Exit(1)
 	}
 

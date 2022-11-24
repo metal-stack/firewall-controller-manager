@@ -206,7 +206,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, fw *v1.Firewall) (*mode
 		SSHPubKeys:  fw.Spec.SSHPublicKeys,
 		Networks:    networks,
 		UserData:    fw.Spec.Userdata,
-		Tags:        []string{r.ClusterTag, controllers.FirewallDeploymentTag(ref.Name)},
+		Tags:        []string{r.ClusterTag, controllers.FirewallSetTag(ref.Name)},
 	}
 
 	resp, err := r.Metal.Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(ctx), nil)

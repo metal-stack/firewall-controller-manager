@@ -10,10 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
-	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -26,7 +23,6 @@ import (
 
 	v1 "github.com/metal-stack/firewall-controller/api/v1"
 	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/client/image"
 	"github.com/metal-stack/metal-go/api/models"
 )
@@ -55,7 +51,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile the Firewall CRD
 // +kubebuilder:rbac:groups=metal-stack.io,resources=firewall,verbs=get;list;watch;create;update;patch;delete
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("firewall", req.NamespacedName)
+	log := r.Log.WithValues("firewalldeployment", req.NamespacedName)
 	requeue := ctrl.Result{
 		RequeueAfter: time.Second * 10,
 	}
@@ -73,7 +69,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	firewallDeployment := &firewallcontrollerv1.FirewallDeployment{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, firewallDeployment, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("no firewalldeployments defined")
+			log.Info("no firewalldeployment defined")
 			return ctrl.Result{}, nil
 		}
 		return requeue, err
@@ -166,215 +162,85 @@ func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
 	return nil
 }
 
-func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	err := r.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
-	if err != nil {
-		return "", err
-	}
+func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1.FirewallDeployment) error {
+	if !deploy.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
+			err := r.deleteAllSets(ctx, deploy)
+			if err != nil {
+				return err
+			}
 
-	if len(sa.Secrets) == 0 {
-		return "", fmt.Errorf("service account %q contains no valid token secret", sa.Name)
-	}
+			controllerutil.RemoveFinalizer(deploy, controllers.FinalizerName)
+			if err := r.Seed.Update(ctx, deploy); err != nil {
+				return err
+			}
+		}
 
-	saSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sa.Secrets[0].Name,
-			Namespace: r.Namespace,
-		},
-	}
-	err = r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
-	if err != nil {
-		return "", err
+		return nil
 	}
 
-	config := &configv1.Config{
-		CurrentContext: r.Namespace,
-		Clusters: []configv1.NamedCluster{
-			{
-				Name: r.Namespace,
-				Cluster: configv1.Cluster{
-					CertificateAuthorityData: saSecret.Data["ca.crt"],
-					Server:                   r.ClusterAPIURL,
-				},
-			},
-		},
-		Contexts: []configv1.NamedContext{
-			{
-				Name: r.Namespace,
-				Context: configv1.Context{
-					Cluster:  r.Namespace,
-					AuthInfo: r.Namespace,
-				},
-			},
-		},
-		AuthInfos: []configv1.NamedAuthInfo{
-			{
-				Name: r.Namespace,
-				AuthInfo: configv1.AuthInfo{
-					Token: string(saSecret.Data["token"]),
-				},
-			},
-		},
+	if !controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
+		controllerutil.AddFinalizer(deploy, controllers.FinalizerName)
+		if err := r.Seed.Update(ctx, deploy); err != nil {
+			return err
+		}
 	}
 
-	kubeconfig, err := runtime.Encode(configlatest.Codec, config)
-	if err != nil {
-		return "", fmt.Errorf("unable to encode kubeconfig for firewall: %w", err)
-	}
-
-	return renderUserdata(kubeconfig)
-}
-
-type firewallReconcileAction string
-
-var (
-	// firewallActionRecreate wipe infrastructure status and triggers creation of a new metal firewall
-	firewallActionRecreate firewallReconcileAction = "recreate"
-	// firewallActionDeleteAndRecreate deletes the firewall, wipe infrastructure status and triggers creation of a new metal firewall
-	// occurs when someone changes the firewalltype, firewallimage or additionalnetworks
-	// TODO: rename to firewallActionRollingUpdate
-	firewallActionDeleteAndRecreate firewallReconcileAction = "delete"
-	// firewallActionDoNothing nothing needs to be done for this firewall
-	firewallActionDoNothing firewallReconcileAction = "nothing"
-	// firewallActionCreate create a new firewall and write infrastructure status
-	firewallActionCreate firewallReconcileAction = "create"
-	// firewallActionStatusUpdateOnMigrate infrastructure status is not present, but a metal firewall machine is present.
-	// this is the case during migration of the shoot to another seed because infrastructure status is not migrated by gardener
-	// therefor the status needs to be recreated
-	firewallActionStatusUpdateOnMigrate firewallReconcileAction = "migrate"
-)
-
-func (r *Reconciler) reconcile(ctx context.Context, firewalldeployment *firewallcontrollerv1.FirewallDeployment) error {
-	// detect which next action is required
-	action, err := r.firewallNextAction(ctx, firewalldeployment)
+	sets := &v1.FirewallSetList{}
+	err := r.Seed.List(ctx, sets, client.InNamespace(r.Namespace))
 	if err != nil {
 		return err
 	}
 
-	switch action {
-	case firewallActionDoNothing:
-		r.Log.Info("firewall reconciled, nothing to be done")
-		return nil
-	case firewallActionCreate:
-		userdata, err := r.createUserdata(ctx)
-		if err != nil {
-			return err
+	var ownedSets []*v1.FirewallSet
+	for _, s := range sets.Items {
+		s := s
+
+		ref := metav1.GetControllerOf(&s)
+		if ref == nil || ref.Name != deploy.Name {
+			continue
 		}
 
-		// TODO: overrides info from the user 🙈
-		firewalldeployment.Spec.Template.Spec.Userdata = userdata
-
-		fw, err := r.createFirewall(ctx, firewalldeployment)
-		if err != nil {
-			return err
-		}
-		r.Log.Info("firewall created", "name", fw.Name)
-
-		// r.providerStatus.Firewall.MachineID = machineID
-		// return updateProviderStatus(ctx, r.c, r.infrastructure, r.providerStatus, &nodeCIDR)
-	// case firewallActionRecreate:
-	// 	err := deleteFirewallFromStatus(ctx, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r.Log.Info("firewall removed from status", "cluster-id", r.clusterID, "cluster", r.cluster.Shoot.Name, "machine-id", r.machineIDInStatus)
-	// 	machineID, nodeCIDR, err := createFirewall(ctx, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r.Log.Info("firewall created", "cluster-id", r.clusterID, "cluster", r.cluster.Shoot.Name, "machine-id", r.providerStatus.Firewall.MachineID)
-
-	// 	r.providerStatus.Firewall.MachineID = machineID
-
-	// 	return updateProviderStatus(ctx, r.c, r.infrastructure, r.providerStatus, &nodeCIDR)
-	// case firewallActionDeleteAndRecreate:
-	// 	err := deleteFirewall(ctx, r.machineIDInStatus, r.infrastructureConfig.ProjectID, r.clusterTag, r.mclient)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r.Log.Info("firewall deleted", "cluster-id", r.clusterID, "cluster", r.cluster.Shoot.Name, "machine-id", r.machineIDInStatus)
-	// 	err = deleteFirewallFromStatus(ctx, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r.Log.Info("firewall removed from status", "cluster-id", r.clusterID, "cluster", r.cluster.Shoot.Name, "machine-id", r.machineIDInStatus)
-	// 	machineID, nodeCIDR, err := createFirewall(ctx, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r.Log.Info("firewall created", "cluster-id", r.clusterID, "cluster", r.cluster.Shoot.Name, "machine-id", r.providerStatus.Firewall.MachineID)
-	// 	r.providerStatus.Firewall.MachineID = machineID
-	// 	return updateProviderStatus(ctx, r.c, r.infrastructure, r.providerStatus, &nodeCIDR)
-	// case firewallActionStatusUpdateOnMigrate:
-	// 	r.providerStatus.Firewall = *status
-	// 	return updateProviderStatus(ctx, r.c, r.infrastructure, r.providerStatus, r.cluster.Shoot.Spec.Networking.Nodes)
-	default:
-		return fmt.Errorf("unsupported firewall reconcile action: %s", action)
+		ownedSets = append(ownedSets, &s)
 	}
+
+	// FIXME: implement
+	// goal: always have one set is doing it's job properly (most recent), try to scale down / delete the rest according to strategy
+	if len(ownedSets) == 0 {
+		_, err := r.createFirewallSet(ctx, deploy)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-// func findClusterFirewalls(ctx context.Context, client metalgo.Client, clusterTag, projectID string) ([]*models.V1FirewallResponse, error) {
-// 	resp, err := client.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-// 		AllocationProject: projectID,
-// 		Tags:              []string{clusterTag},
-// 	}).WithContext(ctx), nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return resp.Payload, nil
-// }
-
-func (r *Reconciler) firewallNextAction(ctx context.Context, firewallDeployment *v1.FirewallDeployment) (firewallReconcileAction, error) {
-	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationProject: firewallDeployment.Spec.Template.Spec.ProjectID,
-		Tags:              []string{r.ClusterTag, controllers.FirewallDeploymentTag(firewallDeployment.Name)},
-	}).WithContext(ctx), nil)
+func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v1.FirewallDeployment) error {
+	sets := v1.FirewallSetList{}
+	err := r.Seed.List(ctx, &sets, client.InNamespace(r.Namespace))
 	if err != nil {
-		return firewallActionDoNothing, err
+		return err
 	}
 
-	firewalls := resp.Payload
-	clusterFirewallAmount := len(firewalls)
+	for _, s := range sets.Items {
+		s := s
 
-	switch clusterFirewallAmount {
-	case 0:
-		r.Log.Info("firewall does not exist, creating")
-		return firewallActionCreate, nil
-	case 1:
-		fw := firewalls[0]
+		ref := metav1.GetControllerOf(&s)
+		if ref == nil || ref.Name != deploy.Name {
+			continue
+		}
 
-		ok, err := r.firewallNeedsToBeReplaced(ctx, firewallDeployment, fw)
+		err = r.Seed.Delete(ctx, &s, &client.DeleteOptions{})
 		if err != nil {
-			return firewallActionDoNothing, err
+			return err
 		}
-
-		if ok {
-			return firewallActionDeleteAndRecreate, nil
-		}
-
-		return firewallActionDoNothing, nil
-	default:
-		err := fmt.Errorf("multiple firewalls exist for this cluster, which is currently unsupported. cleanup manually created firewalls.")
-		r.Log.Error(
-			err,
-			"multiple firewalls exist for this cluster",
-			"clusterID", r.ClusterID,
-			"expectedMachineID", firewallDeployment.Status.FirewallIDs,
-		)
-
-		return firewallActionDoNothing, nil
 	}
+
+	return nil
 }
 
-func (r *Reconciler) firewallNeedsToBeReplaced(ctx context.Context, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
+func (r *Reconciler) requiresRollingUpdate(ctx context.Context, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
 	ok, err := sizeHasChanged(fwd, fw)
 	if err != nil {
 		return false, err
@@ -455,22 +321,24 @@ func networksHaveChanged(fwd *v1.FirewallDeployment, fw *models.V1FirewallRespon
 	return !currentNetworks.Equal(wantNetworks)
 }
 
-func (r *Reconciler) createFirewall(ctx context.Context, firewallDeployment *v1.FirewallDeployment) (*v1.Firewall, error) {
+func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v1.FirewallDeployment) (*v1.FirewallSet, error) {
 	uuid, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
 	}
 
-	clusterName := firewallDeployment.Namespace
-	name := clusterName + "-firewall-" + uuid.String()[:5]
+	name := deploy.Name + uuid.String()[:5]
 
-	fw := &v1.Firewall{
+	fw := &v1.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: firewallDeployment.Namespace,
+			Namespace: deploy.Namespace,
 			// TODO: Do we need to set OwnerReferences by ourselves?
 		},
-		Spec: firewallDeployment.Spec.Template.Spec,
+		Spec: v1.FirewallSetSpec{
+			Replicas: deploy.Spec.Replicas,
+			Template: deploy.Spec.Template,
+		},
 	}
 
 	// TODO: for backwards-compatibility create firewall object in the shoot cluster as well

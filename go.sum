@@ -400,8 +400,8 @@ github.com/markbates/safe v1.0.1/go.mod h1:nAqgmRi7cY2nqMc92/bSEeQA+R4OheNU2T1kN
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/matttproud/golang_protobuf_extensions v1.0.4 h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=
 github.com/matttproud/golang_protobuf_extensions v1.0.4/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
-github.com/metal-stack/firewall-controller v1.1.6-0.20221124152548-48b269fc2fb1 h1:OIUxwY5YQb6tG9BopcuvorJ0Hy+NN0/zZIIq9mH1Dd4=
-github.com/metal-stack/firewall-controller v1.1.6-0.20221124152548-48b269fc2fb1/go.mod h1:rqvQtgBf8FlRhPEORelR6+bH3mGZR1ZX1lKpQwsts6Q=
+github.com/metal-stack/firewall-controller v1.1.6-0.20221124161846-2117aa658f42 h1:M9VeUCOl4qia7NbghIcw8Zm42N+cYcDcbtrsSu71HVw=
+github.com/metal-stack/firewall-controller v1.1.6-0.20221124161846-2117aa658f42/go.mod h1:rqvQtgBf8FlRhPEORelR6+bH3mGZR1ZX1lKpQwsts6Q=
 github.com/metal-stack/metal-go v0.21.4 h1:UFUttWnx/5mzllcPkgUrvv4cvo8IZCdI1NeqDdztSAA=
 github.com/metal-stack/metal-go v0.21.4/go.mod h1:EttkuzD25TrMHwhR2cbaHdY58xg54gfd6pgXjchqBS0=
 github.com/metal-stack/metal-lib v0.11.2 h1:HqPMbHS7zMBRAcoGhbsUZRjDPvOtgI6qNshzd0bSmJQ=
