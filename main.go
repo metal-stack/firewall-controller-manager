@@ -66,6 +66,7 @@ func main() {
 		enableLeaderElection  bool
 		shootKubeconfig       string
 		namespace             string
+		reconcileInterval     time.Duration
 		firewallHealthTimeout time.Duration
 		clusterID             string
 		clusterApiURL         string
@@ -77,6 +78,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&namespace, "namespace", "default", "The namespace this controller is running.")
 	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "The path to the kubeconfig to talk to the shoot")
+	flag.DurationVar(&reconcileInterval, "reconcile-interval", 1*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfi")
@@ -124,6 +126,7 @@ func main() {
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
 		Namespace:               namespace,
 		GracefulShutdownTimeout: &disabledTimeout,
+		SyncPeriod:              &reconcileInterval,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start firewall-controller-manager")

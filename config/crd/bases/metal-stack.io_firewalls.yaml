@@ -24,7 +24,10 @@ spec:
     - jsonPath: .spec.internalprefixes
       name: InternalPrefixes
       type: string
-    - jsonPath: .status.event
+    - jsonPath: .status.machineStatus.machineID
+      name: ID
+      type: string
+    - jsonPath: .status.machineStatus.event
       name: Event
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -277,8 +280,6 @@ spec:
                 type: array
               lastError:
                 type: string
-              machineID:
-                type: string
               machineStatus:
                 properties:
                   allocationTimestamp:
@@ -288,22 +289,26 @@ spec:
                     type: boolean
                   event:
                     type: string
-                  message:
-                    type: string
-                  time:
+                  eventTimestamp:
                     format: date-time
+                    type: string
+                  liveliness:
+                    type: string
+                  machineID:
+                    type: string
+                  message:
                     type: string
                 required:
                 - allocationTimestamp
                 - crashLoop
                 - event
+                - eventTimestamp
+                - liveliness
+                - machineID
                 - message
-                - time
                 type: object
             required:
-            - controllerStatus
             - lastError
-            - machineID
             - machineStatus
             type: object
         type: object

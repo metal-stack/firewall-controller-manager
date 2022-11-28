@@ -12,11 +12,11 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -44,10 +44,10 @@ type Reconciler struct {
 
 // SetupWithManager boilerplate to setup the Reconciler
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallDeployment{}). // TODO: trigger a reconcile also for firewallset status updates
-		WithEventFilter(pred).
+		Named("FirewallDeployment").
+		Owns(&v2.FirewallSet{}).
 		Complete(r)
 }
 
@@ -96,7 +96,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	defer func() {
-		err = r.status(ctx, deploy, ownedSets)
+		statusErr := r.status(ctx, deploy, ownedSets)
+		if statusErr != nil {
+			r.Log.Error(statusErr, "error updating status")
+		}
 	}()
 
 	err = r.reconcile(ctx, deploy, ownedSets)
@@ -202,6 +205,11 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 
 func (r *Reconciler) status(ctx context.Context, deploy *v2.FirewallDeployment, ownedSets []*v2.FirewallSet) error {
 	r.Log.Info("updating firewall deployment status", "name", deploy.Name, "namespace", deploy.Namespace)
+
+	// refetch to prevent updating an old revision
+	if err := r.Seed.Get(ctx, types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, deploy, &client.GetOptions{}); err != nil {
+		return err
+	}
 
 	status := v2.FirewallDeploymentStatus{}
 
@@ -334,7 +342,6 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 		},
 	}
 
-	// TODO: overrides info from the user 🙈
 	set.Spec.Template.Userdata = userdata
 
 	err = r.Seed.Create(ctx, set, &client.CreateOptions{})

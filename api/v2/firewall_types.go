@@ -29,7 +29,8 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Interval",type=string,JSONPath=`.spec.interval`
 // +kubebuilder:printcolumn:name="InternalPrefixes",type=string,JSONPath=`.spec.internalprefixes`
-// +kubebuilder:printcolumn:name="Event",type="string",JSONPath=".status.event"
+// +kubebuilder:printcolumn:name="ID",type="string",JSONPath=".status.machineStatus.machineID"
+// +kubebuilder:printcolumn:name="Event",type="string",JSONPath=".status.machineStatus.event"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -82,44 +83,26 @@ type FirewallSpec struct {
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
 }
 
-// Data contains the fields over which the signature is calculated.
-type Data struct {
-	// Interval on which rule reconciliation should happen
-	Interval string `json:"interval,omitempty"`
-	// DryRun if set to true, firewall rules are not applied
-	DryRun bool `json:"dryrun,omitempty"`
-	// TrafficControl defines where to store the generated ipv4 firewall rules on disk
-	Ipv4RuleFile string `json:"ipv4rulefile,omitempty"`
-	// RateLimits allows configuration of rate limit rules for interfaces.
-	RateLimits []RateLimit `json:"rateLimits,omitempty"`
-	// InternalPrefixes specify prefixes which are considered local to the partition or all regions.
-	// Traffic to/from these prefixes is accounted as internal traffic
-	// TODO: align to camel-case - rename to internalPrefixes
-	InternalPrefixes []string `json:"internalprefixes,omitempty"`
-	// EgressRules
-	EgressRules []EgressRuleSNAT `json:"egressRules,omitempty"`
-	// FirewallNetworks holds the networks known at the metal-api for this firewall machine
-	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
-}
-
 // FirewallStatus defines the observed state of Firewall
 type FirewallStatus struct {
-	MachineID     string        `json:"machineID"`
 	MachineStatus MachineStatus `json:"machineStatus"`
 
 	LastError string `json:"lastError"`
 
 	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
-	ControllerStatus ControllerStatus `json:"controllerStatus"`
+	// +kubebuilder:validation:Optional
+	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 
 	// FirewallNetworks holds the networks known at the metal-api for this firewall machine
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 }
 
 type MachineStatus struct {
+	MachineID           string      `json:"machineID"`
 	Event               string      `json:"event"`
 	Message             string      `json:"message"`
-	Time                metav1.Time `json:"time"`
+	Liveliness          string      `json:"liveliness"`
+	EventTimestamp      metav1.Time `json:"eventTimestamp"`
 	AllocationTimestamp metav1.Time `json:"allocationTimestamp"`
 	CrashLoop           bool        `json:"crashLoop"`
 }

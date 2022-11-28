@@ -8,6 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +40,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.Firewall{}).
-		// TODO: find out if we can filter for owner reference
+		Named("Firewall").
 		WithEventFilter(pred).
 		Complete(r)
 }
@@ -67,7 +68,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	var current *models.V1FirewallResponse
 	defer func() {
-		err = r.status(ctx, fw, current, err)
+		statusErr := r.status(ctx, fw, current, err)
+		if statusErr != nil {
+			r.Log.Error(statusErr, "error updating status")
+		}
 	}()
 
 	current, err = r.reconcile(ctx, fw)
@@ -108,7 +112,7 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) (*models.V1
 	}
 
 	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		Name:              fw.Spec.Name,
+		AllocationName:    fw.Spec.Name,
 		AllocationProject: fw.Spec.ProjectID,
 		Tags:              []string{r.ClusterTag},
 	}).WithContext(ctx), nil)
@@ -130,6 +134,11 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) (*models.V1
 func (r *Reconciler) status(ctx context.Context, fw *v2.Firewall, current *models.V1FirewallResponse, reconcileErr error) error {
 	r.Log.Info("updating firewall status", "name", fw.Name, "namespace", fw.Namespace)
 
+	// refetch to prevent updating an old revision
+	if err := r.Seed.Get(ctx, types.NamespacedName{Name: fw.Name, Namespace: fw.Namespace}, fw, &client.GetOptions{}); err != nil {
+		return err
+	}
+
 	status := v2.FirewallStatus{}
 
 	if reconcileErr != nil {
@@ -139,11 +148,13 @@ func (r *Reconciler) status(ctx context.Context, fw *v2.Firewall, current *model
 	if current == nil {
 		status.MachineStatus.Message = "no firewall created"
 	} else {
-		if current.Allocation == nil || current.ID == nil {
+		if current.Allocation == nil || current.Allocation.Created == nil || current.ID == nil || current.Liveliness == nil {
 			return fmt.Errorf("created firewall is missing essential fields")
 		}
 
-		status.MachineID = *current.ID
+		status.MachineStatus.MachineID = *current.ID
+		status.MachineStatus.AllocationTimestamp = metav1.NewTime(time.Time(*current.Allocation.Created))
+		status.MachineStatus.Liveliness = *current.Liveliness
 
 		// check whether network prefixes were updated in metal-api
 		// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
@@ -159,7 +170,7 @@ func (r *Reconciler) status(ctx context.Context, fw *v2.Firewall, current *model
 			}
 
 			// TODO: network calls could be expensive, maybe add a cache for it
-			nwResp, err := r.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(*n.Networkid), nil)
+			nwResp, err := r.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(*n.Networkid).WithContext(ctx), nil)
 			if err != nil {
 				return fmt.Errorf("network find error: %w", err)
 			}
@@ -183,7 +194,7 @@ func (r *Reconciler) status(ctx context.Context, fw *v2.Firewall, current *model
 				status.MachineStatus.Event = *log.Event
 			}
 			status.MachineStatus.Message = log.Message
-			status.MachineStatus.Time = metav1.NewTime(time.Time(log.Time))
+			status.MachineStatus.EventTimestamp = metav1.NewTime(time.Time(log.Time))
 
 			if current.Events.CrashLoop != nil {
 				status.MachineStatus.CrashLoop = *current.Events.CrashLoop
@@ -241,7 +252,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 
 func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1MachineResponse, error) {
 	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		Name:              fw.Spec.Name,
+		AllocationName:    fw.Spec.Name,
 		AllocationProject: fw.Spec.ProjectID,
 		Tags:              []string{r.ClusterTag},
 	}).WithContext(ctx), nil)
@@ -258,6 +269,8 @@ func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		if err != nil {
 			return nil, fmt.Errorf("firewall delete error: %w", err)
 		}
+
+		r.Log.Info("deleted firewall", "name", fw.Spec.Name, "id", *resp.Payload.ID)
 
 		return resp.Payload, nil
 	default:

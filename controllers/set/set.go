@@ -8,10 +8,10 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -38,10 +38,10 @@ type Reconciler struct {
 
 // SetupWithManager boilerplate to setup the Reconciler
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallSet{}). // TODO: trigger a reconcile also for firewall status updates
-		WithEventFilter(pred).
+		Named("FirewallSet").
+		Owns(&v2.Firewall{}).
 		Complete(r)
 }
 
@@ -85,7 +85,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	defer func() {
-		err = r.status(ctx, set, ownedFirewalls)
+		statusErr := r.status(ctx, set, ownedFirewalls)
+		if statusErr != nil {
+			r.Log.Error(statusErr, "error updating status")
+		}
 	}()
 
 	err = r.reconcile(ctx, set, ownedFirewalls)
@@ -202,7 +205,7 @@ func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) erro
 			continue
 		}
 
-		r.Log.Info("found orphan firewall, deleting orphan", "name", *fw.Allocation.Name, "id", *fw.ID)
+		r.Log.Info("found orphan firewall, deleting orphan", "name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
 
 		_, err = r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
 		if err != nil {
@@ -272,6 +275,9 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 	clusterName := set.Namespace
 	name := fmt.Sprintf("%s-firewall-%s", clusterName, uuid.String()[:5])
 
+	spec := set.Spec.Template.DeepCopy()
+	spec.Name = name
+
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -280,7 +286,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 				*metav1.NewControllerRef(set, v2.GroupVersion.WithKind("FirewallSet")),
 			},
 		},
-		Spec: set.Spec.Template,
+		Spec: *spec,
 	}
 
 	// TODO: for backwards-compatibility create firewall object in the shoot cluster as well
@@ -297,16 +303,26 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 func (r *Reconciler) status(ctx context.Context, set *v2.FirewallSet, fws []*v2.Firewall) error {
 	r.Log.Info("updating firewall set status", "name", set.Name, "namespace", set.Namespace)
 
+	// refetch to prevent updating an old revision
+	if err := r.Seed.Get(ctx, types.NamespacedName{Name: set.Name, Namespace: set.Namespace}, set, &client.GetOptions{}); err != nil {
+		return err
+	}
+
 	status := v2.FirewallSetStatus{}
 
 	for _, fw := range fws {
 		fw := fw
 
-		if fw.Status.MachineStatus.Event == "Phoned Home" && !fw.Status.ControllerStatus.Updated.IsZero() {
-			status.ReadyReplicas++
+		// TODO: this has to be revamped
+		if fw.Status.MachineStatus.Event == "Phoned Home" && fw.Status.MachineStatus.Liveliness == "Alive" {
+			if fw.Status.ControllerStatus != nil && !fw.Status.ControllerStatus.Updated.IsZero() {
+				status.ReadyReplicas++
+			} else if time.Since(fw.Status.MachineStatus.AllocationTimestamp.Time) < r.FirewallHealthTimeout {
+				status.ProgressingReplicas++
+			} else {
+				status.UnhealthyReplicas++
+			}
 		} else if fw.Status.MachineStatus.CrashLoop {
-			status.UnhealthyReplicas++
-		} else if time.Since(fw.Status.MachineStatus.AllocationTimestamp.Time) > r.FirewallHealthTimeout {
 			status.UnhealthyReplicas++
 		} else {
 			status.ProgressingReplicas++

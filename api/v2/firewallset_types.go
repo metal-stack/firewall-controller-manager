@@ -17,6 +17,8 @@ limitations under the License.
 package v2
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,5 +60,9 @@ type FirewallSetStatus struct {
 }
 
 func (f *FirewallSet) Validate() error {
+	if f.Spec.Template.Name != "" {
+		return fmt.Errorf("name will be set by the controller, cannot be set by the user")
+	}
+
 	return nil
 }
