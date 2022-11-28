@@ -5,7 +5,7 @@ WORKDIR /work
 COPY . .
 RUN make
 
-FROM alpine:3.16
+FROM alpine:3.17
 WORKDIR /work
 COPY --from=builder /work/bin/firewall-controller-manager .
 USER 65534

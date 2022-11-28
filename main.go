@@ -59,11 +59,14 @@ func init() {
 
 func main() {
 	var (
-		logLevel             string
-		metricsAddr          string
-		enableLeaderElection bool
-		shootKubeconfig      string
-		namespace            string
+		logLevel              string
+		metricsAddr           string
+		enableLeaderElection  bool
+		shootKubeconfig       string
+		namespace             string
+		firewallHealthTimeout time.Duration
+		clusterID             string
+		clusterApiURL         string
 	)
 	flag.StringVar(&logLevel, "log-level", "", "The log level of the controller.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "The address the metric endpoint binds to.")
@@ -72,6 +75,9 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&namespace, "namespace", "default", "The namespace this controller is running.")
 	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "The path to the kubeconfig to talk to the shoot")
+	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
+	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
+	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfi")
 
 	flag.Parse()
 
@@ -96,26 +102,12 @@ func main() {
 	}
 
 	ctrl.SetLogger(zapr.NewLogger(l))
-
-	clusterID := os.Getenv(metalClusterIDEnvVar)
 	if clusterID == "" {
-		setupLog.Error(fmt.Errorf("environment variable %q is required", metalClusterIDEnvVar), "error during controller init")
+		setupLog.Error(fmt.Errorf("cluster-id is not set"), "")
 		os.Exit(1)
 	}
-	apiURL := os.Getenv(metalClusterAPIURLEnvVar)
-	if apiURL == "" {
-		setupLog.Error(fmt.Errorf("environment variable %q is required", metalClusterAPIURLEnvVar), "error during controller init")
-		os.Exit(1)
-	}
-	firewallHealthTimeoutString := os.Getenv(firewallHealthTimeout)
-	if firewallHealthTimeoutString == "" {
-		setupLog.Error(fmt.Errorf("environment variable %q is required", firewallHealthTimeout), "error during controller init")
-		os.Exit(1)
-	}
-
-	firewallHealthTimeout, err := time.ParseDuration(firewallHealthTimeoutString)
-	if err != nil {
-		setupLog.Error(err, "error during controller init")
+	if clusterApiURL == "" {
+		setupLog.Error(fmt.Errorf("cluster-api-url is not set"), "")
 		os.Exit(1)
 	}
 
@@ -167,7 +159,7 @@ func main() {
 		Namespace:     namespace,
 		ClusterID:     clusterID,
 		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		ClusterAPIURL: apiURL,
+		ClusterAPIURL: clusterApiURL,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
 		os.Exit(1)
@@ -181,7 +173,7 @@ func main() {
 		Namespace:             namespace,
 		ClusterID:             clusterID,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		ClusterAPIURL:         apiURL,
+		ClusterAPIURL:         clusterApiURL,
 		FirewallHealthTimeout: firewallHealthTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "set")
@@ -212,15 +204,11 @@ func main() {
 
 const (
 	metalAPIUrlEnvVar = "METAL_API_URL"
-	//nolint
-	metalAuthTokenEnvVar     = "METAL_AUTH_TOKEN"
-	metalAuthHMACEnvVar      = "METAL_AUTH_HMAC"
-	metalProjectIDEnvVar     = "METAL_PROJECT_ID"
-	metalPartitionIDEnvVar   = "METAL_PARTITION_ID"
-	metalClusterIDEnvVar     = "METAL_CLUSTER_ID"
-	metalClusterAPIURLEnvVar = "METAL_CLUSTER_API_URL"
-
-	firewallHealthTimeout = "FIREWALL_HEALTH_TIMEOUT"
+	// nolint
+	metalAuthTokenEnvVar   = "METAL_AUTH_TOKEN"
+	metalAuthHMACEnvVar    = "METAL_AUTH_HMAC"
+	metalProjectIDEnvVar   = "METAL_PROJECT_ID"
+	metalPartitionIDEnvVar = "METAL_PARTITION_ID"
 )
 
 func getMetalClient() (metalgo.Client, error) {
