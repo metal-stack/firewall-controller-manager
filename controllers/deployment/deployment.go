@@ -19,12 +19,10 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	mn "github.com/metal-stack/metal-lib/pkg/net"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-go/api/client/image"
-	"github.com/metal-stack/metal-go/api/models"
 
 	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
@@ -142,10 +140,56 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		}
 	}
 
-	// FIXME: implement
-	// goal: always have one set doing it's job properly (most recent), try to scale down / delete the rest according to strategy
-	if len(ownedSets) == 0 {
+	lastSet, err := controllers.MaxRevisionOf(ownedSets)
+	if err != nil {
+		return err
+	}
+
+	if lastSet == nil {
 		_, err := r.createFirewallSet(ctx, deploy)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	oldSets := controllers.Except(ownedSets, lastSet)
+
+	newSetRequired, err := r.isNewSetRequired(ctx, deploy, lastSet)
+	if err != nil {
+		return err
+	}
+
+	if !newSetRequired {
+		lastUserdata := lastSet.Spec.Template.Spec.Userdata
+
+		lastSet.Spec.Replicas = deploy.Spec.Replicas
+		lastSet.Spec.Template = deploy.Spec.Template
+		lastSet.Spec.Template.Spec.Userdata = lastUserdata
+
+		err = r.Seed.Update(ctx, lastSet, &client.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to update firewall set : %w", err)
+		}
+	} else {
+		// this is recreate strategy: TODO implement rolling update
+
+		r.Log.Info("significant changes detected in the spec, creating new firewall set")
+		newSet, err := r.createFirewallSet(ctx, deploy)
+		if err != nil {
+			return err
+		}
+		r.Log.Info("created new firewall set", "name", newSet.Name)
+
+		oldSets = append(oldSets, lastSet.DeepCopy())
+	}
+
+	for _, oldSet := range oldSets {
+		r.Log.Info("deleting old firewall set", "name", oldSet.Name)
+
+		oldSet := oldSet
+		err = r.Seed.Delete(ctx, oldSet, &client.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -194,61 +238,44 @@ func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v2.FirewallDeplo
 	return nil
 }
 
-func (r *Reconciler) isNewSetRequired(ctx context.Context, fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
-	ok, err := sizeHasChanged(fwd, fw)
+func (r *Reconciler) isNewSetRequired(ctx context.Context, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
+	ok := sizeHasChanged(deploy, lastSet)
+	if ok {
+		r.Log.Info("firewall size has changed", "size", deploy.Spec.Template.Spec.Size)
+		return ok, nil
+	}
+
+	ok, err := osImageHasChanged(ctx, r.Metal, deploy, lastSet)
 	if err != nil {
 		return false, err
 	}
 	if ok {
-		r.Log.Info("firewall size has changed", "size", fwd.Spec.Template.Spec.Size)
+		r.Log.Info("firewall image has changed", "image", deploy.Spec.Template.Spec.Image)
 		return ok, nil
 	}
 
-	ok, err = osImageHasChanged(ctx, r.Metal, fwd, fw)
-	if err != nil {
-		return false, err
-	}
+	ok = networksHaveChanged(deploy, lastSet)
 	if ok {
-		r.Log.Info("firewall image has changed", "image", fwd.Spec.Template.Spec.Image)
-		return ok, nil
-	}
-
-	ok = networksHaveChanged(fwd, fw)
-	if ok {
-		r.Log.Info("firewall networks have changed", "networks", fwd.Spec.Template.Spec.Networks)
+		r.Log.Info("firewall networks have changed", "networks", deploy.Spec.Template.Spec.Networks)
 		return ok, nil
 	}
 
 	return false, nil
 }
 
-func sizeHasChanged(fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
-	if fw.ID == nil {
-		return false, fmt.Errorf("firewall id is nil")
-	}
-	if fw.Size == nil || fw.Size.ID == nil {
-		return false, fmt.Errorf("firewall size is nil")
-	}
-
-	return *fw.Size.ID != fwd.Spec.Template.Spec.Size, nil
+func sizeHasChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
+	return lastSet.Spec.Template.Spec.Size != deploy.Spec.Template.Spec.Size
 }
 
-func osImageHasChanged(ctx context.Context, m metalgo.Client, fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
-	if fw.Allocation == nil {
-		return false, fmt.Errorf("firewall allocation is nil")
-	}
-	if fw.Allocation.Image == nil || fw.Allocation.Image.ID == nil {
-		return false, fmt.Errorf("firewall image is nil")
-	}
-
-	if *fw.Allocation.Image.ID != fwd.Spec.Template.Spec.Image {
-		want := fwd.Spec.Template.Spec.Image
+func osImageHasChanged(ctx context.Context, m metalgo.Client, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
+	if lastSet.Spec.Template.Spec.Image != deploy.Spec.Template.Spec.Image {
+		want := deploy.Spec.Template.Spec.Image
 		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(want).WithContext(ctx), nil)
 		if err != nil {
 			return false, fmt.Errorf("latest firewall image not found:%s %w", want, err)
 		}
 
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != *fw.Allocation.Image.ID {
+		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != lastSet.Spec.Template.Spec.Image {
 			return true, nil
 		}
 	}
@@ -256,19 +283,13 @@ func osImageHasChanged(ctx context.Context, m metalgo.Client, fwd *v2.FirewallDe
 	return false, nil
 }
 
-func networksHaveChanged(fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) bool {
+func networksHaveChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
 	currentNetworks := sets.NewString()
-	for _, n := range fw.Allocation.Networks {
-		if *n.Networktype == mn.PrivatePrimaryUnshared || *n.Networktype == mn.PrivatePrimaryShared {
-			continue
-		}
-		if *n.Underlay {
-			continue
-		}
-		currentNetworks.Insert(*n.Networkid)
+	for _, n := range lastSet.Spec.Template.Spec.Networks {
+		currentNetworks.Insert(n)
 	}
 	wantNetworks := sets.NewString()
-	for _, n := range fwd.Spec.Template.Spec.Networks {
+	for _, n := range deploy.Spec.Template.Spec.Networks {
 		wantNetworks.Insert(n)
 	}
 

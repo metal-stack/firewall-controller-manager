@@ -43,3 +43,15 @@ func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	}
 	return result, nil
 }
+
+func Except(sets []*v2.FirewallSet, set *v2.FirewallSet) []*v2.FirewallSet {
+	var result []*v2.FirewallSet
+	for _, s := range sets {
+		s := s
+		if set.UID == s.UID {
+			continue
+		}
+		result = append(result, s)
+	}
+	return result
+}
