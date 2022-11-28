@@ -39,7 +39,7 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./main.go
+	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443
 
 # Install CRDs into a cluster
 install: manifests
@@ -94,4 +94,3 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
-

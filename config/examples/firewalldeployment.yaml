@@ -8,7 +8,7 @@ spec:
   strategy: Recreate
   replicas: 1
   template:
-    size: n1-medium-x86
+    size: v1-small-x86
     image: firewall-ubuntu-2.0
     partitionID: partition-a
     projectID: project-a

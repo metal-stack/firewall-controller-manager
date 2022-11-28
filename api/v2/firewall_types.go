@@ -29,6 +29,8 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Interval",type=string,JSONPath=`.spec.interval`
 // +kubebuilder:printcolumn:name="InternalPrefixes",type=string,JSONPath=`.spec.internalprefixes`
+// +kubebuilder:printcolumn:name="Event",type="string",JSONPath=".status.event"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -102,12 +104,14 @@ type Data struct {
 
 // FirewallStatus defines the observed state of Firewall
 type FirewallStatus struct {
-	Message           string        `json:"message,omitempty"`
-	FirewallStats     FirewallStats `json:"stats"`
-	ControllerVersion string        `json:"controllerVersion,omitempty"`
-	Updated           metav1.Time   `json:"lastRun,omitempty"`
-	MachineID         string        `json:"machineID"`
-	MachineStatus     MachineStatus `json:"machineStatus"`
+	MachineID     string        `json:"machineID"`
+	MachineStatus MachineStatus `json:"machineStatus"`
+
+	LastError string `json:"lastError"`
+
+	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
+	ControllerStatus ControllerStatus `json:"controllerStatus"`
+
 	// FirewallNetworks holds the networks known at the metal-api for this firewall machine
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 }
@@ -118,6 +122,13 @@ type MachineStatus struct {
 	Time                metav1.Time `json:"time"`
 	AllocationTimestamp metav1.Time `json:"allocationTimestamp"`
 	CrashLoop           bool        `json:"crashLoop"`
+}
+
+type ControllerStatus struct {
+	Message           string        `json:"message,omitempty"`
+	FirewallStats     FirewallStats `json:"stats"`
+	ControllerVersion string        `json:"controllerVersion,omitempty"`
+	Updated           metav1.Time   `json:"lastRun,omitempty"`
 }
 
 // FirewallStats contains firewall statistics

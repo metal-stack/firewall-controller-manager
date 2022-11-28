@@ -24,8 +24,10 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/Masterminds/semver"
 	"github.com/go-logr/zapr"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -128,7 +130,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	shootClient := mgr.GetClient()
+	var (
+		shootClient     = mgr.GetClient()
+		discoveryClient *discovery.DiscoveryClient
+	)
 	if len(shootKubeconfig) > 0 {
 		shootRestConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: shootKubeconfig},
@@ -143,11 +148,31 @@ func main() {
 			setupLog.Error(err, "unable to create shoot client")
 			os.Exit(1)
 		}
+		discoveryClient, err = discovery.NewDiscoveryClientForConfig(shootRestConfig)
+		if err != nil {
+			setupLog.Error(err, "unable to create shoot discovery client")
+			os.Exit(1)
+		}
+	} else {
+		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(mgr.GetConfig())
 	}
 
 	mclient, err := getMetalClient()
 	if err != nil {
 		setupLog.Error(err, "unable to create metal client")
+		os.Exit(1)
+	}
+
+	version, err := discoveryClient.ServerVersion()
+	if err != nil {
+		setupLog.Error(err, "unable to discover server version")
+		os.Exit(1)
+	}
+
+	setupLog.Info("shoot kubernetes version", "version", version.String())
+	k8sVersion, err := semver.NewVersion(version.GitVersion)
+	if err != nil {
+		setupLog.Error(err, "unable to parse kubernetes version version")
 		os.Exit(1)
 	}
 
@@ -160,6 +185,7 @@ func main() {
 		ClusterID:     clusterID,
 		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 		ClusterAPIURL: clusterApiURL,
+		K8sVersion:    k8sVersion,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
 		os.Exit(1)

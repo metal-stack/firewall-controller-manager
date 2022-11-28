@@ -28,6 +28,10 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fwdeploy
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
+// +kubebuilder:printcolumn:name="Progressing",type=integer,JSONPath=`.status.progressingReplicas`
+// +kubebuilder:printcolumn:name="Unhealthy",type=integer,JSONPath=`.status.unhealthyReplicas`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type FirewallDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

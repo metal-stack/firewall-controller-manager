@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/semver"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ type Reconciler struct {
 	Seed          client.Client
 	Shoot         client.Client
 	Metal         metalgo.Client
+	K8sVersion    *semver.Version
 	Log           logr.Logger
 	Namespace     string
 	ClusterID     string
@@ -52,71 +54,65 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile the Firewall CRD
 // +kubebuilder:rbac:groups=metal-stack.io,resources=firewall,verbs=get;list;watch;create;update;patch;delete
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("firewalldeployment", req.NamespacedName)
-	requeue := ctrl.Result{
-		RequeueAfter: time.Second * 10,
-	}
-
-	log.Info("running in", "namespace", req.Namespace, "configured for", r.Namespace)
 	if req.Namespace != r.Namespace {
 		return ctrl.Result{}, nil
 	}
 
 	err := r.ensureFirewallControllerRBAC(ctx)
 	if err != nil {
-		return requeue, err
+		return ctrl.Result{}, err
 	}
 
 	deploy := &v2.FirewallDeployment{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, deploy, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("no firewalldeployment defined")
+			r.Log.Info("firewall deployment resource no longer exists")
 			return ctrl.Result{}, nil
 		}
-		return requeue, err
+
+		return ctrl.Result{}, err
 	}
 
 	err = deploy.Validate() // TODO: add a validating webhook to perform this validation immediately (https://book.kubebuilder.io/cronjob-tutorial/webhook-implementation.html)
 	if err != nil {
-		return requeue, err
+		return ctrl.Result{}, err
 	}
 
 	sets := &v2.FirewallSetList{}
 	err = r.Seed.List(ctx, sets, client.InNamespace(r.Namespace))
 	if err != nil {
-		return requeue, err
+		return ctrl.Result{}, err
 	}
 
 	var ownedSets []*v2.FirewallSet
-	for _, s := range sets.Items {
-		s := s
+	for _, set := range sets.Items {
+		set := set
 
-		if !metav1.IsControlledBy(&s, deploy) {
+		if !metav1.IsControlledBy(&set, deploy) {
 			continue
 		}
 
-		ownedSets = append(ownedSets, &s)
-	}
-
-	lastSet, err := controllers.MaxRevisionOf(ownedSets)
-	if err != nil {
-		return requeue, err
+		ownedSets = append(ownedSets, &set)
 	}
 
 	defer func() {
-		err = r.status(ctx, deploy, lastSet)
+		err = r.status(ctx, deploy, ownedSets)
 	}()
 
 	err = r.reconcile(ctx, deploy, ownedSets)
 	if err != nil {
-		r.Log.Error(err, "error occurred during reconcile")
-		return requeue, err
+		r.Log.Error(err, "error occurred during reconcile, requeueing")
+		return ctrl.Result{ //nolint:nilerr
+			RequeueAfter: 10 * time.Second,
+		}, nil
 	}
 
 	return ctrl.Result{}, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeployment, ownedSets []*v2.FirewallSet) error {
+	r.Log.Info("reconciling firewall deployment", "namespace", deploy.Namespace, "owned-set-amount", len(ownedSets))
+
 	if !deploy.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
 			err := r.deleteAllSets(ctx, deploy)
@@ -146,6 +142,8 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	}
 
 	if lastSet == nil {
+		r.Log.Info("no firewall set is present, creating a new one")
+
 		_, err := r.createFirewallSet(ctx, deploy)
 		if err != nil {
 			return fmt.Errorf("unable to create firewall set: %w", err)
@@ -156,12 +154,16 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 
 	oldSets := controllers.Except(ownedSets, lastSet)
 
+	r.Log.Info("firewall sets already exist", "current-set-name", lastSet.Name, "old-set-count", len(oldSets))
+
 	newSetRequired, err := r.isNewSetRequired(ctx, deploy, lastSet)
 	if err != nil {
 		return err
 	}
 
 	if !newSetRequired {
+		r.Log.Info("existing firewall set does not need to be rolled, only updating the resource")
+
 		lastUserdata := lastSet.Spec.Template.Userdata
 
 		lastSet.Spec.Replicas = deploy.Spec.Replicas
@@ -198,18 +200,25 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	return nil
 }
 
-func (r *Reconciler) status(ctx context.Context, deploy *v2.FirewallDeployment, set *v2.FirewallSet) error {
+func (r *Reconciler) status(ctx context.Context, deploy *v2.FirewallDeployment, ownedSets []*v2.FirewallSet) error {
+	r.Log.Info("updating firewall deployment status", "name", deploy.Name, "namespace", deploy.Namespace)
+
 	status := v2.FirewallDeploymentStatus{}
 
-	if set != nil {
-		status.ProgressingReplicas = set.Status.ProgressingReplicas
-		status.UnhealthyReplicas = set.Status.UnhealthyReplicas
-		status.ReadyReplicas = set.Status.ReadyReplicas
+	lastSet, err := controllers.MaxRevisionOf(ownedSets)
+	if err != nil {
+		return err
+	}
+
+	if lastSet != nil {
+		status.ProgressingReplicas = lastSet.Status.ProgressingReplicas
+		status.UnhealthyReplicas = lastSet.Status.UnhealthyReplicas
+		status.ReadyReplicas = lastSet.Status.ReadyReplicas
 	}
 
 	deploy.Status = status
 
-	err := r.Seed.Status().Update(ctx, deploy)
+	err = r.Seed.Status().Update(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
@@ -309,7 +318,7 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 		return nil, err
 	}
 
-	name := deploy.Name + uuid.String()[:5]
+	name := fmt.Sprintf("%s-%s", deploy.Name, uuid.String()[:5])
 
 	set := &v2.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -337,30 +346,57 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 }
 
 func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	err := r.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
-	if err != nil {
-		return "", err
+	var (
+		ca    []byte
+		token string
+	)
+	if controllers.VersionGreaterOrEqual125(r.K8sVersion) {
+		saSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "firewall-controller-seed-access",
+				Namespace: r.Namespace,
+			},
+		}
+		err := r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+
+		token = string(saSecret.Data["token"])
+		ca = saSecret.Data["ca.crt"]
+	} else {
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "firewall-controller-seed-access",
+				Namespace: r.Namespace,
+			},
+		}
+		err := r.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+
+		if len(sa.Secrets) == 0 {
+			return "", fmt.Errorf("service account %q contains no valid token secret", sa.Name)
+		}
+
+		saSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      sa.Secrets[0].Name,
+				Namespace: r.Namespace,
+			},
+		}
+		err = r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+
+		token = string(saSecret.Data["token"])
+		ca = saSecret.Data["ca.crt"]
 	}
 
-	if len(sa.Secrets) == 0 {
-		return "", fmt.Errorf("service account %q contains no valid token secret", sa.Name)
-	}
-
-	saSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sa.Secrets[0].Name,
-			Namespace: r.Namespace,
-		},
-	}
-	err = r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
-	if err != nil {
-		return "", err
+	if token == "" {
+		return "", fmt.Errorf("no token was created")
 	}
 
 	config := &configv1.Config{
@@ -369,7 +405,7 @@ func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
 			{
 				Name: r.Namespace,
 				Cluster: configv1.Cluster{
-					CertificateAuthorityData: saSecret.Data["ca.crt"],
+					CertificateAuthorityData: ca,
 					Server:                   r.ClusterAPIURL,
 				},
 			},
@@ -387,7 +423,7 @@ func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
 			{
 				Name: r.Namespace,
 				AuthInfo: configv1.AuthInfo{
-					Token: string(saSecret.Data["token"]),
+					Token: token,
 				},
 			},
 		},
@@ -402,6 +438,8 @@ func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
 }
 
 func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
+	r.Log.Info("ensuring firewall controller rbac")
+
 	serviceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-controller-seed-access",
@@ -416,6 +454,27 @@ func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
 	})
 	if err != nil {
 		return fmt.Errorf("error ensuring service account: %w", err)
+	}
+
+	if controllers.VersionGreaterOrEqual125(r.K8sVersion) {
+		serviceAccountSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "firewall-controller-seed-access",
+				Namespace: r.Namespace,
+			},
+		}
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Seed, serviceAccountSecret, func() error {
+			serviceAccountSecret.Annotations = map[string]string{
+				"kubernetes.io/service-account.name": serviceAccount.Name,
+			}
+			serviceAccountSecret.Type = corev1.SecretTypeServiceAccountToken
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("error ensuring service account token secret: %w", err)
+		}
+
 	}
 
 	role := &rbac.Role{

@@ -17,7 +17,20 @@ spec:
     singular: firewalldeployment
   scope: Namespaced
   versions:
-  - name: v2
+  - additionalPrinterColumns:
+    - jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
+    - jsonPath: .status.progressingReplicas
+      name: Progressing
+      type: integer
+    - jsonPath: .status.unhealthyReplicas
+      name: Unhealthy
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2
     schema:
       openAPIV3Schema:
         properties:

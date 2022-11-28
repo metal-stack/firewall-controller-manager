@@ -34,6 +34,10 @@ func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	var result *v2.FirewallSet
 	max := int64(0)
 	for _, set := range sets {
+		set := set
+		if result == nil {
+			result = set
+		}
 		if v, err := Revision(set); err != nil {
 			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
 		} else if v > max {

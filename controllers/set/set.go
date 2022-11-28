@@ -48,12 +48,6 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile the Firewall CRD
 // +kubebuilder:rbac:groups=metal-stack.io,resources=firewall,verbs=get;list;watch;create;update;patch;delete
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("firewallset", req.NamespacedName)
-	requeue := ctrl.Result{
-		RequeueAfter: time.Second * 10,
-	}
-
-	log.Info("running in", "namespace", req.Namespace, "configured for", r.Namespace)
 	if req.Namespace != r.Namespace {
 		return ctrl.Result{}, nil
 	}
@@ -61,21 +55,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	set := &v2.FirewallSet{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, set, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("no firewallset defined")
+			r.Log.Info("firewall set resource no longer exists")
 			return ctrl.Result{}, nil
 		}
-		return requeue, err
+
+		return ctrl.Result{}, err
 	}
 
 	err := set.Validate()
 	if err != nil {
-		return requeue, err
+		return ctrl.Result{}, err
 	}
 
 	fws := &v2.FirewallList{}
 	err = r.Seed.List(ctx, fws, client.InNamespace(r.Namespace))
 	if err != nil {
-		return requeue, err
+		return ctrl.Result{}, err
 	}
 
 	var ownedFirewalls []*v2.Firewall
@@ -95,14 +90,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	err = r.reconcile(ctx, set, ownedFirewalls)
 	if err != nil {
-		r.Log.Error(err, "error occurred during reconcile")
-		return requeue, err
+		r.Log.Error(err, "error occurred during reconcile, requeueing")
+		return ctrl.Result{ //nolint:nilerr
+			RequeueAfter: 10 * time.Second,
+		}, nil
 	}
 
 	return ctrl.Result{}, err
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFirewalls []*v2.Firewall) error {
+	r.Log.Info("reconciling firewall set", "name", set.Name, "namespace", set.Namespace, "owned-firewall-count", len(ownedFirewalls))
+
 	if !set.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(set, controllers.FinalizerName) {
 			err := r.deleteAllFirewallsFromSet(ctx, set)
@@ -214,7 +213,7 @@ func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v2.Firewall
 	for _, fw := range firewalls.Items {
 		fw := fw
 
-		if metav1.IsControlledBy(&fw, set) {
+		if !metav1.IsControlledBy(&fw, set) {
 			continue
 		}
 
@@ -239,7 +238,7 @@ func (r *Reconciler) deleteAllFirewallsFromSet(ctx context.Context, set *v2.Fire
 	for _, fw := range firewalls.Items {
 		fw := fw
 
-		if metav1.IsControlledBy(&fw, set) {
+		if !metav1.IsControlledBy(&fw, set) {
 			continue
 		}
 
@@ -259,7 +258,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 	}
 
 	clusterName := set.Namespace
-	name := clusterName + "-firewall-" + uuid.String()[:5]
+	name := fmt.Sprintf("%s-firewall-%s", clusterName, uuid.String()[:5])
 
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
@@ -284,12 +283,14 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 }
 
 func (r *Reconciler) status(ctx context.Context, set *v2.FirewallSet, fws []*v2.Firewall) error {
+	r.Log.Info("updating firewall set status", "name", set.Name, "namespace", set.Namespace)
+
 	status := v2.FirewallSetStatus{}
 
 	for _, fw := range fws {
 		fw := fw
 
-		if fw.Status.MachineStatus.Event == "Phoned Home" && !fw.Status.Updated.IsZero() {
+		if fw.Status.MachineStatus.Event == "Phoned Home" && !fw.Status.ControllerStatus.Updated.IsZero() {
 			status.ReadyReplicas++
 		} else if fw.Status.MachineStatus.CrashLoop {
 			status.UnhealthyReplicas++
