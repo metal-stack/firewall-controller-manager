@@ -47,14 +47,15 @@ type FirewallList struct {
 
 // FirewallSpec defines the desired state of Firewall
 type FirewallSpec struct {
-	Name          string   `json:"name"`
 	Size          string   `json:"size"`
 	Image         string   `json:"image"`
 	PartitionID   string   `json:"partitionID"`
 	ProjectID     string   `json:"projectID"`
 	Networks      []string `json:"networks"`
-	Userdata      string   `json:"userdata"`
 	SSHPublicKeys []string `json:"sshpublickeys"`
+
+	Name     string `json:"name,omitempty"`
+	Userdata string `json:"userdata,omitempty"`
 
 	// Interval on which rule reconciliation should happen
 	Interval string `json:"interval,omitempty"`

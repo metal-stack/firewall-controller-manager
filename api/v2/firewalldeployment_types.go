@@ -49,14 +49,14 @@ type FirewallUpdateStrategy string
 const (
 	// StrategyRollingUpdate first creates a new firewall, wait's until it is ready and then removes the old one
 	StrategyRollingUpdate = "RollingUpdate"
-	// StrategyReplace removes the old firewall and then creates a new one
-	StrategyReplace = "Replace"
+	// StrategyRecreate removes the old firewall and then creates a new one
+	StrategyRecreate = "Recreate"
 )
 
 type FirewallDeploymentSpec struct {
 	Strategy FirewallUpdateStrategy `json:"strategy"`
 	Replicas int                    `json:"replicas"`
-	Template Firewall               `json:"template"`
+	Template FirewallSpec           `json:"template"`
 }
 
 type FirewallDeploymentStatus struct {
@@ -77,8 +77,14 @@ func (f *FirewallDeployment) Validate() error {
 	if f.Spec.Replicas > 1 {
 		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
 	}
+	if f.Spec.Strategy != StrategyRecreate && f.Spec.Strategy != StrategyRollingUpdate {
+		return fmt.Errorf("unknown strategy: %s", f.Spec.Strategy)
+	}
 
-	if f.Spec.Template.Spec.Userdata != "" {
+	if f.Spec.Template.Name != "" {
+		return fmt.Errorf("name will be set by the controller, cannot be set by the user")
+	}
+	if f.Spec.Template.Userdata != "" {
 		return fmt.Errorf("userdata will be set by the controller, cannot be set by the user")
 	}
 

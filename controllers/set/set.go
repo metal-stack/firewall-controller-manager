@@ -153,7 +153,7 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFi
 
 func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) error {
 	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationProject: set.Spec.Template.Spec.ProjectID,
+		AllocationProject: set.Spec.Template.ProjectID,
 		Tags:              []string{r.ClusterTag, controllers.FirewallSetTag(set.Name)},
 	}).WithContext(ctx), nil)
 	if err != nil {
@@ -269,7 +269,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 				*metav1.NewControllerRef(set, v2.GroupVersion.WithKind("FirewallSet")),
 			},
 		},
-		Spec: set.Spec.Template.Spec,
+		Spec: set.Spec.Template,
 	}
 
 	// TODO: for backwards-compatibility create firewall object in the shoot cluster as well
@@ -289,7 +289,7 @@ func (r *Reconciler) status(ctx context.Context, set *v2.FirewallSet, fws []*v2.
 	for _, fw := range fws {
 		fw := fw
 
-		if fw.Status.MachineStatus.Event == "Phoned Home" {
+		if fw.Status.MachineStatus.Event == "Phoned Home" && !fw.Status.Updated.IsZero() {
 			status.ReadyReplicas++
 		} else if fw.Status.MachineStatus.CrashLoop {
 			status.UnhealthyReplicas++

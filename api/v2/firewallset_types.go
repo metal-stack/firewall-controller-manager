@@ -43,8 +43,8 @@ type FirewallSet struct {
 }
 
 type FirewallSetSpec struct {
-	Replicas int      `json:"replicas"`
-	Template Firewall `json:"template"`
+	Replicas int          `json:"replicas"`
+	Template FirewallSpec `json:"template"`
 }
 
 type FirewallSetStatus struct {

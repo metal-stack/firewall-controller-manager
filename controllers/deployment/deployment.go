@@ -136,7 +136,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	if !controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
 		controllerutil.AddFinalizer(deploy, controllers.FinalizerName)
 		if err := r.Seed.Update(ctx, deploy); err != nil {
-			return err
+			return fmt.Errorf("unable to add finalizer: %w", err)
 		}
 	}
 
@@ -148,7 +148,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	if lastSet == nil {
 		_, err := r.createFirewallSet(ctx, deploy)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to create firewall set: %w", err)
 		}
 
 		return nil
@@ -162,15 +162,15 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	}
 
 	if !newSetRequired {
-		lastUserdata := lastSet.Spec.Template.Spec.Userdata
+		lastUserdata := lastSet.Spec.Template.Userdata
 
 		lastSet.Spec.Replicas = deploy.Spec.Replicas
 		lastSet.Spec.Template = deploy.Spec.Template
-		lastSet.Spec.Template.Spec.Userdata = lastUserdata
+		lastSet.Spec.Template.Userdata = lastUserdata
 
 		err = r.Seed.Update(ctx, lastSet, &client.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("unable to update firewall set : %w", err)
+			return fmt.Errorf("unable to update firewall set: %w", err)
 		}
 	} else {
 		// this is recreate strategy: TODO implement rolling update
@@ -201,9 +201,11 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 func (r *Reconciler) status(ctx context.Context, deploy *v2.FirewallDeployment, set *v2.FirewallSet) error {
 	status := v2.FirewallDeploymentStatus{}
 
-	status.ProgressingReplicas = set.Status.ProgressingReplicas
-	status.UnhealthyReplicas = set.Status.UnhealthyReplicas
-	status.ReadyReplicas = set.Status.ReadyReplicas
+	if set != nil {
+		status.ProgressingReplicas = set.Status.ProgressingReplicas
+		status.UnhealthyReplicas = set.Status.UnhealthyReplicas
+		status.ReadyReplicas = set.Status.ReadyReplicas
+	}
 
 	deploy.Status = status
 
@@ -241,7 +243,7 @@ func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v2.FirewallDeplo
 func (r *Reconciler) isNewSetRequired(ctx context.Context, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
 	ok := sizeHasChanged(deploy, lastSet)
 	if ok {
-		r.Log.Info("firewall size has changed", "size", deploy.Spec.Template.Spec.Size)
+		r.Log.Info("firewall size has changed", "size", deploy.Spec.Template.Size)
 		return ok, nil
 	}
 
@@ -250,13 +252,13 @@ func (r *Reconciler) isNewSetRequired(ctx context.Context, deploy *v2.FirewallDe
 		return false, err
 	}
 	if ok {
-		r.Log.Info("firewall image has changed", "image", deploy.Spec.Template.Spec.Image)
+		r.Log.Info("firewall image has changed", "image", deploy.Spec.Template.Image)
 		return ok, nil
 	}
 
 	ok = networksHaveChanged(deploy, lastSet)
 	if ok {
-		r.Log.Info("firewall networks have changed", "networks", deploy.Spec.Template.Spec.Networks)
+		r.Log.Info("firewall networks have changed", "networks", deploy.Spec.Template.Networks)
 		return ok, nil
 	}
 
@@ -264,18 +266,18 @@ func (r *Reconciler) isNewSetRequired(ctx context.Context, deploy *v2.FirewallDe
 }
 
 func sizeHasChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
-	return lastSet.Spec.Template.Spec.Size != deploy.Spec.Template.Spec.Size
+	return lastSet.Spec.Template.Size != deploy.Spec.Template.Size
 }
 
 func osImageHasChanged(ctx context.Context, m metalgo.Client, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
-	if lastSet.Spec.Template.Spec.Image != deploy.Spec.Template.Spec.Image {
-		want := deploy.Spec.Template.Spec.Image
+	if lastSet.Spec.Template.Image != deploy.Spec.Template.Image {
+		want := deploy.Spec.Template.Image
 		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(want).WithContext(ctx), nil)
 		if err != nil {
 			return false, fmt.Errorf("latest firewall image not found:%s %w", want, err)
 		}
 
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != lastSet.Spec.Template.Spec.Image {
+		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != lastSet.Spec.Template.Image {
 			return true, nil
 		}
 	}
@@ -285,11 +287,11 @@ func osImageHasChanged(ctx context.Context, m metalgo.Client, deploy *v2.Firewal
 
 func networksHaveChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
 	currentNetworks := sets.NewString()
-	for _, n := range lastSet.Spec.Template.Spec.Networks {
+	for _, n := range lastSet.Spec.Template.Networks {
 		currentNetworks.Insert(n)
 	}
 	wantNetworks := sets.NewString()
-	for _, n := range deploy.Spec.Template.Spec.Networks {
+	for _, n := range deploy.Spec.Template.Networks {
 		wantNetworks.Insert(n)
 	}
 
@@ -324,11 +326,11 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 	}
 
 	// TODO: overrides info from the user 🙈
-	set.Spec.Template.Spec.Userdata = userdata
+	set.Spec.Template.Userdata = userdata
 
 	err = r.Seed.Create(ctx, set, &client.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to create firewall resource: %w", err)
+		return nil, fmt.Errorf("unable to create firewall set: %w", err)
 	}
 
 	return set, nil
