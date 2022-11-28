@@ -125,6 +125,15 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFi
 		}
 	}
 
+	for _, fw := range ownedFirewalls {
+		fw.Spec = set.Spec.Template
+
+		err := r.Seed.Update(ctx, fw, &client.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error updating firewall spec: %w", err)
+		}
+	}
+
 	currentAmount := len(ownedFirewalls)
 
 	if currentAmount < set.Spec.Replicas {
@@ -186,11 +195,14 @@ func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) erro
 	}
 
 	for _, fw := range resp.Payload {
-		if _, ok := existingNames[fw.Name]; ok {
+		if fw.Allocation == nil || fw.Allocation.Name == nil {
+			continue
+		}
+		if _, ok := existingNames[*fw.Allocation.Name]; ok {
 			continue
 		}
 
-		r.Log.Info("found orphan firewall, deleting orphan", "name", fw.Name, "id", *fw.ID)
+		r.Log.Info("found orphan firewall, deleting orphan", "name", *fw.Allocation.Name, "id", *fw.ID)
 
 		_, err = r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
 		if err != nil {

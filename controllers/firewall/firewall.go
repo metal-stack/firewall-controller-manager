@@ -254,7 +254,7 @@ func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		r.Log.Info("firewall already deleted")
 		return nil, nil
 	case 1:
-		resp, err := r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(fw.Status.MachineID).WithContext(ctx), nil)
+		resp, err := r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*resp.Payload[0].ID).WithContext(ctx), nil)
 		if err != nil {
 			return nil, fmt.Errorf("firewall delete error: %w", err)
 		}

@@ -231,26 +231,14 @@ func main() {
 const (
 	metalAPIUrlEnvVar = "METAL_API_URL"
 	// nolint
-	metalAuthTokenEnvVar   = "METAL_AUTH_TOKEN"
-	metalAuthHMACEnvVar    = "METAL_AUTH_HMAC"
-	metalProjectIDEnvVar   = "METAL_PROJECT_ID"
-	metalPartitionIDEnvVar = "METAL_PARTITION_ID"
+	metalAuthTokenEnvVar = "METAL_AUTH_TOKEN"
+	metalAuthHMACEnvVar  = "METAL_AUTH_HMAC"
 )
 
 func getMetalClient() (metalgo.Client, error) {
 	url := os.Getenv(metalAPIUrlEnvVar)
 	token := os.Getenv(metalAuthTokenEnvVar)
 	hmac := os.Getenv(metalAuthHMACEnvVar)
-	projectID := os.Getenv(metalProjectIDEnvVar)
-	partitionID := os.Getenv(metalPartitionIDEnvVar)
-
-	if projectID == "" {
-		return nil, fmt.Errorf("environment variable %q is required", metalProjectIDEnvVar)
-	}
-
-	if partitionID == "" {
-		return nil, fmt.Errorf("environment variable %q is required", metalPartitionIDEnvVar)
-	}
 
 	if url == "" {
 		return nil, fmt.Errorf("environment variable %q is required", metalAPIUrlEnvVar)
