@@ -14,10 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	firewallcontrollerv1 "github.com/metal-stack/firewall-controller/api/v1"
-
+	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	v1 "github.com/metal-stack/firewall-controller/api/v1"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/client/machine"
@@ -40,7 +38,7 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&firewallcontrollerv1.Firewall{}).
+		For(&v2.Firewall{}).
 		// TODO: find out if we can filter for owner reference
 		WithEventFilter(pred).
 		Complete(r)
@@ -59,7 +57,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	fw := &firewallcontrollerv1.Firewall{}
+	fw := &v2.Firewall{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, fw, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("no firewall defined")
@@ -81,11 +79,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-func validate(firewall *firewallcontrollerv1.Firewall) error {
+func validate(firewall *v2.Firewall) error {
 	return nil
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, fw *firewallcontrollerv1.Firewall) error {
+func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) error {
 	if !fw.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(fw, controllers.FinalizerName) {
 			_, err := r.deleteFirewall(ctx, fw)
@@ -144,7 +142,7 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *firewallcontrollerv1.Fir
 				return fmt.Errorf("network find error: %w", err)
 			}
 
-			fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v1.FirewallNetwork{
+			fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v2.FirewallNetwork{
 				Asn:                 n.Asn,
 				Destinationprefixes: n.Destinationprefixes,
 				Ips:                 n.Ips,
@@ -156,7 +154,7 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *firewallcontrollerv1.Fir
 			})
 		}
 
-		machineStatus := v1.MachineStatus{}
+		machineStatus := v2.MachineStatus{}
 		if current.Events != nil && len(current.Events.Log) > 0 {
 			log := current.Events.Log[0]
 
@@ -179,7 +177,7 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *firewallcontrollerv1.Fir
 	}
 }
 
-func (r *Reconciler) createFirewall(ctx context.Context, fw *v1.Firewall) (*models.V1FirewallResponse, error) {
+func (r *Reconciler) createFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1FirewallResponse, error) {
 	var networks []*models.V1MachineAllocationNetwork
 	for _, n := range fw.Spec.Networks {
 		n := n
@@ -226,7 +224,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, fw *v1.Firewall) (*mode
 			continue
 		}
 
-		fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v1.FirewallNetwork{
+		fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v2.FirewallNetwork{
 			Asn:                 n.Asn,
 			Destinationprefixes: n.Destinationprefixes,
 			Ips:                 n.Ips,
@@ -246,7 +244,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, fw *v1.Firewall) (*mode
 	return resp.Payload, nil
 }
 
-func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v1.Firewall) (*models.V1MachineResponse, error) {
+func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1MachineResponse, error) {
 	resp, err := r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(fw.Status.MachineID).WithContext(ctx), nil)
 	if err != nil {
 		return nil, fmt.Errorf("firewall delete error: %w", err)

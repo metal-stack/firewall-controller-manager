@@ -16,12 +16,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	firewallcontrollerv1 "github.com/metal-stack/firewall-controller/api/v1"
 	mn "github.com/metal-stack/metal-lib/pkg/net"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/metal-stack/firewall-controller/api/v1"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-go/api/client/image"
 	"github.com/metal-stack/metal-go/api/models"
@@ -43,7 +42,7 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&firewallcontrollerv1.FirewallDeployment{}).
+		For(&v2.FirewallDeployment{}).
 		WithEventFilter(pred).
 		Complete(r)
 }
@@ -66,7 +65,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return requeue, err
 	}
 
-	firewallDeployment := &firewallcontrollerv1.FirewallDeployment{}
+	firewallDeployment := &v2.FirewallDeployment{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, firewallDeployment, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("no firewalldeployment defined")
@@ -88,7 +87,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-func validate(firewalldeployment *firewallcontrollerv1.FirewallDeployment) error {
+func validate(firewalldeployment *v2.FirewallDeployment) error {
 	if firewalldeployment.Spec.Replicas > 1 {
 		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
 	}
@@ -122,12 +121,12 @@ func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Seed, role, func() error {
 		role.Rules = []rbac.PolicyRule{
 			{
-				APIGroups: []string{v1.GroupVersion.String()},
+				APIGroups: []string{v2.GroupVersion.String()},
 				Resources: []string{"firewall"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
-				APIGroups: []string{v1.GroupVersion.String()},
+				APIGroups: []string{v2.GroupVersion.String()},
 				Resources: []string{"firewall/status"},
 				Verbs:     []string{"get", "list", "watch", "update"},
 			},
@@ -166,7 +165,7 @@ func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
 	return nil
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1.FirewallDeployment) error {
+func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeployment) error {
 	if !deploy.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
 			err := r.deleteAllSets(ctx, deploy)
@@ -190,13 +189,13 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1
 		}
 	}
 
-	sets := &v1.FirewallSetList{}
+	sets := &v2.FirewallSetList{}
 	err := r.Seed.List(ctx, sets, client.InNamespace(r.Namespace))
 	if err != nil {
 		return err
 	}
 
-	var ownedSets []*v1.FirewallSet
+	var ownedSets []*v2.FirewallSet
 	for _, s := range sets.Items {
 		s := s
 
@@ -219,8 +218,8 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *firewallcontrollerv1
 	return nil
 }
 
-func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v1.FirewallDeployment) error {
-	sets := v1.FirewallSetList{}
+func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v2.FirewallDeployment) error {
+	sets := v2.FirewallSetList{}
 	err := r.Seed.List(ctx, &sets, client.InNamespace(r.Namespace))
 	if err != nil {
 		return err
@@ -242,7 +241,7 @@ func (r *Reconciler) deleteAllSets(ctx context.Context, deploy *v1.FirewallDeplo
 	return nil
 }
 
-func (r *Reconciler) isNewSetRequired(ctx context.Context, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
+func (r *Reconciler) isNewSetRequired(ctx context.Context, fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
 	ok, err := sizeHasChanged(fwd, fw)
 	if err != nil {
 		return false, err
@@ -270,7 +269,7 @@ func (r *Reconciler) isNewSetRequired(ctx context.Context, fwd *v1.FirewallDeplo
 	return false, nil
 }
 
-func sizeHasChanged(fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
+func sizeHasChanged(fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
 	if fw.ID == nil {
 		return false, fmt.Errorf("firewall id is nil")
 	}
@@ -281,7 +280,7 @@ func sizeHasChanged(fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (
 	return *fw.Size.ID != fwd.Spec.Template.Spec.Size, nil
 }
 
-func osImageHasChanged(ctx context.Context, m metalgo.Client, fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
+func osImageHasChanged(ctx context.Context, m metalgo.Client, fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) (bool, error) {
 	if fw.Allocation == nil {
 		return false, fmt.Errorf("firewall allocation is nil")
 	}
@@ -304,7 +303,7 @@ func osImageHasChanged(ctx context.Context, m metalgo.Client, fwd *v1.FirewallDe
 	return false, nil
 }
 
-func networksHaveChanged(fwd *v1.FirewallDeployment, fw *models.V1FirewallResponse) bool {
+func networksHaveChanged(fwd *v2.FirewallDeployment, fw *models.V1FirewallResponse) bool {
 	currentNetworks := sets.NewString()
 	for _, n := range fw.Allocation.Networks {
 		if *n.Networktype == mn.PrivatePrimaryUnshared || *n.Networktype == mn.PrivatePrimaryShared {
@@ -323,7 +322,7 @@ func networksHaveChanged(fwd *v1.FirewallDeployment, fw *models.V1FirewallRespon
 	return !currentNetworks.Equal(wantNetworks)
 }
 
-func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v1.FirewallDeployment) (*v1.FirewallSet, error) {
+func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallDeployment) (*v2.FirewallSet, error) {
 	uuid, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
@@ -331,15 +330,15 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v1.FirewallD
 
 	name := deploy.Name + uuid.String()[:5]
 
-	fw := &v1.FirewallSet{
+	fw := &v2.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: deploy.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(deploy, v1.GroupVersion.WithKind("FirewallDeployment")),
+				*metav1.NewControllerRef(deploy, v2.GroupVersion.WithKind("FirewallDeployment")),
 			},
 		},
-		Spec: v1.FirewallSetSpec{
+		Spec: v2.FirewallSetSpec{
 			Replicas: deploy.Spec.Replicas,
 			Template: deploy.Spec.Template,
 		},

@@ -16,11 +16,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	firewallcontrollerv1 "github.com/metal-stack/firewall-controller/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/metal-stack/firewall-controller/api/v1"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/models"
@@ -45,7 +44,7 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&firewallcontrollerv1.FirewallSet{}).
+		For(&v2.FirewallSet{}).
 		WithEventFilter(pred).
 		Complete(r)
 }
@@ -63,7 +62,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	firewallSet := &firewallcontrollerv1.FirewallSet{}
+	firewallSet := &v2.FirewallSet{}
 	if err := r.Seed.Get(ctx, req.NamespacedName, firewallSet, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("no firewallset defined")
@@ -85,11 +84,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-func validate(firewallset *firewallcontrollerv1.FirewallSet) error {
+func validate(firewallset *v2.FirewallSet) error {
 	return nil
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, set *firewallcontrollerv1.FirewallSet) error {
+func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet) error {
 	if !set.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(set, controllers.FinalizerName) {
 			err := r.deleteAllFirewallsFromSet(ctx, set)
@@ -162,10 +161,10 @@ func (r *Reconciler) reconcile(ctx context.Context, set *firewallcontrollerv1.Fi
 	return nil
 }
 
-func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v1.FirewallSet) (*v1.Firewall, error) {
+func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v2.FirewallSet) (*v2.Firewall, error) {
 	// TODO: should we prefer deleting some firewalls over others?
 
-	firewalls := v1.FirewallList{}
+	firewalls := v2.FirewallList{}
 	err := r.Seed.List(ctx, &firewalls, client.InNamespace(r.Namespace))
 	if err != nil {
 		return nil, err
@@ -189,8 +188,8 @@ func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v1.Firewall
 	return nil, fmt.Errorf("no firewall found for deletion")
 }
 
-func (r *Reconciler) deleteAllFirewallsFromSet(ctx context.Context, set *v1.FirewallSet) error {
-	firewalls := v1.FirewallList{}
+func (r *Reconciler) deleteAllFirewallsFromSet(ctx context.Context, set *v2.FirewallSet) error {
+	firewalls := v2.FirewallList{}
 	err := r.Seed.List(ctx, &firewalls, client.InNamespace(r.Namespace))
 	if err != nil {
 		return err
@@ -277,7 +276,7 @@ func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
 	return renderUserdata(kubeconfig)
 }
 
-func (r *Reconciler) createFirewall(ctx context.Context, set *v1.FirewallSet) (*v1.Firewall, error) {
+func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*v2.Firewall, error) {
 	uuid, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
@@ -286,12 +285,12 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v1.FirewallSet) (*
 	clusterName := set.Namespace
 	name := clusterName + "-firewall-" + uuid.String()[:5]
 
-	fw := &v1.Firewall{
+	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: set.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(set, v1.GroupVersion.WithKind("FirewallSet")),
+				*metav1.NewControllerRef(set, v2.GroupVersion.WithKind("FirewallSet")),
 			},
 		},
 		Spec: set.Spec.Template.Spec,
