@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,6 +25,9 @@ import (
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-go/api/client/image"
 	"github.com/metal-stack/metal-go/api/models"
+
+	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // Reconciler reconciles a Firewall object
@@ -42,7 +46,7 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v2.FirewallDeployment{}).
+		For(&v2.FirewallDeployment{}). // TODO: trigger a reconcile also for firewallset status updates
 		WithEventFilter(pred).
 		Complete(r)
 }
@@ -65,8 +69,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return requeue, err
 	}
 
-	firewallDeployment := &v2.FirewallDeployment{}
-	if err := r.Seed.Get(ctx, req.NamespacedName, firewallDeployment, &client.GetOptions{}); err != nil {
+	deploy := &v2.FirewallDeployment{}
+	if err := r.Seed.Get(ctx, req.NamespacedName, deploy, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("no firewalldeployment defined")
 			return ctrl.Result{}, nil
@@ -74,98 +78,47 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return requeue, err
 	}
 
-	err = validate(firewallDeployment)
+	err = deploy.Validate() // TODO: add a validating webhook to perform this validation immediately (https://book.kubebuilder.io/cronjob-tutorial/webhook-implementation.html)
 	if err != nil {
 		return requeue, err
 	}
 
-	err = r.reconcile(ctx, firewallDeployment)
+	sets := &v2.FirewallSetList{}
+	err = r.Seed.List(ctx, sets, client.InNamespace(r.Namespace))
 	if err != nil {
 		return requeue, err
 	}
 
-	return ctrl.Result{}, nil
+	var ownedSets []*v2.FirewallSet
+	for _, s := range sets.Items {
+		s := s
+
+		if !metav1.IsControlledBy(&s, deploy) {
+			continue
+		}
+
+		ownedSets = append(ownedSets, &s)
+	}
+
+	lastSet, err := controllers.MaxRevisionOf(ownedSets)
+	if err != nil {
+		return requeue, err
+	}
+
+	defer func() {
+		err = r.status(ctx, deploy, lastSet)
+	}()
+
+	err = r.reconcile(ctx, deploy, ownedSets)
+	if err != nil {
+		r.Log.Error(err, "error occurred during reconcile")
+		return requeue, err
+	}
+
+	return ctrl.Result{}, err
 }
 
-func validate(firewalldeployment *v2.FirewallDeployment) error {
-	if firewalldeployment.Spec.Replicas > 1 {
-		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
-	}
-
-	return nil
-}
-
-func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
-	serviceAccount := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Seed, serviceAccount, func() error {
-		serviceAccount.Labels = map[string]string{
-			"token-invalidator.resources.gardener.cloud/skip": "true",
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error ensuring service account: %w", err)
-	}
-
-	role := &rbac.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Seed, role, func() error {
-		role.Rules = []rbac.PolicyRule{
-			{
-				APIGroups: []string{v2.GroupVersion.String()},
-				Resources: []string{"firewall"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{v2.GroupVersion.String()},
-				Resources: []string{"firewall/status"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error ensuring role: %w", err)
-	}
-
-	roleBinding := &rbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Seed, roleBinding, func() error {
-		roleBinding.RoleRef = rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "Role",
-			Name:     "firewall-controller-seed-access",
-		}
-		roleBinding.Subjects = []rbac.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "firewall-controller-seed-access",
-				Namespace: r.Namespace,
-			},
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error ensuring role binding: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeployment) error {
+func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeployment, ownedSets []*v2.FirewallSet) error {
 	if !deploy.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(deploy, controllers.FinalizerName) {
 			err := r.deleteAllSets(ctx, deploy)
@@ -189,23 +142,6 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		}
 	}
 
-	sets := &v2.FirewallSetList{}
-	err := r.Seed.List(ctx, sets, client.InNamespace(r.Namespace))
-	if err != nil {
-		return err
-	}
-
-	var ownedSets []*v2.FirewallSet
-	for _, s := range sets.Items {
-		s := s
-
-		if !metav1.IsControlledBy(&s, deploy) {
-			continue
-		}
-
-		ownedSets = append(ownedSets, &s)
-	}
-
 	// FIXME: implement
 	// goal: always have one set doing it's job properly (most recent), try to scale down / delete the rest according to strategy
 	if len(ownedSets) == 0 {
@@ -213,6 +149,23 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (r *Reconciler) status(ctx context.Context, deploy *v2.FirewallDeployment, set *v2.FirewallSet) error {
+	status := v2.FirewallDeploymentStatus{}
+
+	status.ProgressingReplicas = set.Status.ProgressingReplicas
+	status.UnhealthyReplicas = set.Status.UnhealthyReplicas
+	status.ReadyReplicas = set.Status.ReadyReplicas
+
+	deploy.Status = status
+
+	err := r.Seed.Status().Update(ctx, deploy)
+	if err != nil {
+		return fmt.Errorf("error updating status: %w", err)
 	}
 
 	return nil
@@ -328,9 +281,14 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 		return nil, err
 	}
 
+	userdata, err := r.createUserdata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	name := deploy.Name + uuid.String()[:5]
 
-	fw := &v2.FirewallSet{
+	set := &v2.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: deploy.Namespace,
@@ -344,10 +302,148 @@ func (r *Reconciler) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 		},
 	}
 
-	err = r.Seed.Create(ctx, fw, &client.CreateOptions{})
+	// TODO: overrides info from the user 🙈
+	set.Spec.Template.Spec.Userdata = userdata
+
+	err = r.Seed.Create(ctx, set, &client.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create firewall resource: %w", err)
 	}
 
-	return fw, nil
+	return set, nil
+}
+
+func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: r.Namespace,
+		},
+	}
+	err := r.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	if len(sa.Secrets) == 0 {
+		return "", fmt.Errorf("service account %q contains no valid token secret", sa.Name)
+	}
+
+	saSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sa.Secrets[0].Name,
+			Namespace: r.Namespace,
+		},
+	}
+	err = r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	config := &configv1.Config{
+		CurrentContext: r.Namespace,
+		Clusters: []configv1.NamedCluster{
+			{
+				Name: r.Namespace,
+				Cluster: configv1.Cluster{
+					CertificateAuthorityData: saSecret.Data["ca.crt"],
+					Server:                   r.ClusterAPIURL,
+				},
+			},
+		},
+		Contexts: []configv1.NamedContext{
+			{
+				Name: r.Namespace,
+				Context: configv1.Context{
+					Cluster:  r.Namespace,
+					AuthInfo: r.Namespace,
+				},
+			},
+		},
+		AuthInfos: []configv1.NamedAuthInfo{
+			{
+				Name: r.Namespace,
+				AuthInfo: configv1.AuthInfo{
+					Token: string(saSecret.Data["token"]),
+				},
+			},
+		},
+	}
+
+	kubeconfig, err := runtime.Encode(configlatest.Codec, config)
+	if err != nil {
+		return "", fmt.Errorf("unable to encode kubeconfig for firewall: %w", err)
+	}
+
+	return renderUserdata(kubeconfig)
+}
+
+func (r *Reconciler) ensureFirewallControllerRBAC(ctx context.Context) error {
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: r.Namespace,
+		},
+	}
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Seed, serviceAccount, func() error {
+		serviceAccount.Labels = map[string]string{
+			"token-invalidator.resources.gardener.cloud/skip": "true",
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring service account: %w", err)
+	}
+
+	role := &rbac.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: r.Namespace,
+		},
+	}
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Seed, role, func() error {
+		role.Rules = []rbac.PolicyRule{
+			{
+				APIGroups: []string{v2.GroupVersion.String()},
+				Resources: []string{"firewall"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{v2.GroupVersion.String()},
+				Resources: []string{"firewall/status"},
+				Verbs:     []string{"get", "list", "watch", "update"},
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring role: %w", err)
+	}
+
+	roleBinding := &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: r.Namespace,
+		},
+	}
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Seed, roleBinding, func() error {
+		roleBinding.RoleRef = rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "Role",
+			Name:     "firewall-controller-seed-access",
+		}
+		roleBinding.Subjects = []rbac.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "firewall-controller-seed-access",
+				Namespace: r.Namespace,
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring role binding: %w", err)
+	}
+
+	return nil
 }

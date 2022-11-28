@@ -17,6 +17,8 @@ limitations under the License.
 package v2
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,6 +60,27 @@ type FirewallDeploymentSpec struct {
 }
 
 type FirewallDeploymentStatus struct {
-	Reconciled  bool     `json:"reconciled"`
-	FirewallIDs []string `json:"firewallIDs"`
+	ProgressingReplicas int `json:"progressingReplicas"`
+	ReadyReplicas       int `json:"readyReplicas"`
+	UnhealthyReplicas   int `json:"unhealthyReplicas"`
+}
+
+func (fl *FirewallDeploymentList) Validate() error {
+	for _, f := range fl.Items {
+		return f.Validate()
+	}
+
+	return nil
+}
+
+func (f *FirewallDeployment) Validate() error {
+	if f.Spec.Replicas > 1 {
+		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
+	}
+
+	if f.Spec.Template.Spec.Userdata != "" {
+		return fmt.Errorf("userdata will be set by the controller, cannot be set by the user")
+	}
+
+	return nil
 }

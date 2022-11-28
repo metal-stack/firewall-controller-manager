@@ -48,6 +48,11 @@ type FirewallSetSpec struct {
 }
 
 type FirewallSetStatus struct {
-	Reconciled  bool     `json:"reconciled"`
-	FirewallIDs []string `json:"firewallIDs"`
+	ProgressingReplicas int `json:"progressingReplicas"`
+	ReadyReplicas       int `json:"readyReplicas"`
+	UnhealthyReplicas   int `json:"unhealthyReplicas"`
+}
+
+func (f *FirewallSet) Validate() error {
+	return nil
 }

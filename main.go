@@ -107,6 +107,17 @@ func main() {
 		setupLog.Error(fmt.Errorf("environment variable %q is required", metalClusterAPIURLEnvVar), "error during controller init")
 		os.Exit(1)
 	}
+	firewallHealthTimeoutString := os.Getenv(firewallHealthTimeout)
+	if firewallHealthTimeoutString == "" {
+		setupLog.Error(fmt.Errorf("environment variable %q is required", firewallHealthTimeout), "error during controller init")
+		os.Exit(1)
+	}
+
+	firewallHealthTimeout, err := time.ParseDuration(firewallHealthTimeoutString)
+	if err != nil {
+		setupLog.Error(err, "error during controller init")
+		os.Exit(1)
+	}
 
 	restConfig := ctrl.GetConfigOrDie()
 
@@ -163,14 +174,15 @@ func main() {
 	}
 
 	if err = (&set.Reconciler{
-		Seed:          mgr.GetClient(),
-		Shoot:         shootClient,
-		Metal:         mclient,
-		Log:           ctrl.Log.WithName("controllers").WithName("set"),
-		Namespace:     namespace,
-		ClusterID:     clusterID,
-		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		ClusterAPIURL: apiURL,
+		Seed:                  mgr.GetClient(),
+		Shoot:                 shootClient,
+		Metal:                 mclient,
+		Log:                   ctrl.Log.WithName("controllers").WithName("set"),
+		Namespace:             namespace,
+		ClusterID:             clusterID,
+		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		ClusterAPIURL:         apiURL,
+		FirewallHealthTimeout: firewallHealthTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "set")
 		os.Exit(1)
@@ -207,6 +219,8 @@ const (
 	metalPartitionIDEnvVar   = "METAL_PARTITION_ID"
 	metalClusterIDEnvVar     = "METAL_CLUSTER_ID"
 	metalClusterAPIURLEnvVar = "METAL_CLUSTER_API_URL"
+
+	firewallHealthTimeout = "FIREWALL_HEALTH_TIMEOUT"
 )
 
 func getMetalClient() (metalgo.Client, error) {

@@ -66,44 +66,46 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return requeue, err
 	}
 
-	err := validate(fw)
+	err := fw.Validate()
 	if err != nil {
 		return requeue, err
 	}
 
-	err = r.reconcile(ctx, fw)
+	var current *models.V1FirewallResponse
+	defer func() {
+		err = r.status(ctx, fw, current)
+	}()
+
+	current, err = r.reconcile(ctx, fw)
 	if err != nil {
+		r.Log.Error(err, "error occurred during reconcile")
 		return requeue, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
-func validate(firewall *v2.Firewall) error {
-	return nil
-}
-
-func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) error {
+func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) (*models.V1FirewallResponse, error) {
 	if !fw.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(fw, controllers.FinalizerName) {
 			_, err := r.deleteFirewall(ctx, fw)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			controllerutil.RemoveFinalizer(fw, controllers.FinalizerName)
 			if err := r.Seed.Update(ctx, fw); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
-		return nil
+		return nil, nil
 	}
 
 	if !controllerutil.ContainsFinalizer(fw, controllers.FinalizerName) {
 		controllerutil.AddFinalizer(fw, controllers.FinalizerName)
 		if err := r.Seed.Update(ctx, fw); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -113,68 +115,79 @@ func (r *Reconciler) reconcile(ctx context.Context, fw *v2.Firewall) error {
 		Tags:              []string{r.ClusterTag},
 	}).WithContext(ctx), nil)
 	if err != nil {
-		return fmt.Errorf("firewall find error: %w", err)
+		return nil, fmt.Errorf("firewall find error: %w", err)
 	}
 
 	switch len(resp.Payload) {
 	case 0:
-		_, err := r.createFirewall(ctx, fw)
-		return err
+		current, err := r.createFirewall(ctx, fw)
+		return current, err
 	case 1:
-		current := resp.Payload[0]
-
-		// check whether network prefixes were updated in metal-api
-		// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
-		// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
-		//
-		// we replace the prefixes from the snapshot with the actual prefixes that are currently attached to the network.
-		// this allows dynamic prefix reconfiguration of the firewall.
-		fw.Status.FirewallNetworks = nil
-		for _, n := range current.Allocation.Networks {
-			n := n
-			if n.Networkid == nil {
-				continue
-			}
-
-			// TODO: network calls could be expensive, maybe add a cache for it
-			nwResp, err := r.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(*n.Networkid), nil)
-			if err != nil {
-				return fmt.Errorf("network find error: %w", err)
-			}
-
-			fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v2.FirewallNetwork{
-				Asn:                 n.Asn,
-				Destinationprefixes: n.Destinationprefixes,
-				Ips:                 n.Ips,
-				Nat:                 n.Nat,
-				Networkid:           n.Networkid,
-				Networktype:         n.Networktype,
-				Prefixes:            nwResp.Payload.Prefixes,
-				Vrf:                 n.Vrf,
-			})
-		}
-
-		machineStatus := v2.MachineStatus{}
-		if current.Events != nil && len(current.Events.Log) > 0 {
-			log := current.Events.Log[0]
-
-			if log.Event != nil {
-				machineStatus.Event = *log.Event
-			}
-			machineStatus.Message = log.Message
-			machineStatus.Time = metav1.NewTime(time.Time(log.Time))
-		}
-		fw.Status.MachineStatus = machineStatus
-
-		err = r.Seed.Status().Update(ctx, fw)
-		if err != nil {
-			return fmt.Errorf("error updating status: %w", err)
-		}
-
-		return nil
+		return resp.Payload[0], nil
 	default:
-		return fmt.Errorf("multiple firewalls found")
+		return nil, fmt.Errorf("multiple firewalls found")
 	}
+}
+
+func (r *Reconciler) status(ctx context.Context, fw *v2.Firewall, current *models.V1FirewallResponse) error {
+	if current == nil {
+		return nil
+	}
+
+	// check whether network prefixes were updated in metal-api
+	// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
+	// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
+	//
+	// we replace the prefixes from the snapshot with the actual prefixes that are currently attached to the network.
+	// this allows dynamic prefix reconfiguration of the firewall.
+	fw.Status.FirewallNetworks = nil
+	for _, n := range current.Allocation.Networks {
+		n := n
+		if n.Networkid == nil {
+			continue
+		}
+
+		// TODO: network calls could be expensive, maybe add a cache for it
+		nwResp, err := r.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(*n.Networkid), nil)
+		if err != nil {
+			return fmt.Errorf("network find error: %w", err)
+		}
+
+		fw.Status.FirewallNetworks = append(fw.Status.FirewallNetworks, v2.FirewallNetwork{
+			Asn:                 n.Asn,
+			Destinationprefixes: n.Destinationprefixes,
+			Ips:                 n.Ips,
+			Nat:                 n.Nat,
+			Networkid:           n.Networkid,
+			Networktype:         n.Networktype,
+			Prefixes:            nwResp.Payload.Prefixes,
+			Vrf:                 n.Vrf,
+		})
+	}
+
+	machineStatus := v2.MachineStatus{}
+	if current.Events != nil && len(current.Events.Log) > 0 {
+		log := current.Events.Log[0]
+
+		if log.Event != nil {
+			machineStatus.Event = *log.Event
+		}
+		machineStatus.Message = log.Message
+		machineStatus.Time = metav1.NewTime(time.Time(log.Time))
+
+		if current.Events.CrashLoop != nil {
+			machineStatus.CrashLoop = *current.Events.CrashLoop
+		}
+	}
+
+	fw.Status.MachineStatus = machineStatus
+
+	err := r.Seed.Status().Update(ctx, fw)
+	if err != nil {
+		return fmt.Errorf("error updating status: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Reconciler) createFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1FirewallResponse, error) {

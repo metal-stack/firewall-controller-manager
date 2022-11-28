@@ -8,43 +8,39 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	corev1 "k8s.io/api/core/v1"
-
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/machine"
+	"github.com/metal-stack/metal-go/api/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/models"
-
-	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
-	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // Reconciler reconciles a Firewall object
 type Reconciler struct {
-	Seed          client.Client
-	Shoot         client.Client
-	Metal         metalgo.Client
-	Log           logr.Logger
-	Namespace     string
-	ClusterID     string
-	ClusterTag    string
-	ClusterAPIURL string
+	Seed                  client.Client
+	Shoot                 client.Client
+	Metal                 metalgo.Client
+	Log                   logr.Logger
+	Namespace             string
+	ClusterID             string
+	ClusterTag            string
+	ClusterAPIURL         string
+	FirewallHealthTimeout time.Duration
 }
 
 // SetupWithManager boilerplate to setup the Reconciler
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{} // prevents reconcile on status sub resource update
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v2.FirewallSet{}).
+		For(&v2.FirewallSet{}). // TODO: trigger a reconcile also for firewall status updates
 		WithEventFilter(pred).
 		Complete(r)
 }
@@ -62,8 +58,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	firewallSet := &v2.FirewallSet{}
-	if err := r.Seed.Get(ctx, req.NamespacedName, firewallSet, &client.GetOptions{}); err != nil {
+	set := &v2.FirewallSet{}
+	if err := r.Seed.Get(ctx, req.NamespacedName, set, &client.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("no firewallset defined")
 			return ctrl.Result{}, nil
@@ -71,24 +67,42 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return requeue, err
 	}
 
-	err := validate(firewallSet)
+	err := set.Validate()
 	if err != nil {
 		return requeue, err
 	}
 
-	err = r.reconcile(ctx, firewallSet)
+	fws := &v2.FirewallList{}
+	err = r.Seed.List(ctx, fws, client.InNamespace(r.Namespace))
 	if err != nil {
 		return requeue, err
 	}
 
-	return ctrl.Result{}, nil
+	var ownedFirewalls []*v2.Firewall
+	for _, fw := range fws.Items {
+		fw := fw
+
+		if !metav1.IsControlledBy(&fw, set) {
+			continue
+		}
+
+		ownedFirewalls = append(ownedFirewalls, &fw)
+	}
+
+	defer func() {
+		err = r.status(ctx, set, ownedFirewalls)
+	}()
+
+	err = r.reconcile(ctx, set, ownedFirewalls)
+	if err != nil {
+		r.Log.Error(err, "error occurred during reconcile")
+		return requeue, err
+	}
+
+	return ctrl.Result{}, err
 }
 
-func validate(firewallset *v2.FirewallSet) error {
-	return nil
-}
-
-func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet) error {
+func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFirewalls []*v2.Firewall) error {
 	if !set.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(set, controllers.FinalizerName) {
 			err := r.deleteAllFirewallsFromSet(ctx, set)
@@ -112,29 +126,9 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet) error {
 		}
 	}
 
-	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationProject: set.Spec.Template.Spec.ProjectID,
-		Tags:              []string{r.ClusterTag, controllers.FirewallSetTag(set.Name)},
-	}).WithContext(ctx), nil)
-	if err != nil {
-		return err
-	}
-
-	currentAmount := len(resp.Payload)
-
-	if currentAmount == set.Spec.Replicas {
-		return nil
-	}
+	currentAmount := len(ownedFirewalls)
 
 	if currentAmount < set.Spec.Replicas {
-		userdata, err := r.createUserdata(ctx)
-		if err != nil {
-			return err
-		}
-
-		// TODO: overrides info from the user 🙈
-		set.Spec.Template.Spec.Userdata = userdata
-
 		for i := currentAmount; i < set.Spec.Replicas; i++ {
 			fw, err := r.createFirewall(ctx, set)
 			if err != nil {
@@ -142,8 +136,6 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet) error {
 			}
 			r.Log.Info("firewall created", "name", fw.Name)
 		}
-
-		return nil
 	}
 
 	if currentAmount > set.Spec.Replicas {
@@ -154,8 +146,57 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet) error {
 			}
 			r.Log.Info("firewall deleted", "name", fw.Name)
 		}
+	}
 
+	return r.checkOrphans(ctx, set)
+}
+
+func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) error {
+	resp, err := r.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+		AllocationProject: set.Spec.Template.Spec.ProjectID,
+		Tags:              []string{r.ClusterTag, controllers.FirewallSetTag(set.Name)},
+	}).WithContext(ctx), nil)
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Payload) == 0 {
 		return nil
+	}
+
+	fws := &v2.FirewallList{}
+	err = r.Seed.List(ctx, fws, client.InNamespace(r.Namespace))
+	if err != nil {
+		return err
+	}
+
+	var ownedFirewalls []*v2.Firewall
+	for _, fw := range fws.Items {
+		fw := fw
+
+		if !metav1.IsControlledBy(&fw, set) {
+			continue
+		}
+
+		ownedFirewalls = append(ownedFirewalls, &fw)
+	}
+
+	existingNames := map[string]bool{}
+	for _, fw := range ownedFirewalls {
+		existingNames[fw.Name] = true
+	}
+
+	for _, fw := range resp.Payload {
+		if _, ok := existingNames[fw.Name]; ok {
+			continue
+		}
+
+		r.Log.Info("found orphan firewall, deleting orphan", "name", fw.Name, "id", *fw.ID)
+
+		_, err = r.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
+		if err != nil {
+			return fmt.Errorf("error deleting orphaned firewall: %w", err)
+		}
 	}
 
 	return nil
@@ -211,71 +252,6 @@ func (r *Reconciler) deleteAllFirewallsFromSet(ctx context.Context, set *v2.Fire
 	return nil
 }
 
-func (r *Reconciler) createUserdata(ctx context.Context) (string, error) {
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: r.Namespace,
-		},
-	}
-	err := r.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	if len(sa.Secrets) == 0 {
-		return "", fmt.Errorf("service account %q contains no valid token secret", sa.Name)
-	}
-
-	saSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sa.Secrets[0].Name,
-			Namespace: r.Namespace,
-		},
-	}
-	err = r.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	config := &configv1.Config{
-		CurrentContext: r.Namespace,
-		Clusters: []configv1.NamedCluster{
-			{
-				Name: r.Namespace,
-				Cluster: configv1.Cluster{
-					CertificateAuthorityData: saSecret.Data["ca.crt"],
-					Server:                   r.ClusterAPIURL,
-				},
-			},
-		},
-		Contexts: []configv1.NamedContext{
-			{
-				Name: r.Namespace,
-				Context: configv1.Context{
-					Cluster:  r.Namespace,
-					AuthInfo: r.Namespace,
-				},
-			},
-		},
-		AuthInfos: []configv1.NamedAuthInfo{
-			{
-				Name: r.Namespace,
-				AuthInfo: configv1.AuthInfo{
-					Token: string(saSecret.Data["token"]),
-				},
-			},
-		},
-	}
-
-	kubeconfig, err := runtime.Encode(configlatest.Codec, config)
-	if err != nil {
-		return "", fmt.Errorf("unable to encode kubeconfig for firewall: %w", err)
-	}
-
-	return renderUserdata(kubeconfig)
-}
-
 func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*v2.Firewall, error) {
 	uuid, err := uuid.NewUUID()
 	if err != nil {
@@ -305,4 +281,31 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 	}
 
 	return fw, nil
+}
+
+func (r *Reconciler) status(ctx context.Context, set *v2.FirewallSet, fws []*v2.Firewall) error {
+	status := v2.FirewallSetStatus{}
+
+	for _, fw := range fws {
+		fw := fw
+
+		if fw.Status.MachineStatus.Event == "Phoned Home" {
+			status.ReadyReplicas++
+		} else if fw.Status.MachineStatus.CrashLoop {
+			status.UnhealthyReplicas++
+		} else if time.Since(fw.Status.MachineStatus.AllocationTimestamp.Time) > r.FirewallHealthTimeout {
+			status.UnhealthyReplicas++
+		} else {
+			status.ProgressingReplicas++
+		}
+	}
+
+	set.Status = status
+
+	err := r.Seed.Status().Update(ctx, set)
+	if err != nil {
+		return fmt.Errorf("error updating status: %w", err)
+	}
+
+	return nil
 }
