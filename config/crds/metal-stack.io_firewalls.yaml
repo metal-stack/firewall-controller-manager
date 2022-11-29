@@ -61,11 +61,12 @@ spec:
                 description: ControllerVersion holds the firewall-controller version
                   to reconcile.
                 type: string
-              dryrun:
+              dryRun:
                 description: DryRun if set to true, firewall rules are not applied
                 type: boolean
               egressRules:
-                description: EgressRules
+                description: EgressRules contains egress rules configured for this
+                  firewall
                 items:
                   description: EgressRuleSNAT holds a Source-NAT rule
                   properties:
@@ -73,27 +74,27 @@ spec:
                       items:
                         type: string
                       type: array
-                    networkid:
+                    networkID:
                       type: string
                   required:
                   - ips
-                  - networkid
+                  - networkID
                   type: object
                 type: array
               image:
+                description: Image is the os image used for the creation of the firewall
                 type: string
-              internalprefixes:
-                description: 'InternalPrefixes specify prefixes which are considered
+              internalPrefixes:
+                description: InternalPrefixes specify prefixes which are considered
                   local to the partition or all regions. Traffic to/from these prefixes
-                  is accounted as internal traffic TODO: align to camel-case - rename
-                  to internalPrefixes'
+                  is accounted as internal traffic
                 items:
                   type: string
                 type: array
               interval:
                 description: Interval on which rule reconciliation should happen
                 type: string
-              ipv4rulefile:
+              ipv4RuleFile:
                 description: TrafficControl defines where to store the generated ipv4
                   firewall rules on disk
                 type: string
@@ -102,12 +103,17 @@ spec:
                   connections in the droptailer log
                 type: boolean
               networks:
+                description: Networks are the networks to which this firewall is connected
                 items:
                   type: string
                 type: array
               partitionID:
+                description: PartitionID is the partition in which the firewall gets
+                  created
                 type: string
               projectID:
+                description: ProjectID is the project for which the firewall gets
+                  created
                 type: string
               rateLimits:
                 description: RateLimits allows configuration of rate limit rules for
@@ -115,7 +121,7 @@ spec:
                 items:
                   description: RateLimit contains the rate limit rule for a network.
                   properties:
-                    networkid:
+                    networkID:
                       description: NetworkID specifies the network which should be
                         rate limited
                       type: string
@@ -124,13 +130,16 @@ spec:
                       format: int32
                       type: integer
                   required:
-                  - networkid
+                  - networkID
                   - rate
                   type: object
                 type: array
               size:
+                description: Size is the size for the firewall to be created
                 type: string
-              sshpublickeys:
+              sshPublicKeys:
+                description: SSHPublicKeys are the public keys which are added to
+                  the firewall's authorized keys file after creation
                 items:
                   type: string
                 type: array
@@ -140,7 +149,7 @@ spec:
             - partitionID
             - projectID
             - size
-            - sshpublickeys
+            - sshPublicKeys
             type: object
           status:
             description: FirewallStatus defines the observed state of Firewall
@@ -182,18 +191,18 @@ spec:
                         description: DeviceStatsByDevice contains DeviceStatistics
                           grouped by device name
                         type: object
-                      idsstats:
+                      idsStats:
                         additionalProperties:
                           properties:
                             drop:
                               type: integer
-                            invalidchecksums:
+                            invalidChecksums:
                               type: integer
                             packets:
                               type: integer
                           required:
                           - drop
-                          - invalidchecksums
+                          - invalidChecksums
                           - packets
                           type: object
                         type: object
@@ -228,21 +237,22 @@ spec:
                         type: object
                     required:
                     - devices
-                    - idsstats
+                    - idsStats
                     - rules
                     type: object
                 required:
                 - stats
                 type: object
               firewallNetworks:
-                description: FirewallNetworks holds the networks known at the metal-api
-                  for this firewall machine
+                description: FirewallNetworks holds refined information about the
+                  networks that this firewall is connected to the information is used
+                  by the firewall-controller in order to reconcile this firewall
                 items:
                   properties:
                     asn:
                       format: int64
                       type: integer
-                    destinationprefixes:
+                    destinationPrefixes:
                       items:
                         type: string
                       type: array
@@ -252,9 +262,9 @@ spec:
                       type: array
                     nat:
                       type: boolean
-                    networkid:
+                    networkID:
                       type: string
-                    networktype:
+                    networkType:
                       type: string
                     prefixes:
                       items:
@@ -265,18 +275,17 @@ spec:
                       type: integer
                   required:
                   - asn
-                  - destinationprefixes
+                  - destinationPrefixes
                   - ips
                   - nat
-                  - networkid
-                  - networktype
+                  - networkID
+                  - networkType
                   - prefixes
                   - vrf
                   type: object
                 type: array
-              lastError:
-                type: string
               machineStatus:
+                description: MachineStatus holds the status of the firewall machine
                 properties:
                   allocationTimestamp:
                     format: date-time
@@ -296,8 +305,7 @@ spec:
                     type: string
                 type: object
             required:
-            - lastError
-            - machineStatus
+            - firewallNetworks
             type: object
           userdata:
             type: string

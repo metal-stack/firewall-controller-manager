@@ -4,22 +4,120 @@ import (
 	"context"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_firewallValidator_ValidateCreate(t *testing.T) {
+	valid := &v2.Firewall{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-123",
+			Namespace: "default",
+		},
+		Spec: v2.FirewallSpec{
+			Interval:          "10s",
+			ControllerURL:     "https://metal-stack.io/controller.img",
+			ControllerVersion: "v",
+			Image:             "image-a",
+			PartitionID:       "partition-a",
+			ProjectID:         "project-a",
+			Size:              "size-a",
+			Networks:          []string{"internet"},
+			EgressRules: []v2.EgressRuleSNAT{
+				{
+					NetworkID: "network-a",
+					IPs:       []string{"1.2.3.4"},
+				},
+			},
+			InternalPrefixes: []string{"1.2.3.0/24"},
+			RateLimits: []v2.RateLimit{
+				{
+					NetworkID: "network-a",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		mutateFn func(f *v2.Firewall) *v2.Firewall
+		wantErr  error
+	}{
+		{
+			name: "valid",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				return f
+			},
+			wantErr: nil,
+		},
+		{
+			name: "networks are empty",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				f.Spec.Networks = nil
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall-123" is invalid: spec.networks: Required value: field is required`,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewFirewallValidator()
+
+			got := v.ValidateCreate(context.TODO(), tt.mutateFn(valid.DeepCopy()))
+			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {
+				t.Errorf("error diff (+got -want):\n %s", diff)
+			}
+		})
+	}
+}
+
+func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
-		f       *v2.Firewall
+		newF    *v2.Firewall
+		oldF    *v2.Firewall
 		wantErr error
 	}{
 		{
 			name: "valid",
-			f: &v2.Firewall{
+			newF: &v2.Firewall{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "firewall-123",
+					Namespace:       "default",
+					ResourceVersion: "1",
+				},
+				Spec: v2.FirewallSpec{
+					Interval:          "10s",
+					ControllerURL:     "https://metal-stack.io/controller.img",
+					ControllerVersion: "v",
+					Image:             "image-a",
+					PartitionID:       "partition-a",
+					ProjectID:         "project-a",
+					Size:              "size-a",
+					Networks:          []string{"internet"},
+					EgressRules: []v2.EgressRuleSNAT{
+						{
+							NetworkID: "network-a",
+							IPs:       []string{"1.2.3.4"},
+						},
+					},
+					InternalPrefixes: []string{"1.2.3.0/24"},
+					RateLimits: []v2.RateLimit{
+						{
+							NetworkID: "network-a",
+						},
+					},
+				},
+			},
+			oldF: &v2.Firewall{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "firewall-123",
 					Namespace: "default",
@@ -33,6 +131,18 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 					ProjectID:         "project-a",
 					Size:              "size-a",
 					Networks:          []string{"internet"},
+					EgressRules: []v2.EgressRuleSNAT{
+						{
+							NetworkID: "network-a",
+							IPs:       []string{"1.2.3.4"},
+						},
+					},
+					InternalPrefixes: []string{"1.2.3.0/24"},
+					RateLimits: []v2.RateLimit{
+						{
+							NetworkID: "network-a",
+						},
+					},
 				},
 			},
 			wantErr: nil,
@@ -43,7 +153,7 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallValidator()
 
-			got := v.ValidateCreate(context.TODO(), tt.f)
+			got := v.ValidateUpdate(context.TODO(), tt.oldF, tt.newF)
 			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}

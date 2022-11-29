@@ -63,11 +63,12 @@ spec:
                     description: ControllerVersion holds the firewall-controller version
                       to reconcile.
                     type: string
-                  dryrun:
+                  dryRun:
                     description: DryRun if set to true, firewall rules are not applied
                     type: boolean
                   egressRules:
-                    description: EgressRules
+                    description: EgressRules contains egress rules configured for
+                      this firewall
                     items:
                       description: EgressRuleSNAT holds a Source-NAT rule
                       properties:
@@ -75,27 +76,28 @@ spec:
                           items:
                             type: string
                           type: array
-                        networkid:
+                        networkID:
                           type: string
                       required:
                       - ips
-                      - networkid
+                      - networkID
                       type: object
                     type: array
                   image:
+                    description: Image is the os image used for the creation of the
+                      firewall
                     type: string
-                  internalprefixes:
-                    description: 'InternalPrefixes specify prefixes which are considered
+                  internalPrefixes:
+                    description: InternalPrefixes specify prefixes which are considered
                       local to the partition or all regions. Traffic to/from these
-                      prefixes is accounted as internal traffic TODO: align to camel-case
-                      - rename to internalPrefixes'
+                      prefixes is accounted as internal traffic
                     items:
                       type: string
                     type: array
                   interval:
                     description: Interval on which rule reconciliation should happen
                     type: string
-                  ipv4rulefile:
+                  ipv4RuleFile:
                     description: TrafficControl defines where to store the generated
                       ipv4 firewall rules on disk
                     type: string
@@ -104,12 +106,18 @@ spec:
                       connections in the droptailer log
                     type: boolean
                   networks:
+                    description: Networks are the networks to which this firewall
+                      is connected
                     items:
                       type: string
                     type: array
                   partitionID:
+                    description: PartitionID is the partition in which the firewall
+                      gets created
                     type: string
                   projectID:
+                    description: ProjectID is the project for which the firewall gets
+                      created
                     type: string
                   rateLimits:
                     description: RateLimits allows configuration of rate limit rules
@@ -117,7 +125,7 @@ spec:
                     items:
                       description: RateLimit contains the rate limit rule for a network.
                       properties:
-                        networkid:
+                        networkID:
                           description: NetworkID specifies the network which should
                             be rate limited
                           type: string
@@ -126,13 +134,16 @@ spec:
                           format: int32
                           type: integer
                       required:
-                      - networkid
+                      - networkID
                       - rate
                       type: object
                     type: array
                   size:
+                    description: Size is the size for the firewall to be created
                     type: string
-                  sshpublickeys:
+                  sshPublicKeys:
+                    description: SSHPublicKeys are the public keys which are added
+                      to the firewall's authorized keys file after creation
                     items:
                       type: string
                     type: array
@@ -142,7 +153,7 @@ spec:
                 - partitionID
                 - projectID
                 - size
-                - sshpublickeys
+                - sshPublicKeys
                 type: object
             required:
             - replicas

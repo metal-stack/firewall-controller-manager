@@ -1,6 +1,7 @@
 package v2
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,31 +32,37 @@ type Firewall struct {
 type FirewallList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Firewall `json:"items"`
+
+	Items []Firewall `json:"items"`
 }
 
 // FirewallSpec defines the desired state of Firewall
 type FirewallSpec struct {
-	Size          string   `json:"size"`
-	Image         string   `json:"image"`
-	PartitionID   string   `json:"partitionID"`
-	ProjectID     string   `json:"projectID"`
-	Networks      []string `json:"networks"`
-	SSHPublicKeys []string `json:"sshpublickeys"`
+	// Size is the size for the firewall to be created
+	Size string `json:"size"`
+	// Image is the os image used for the creation of the firewall
+	Image string `json:"image"`
+	// PartitionID is the partition in which the firewall gets created
+	PartitionID string `json:"partitionID"`
+	// ProjectID is the project for which the firewall gets created
+	ProjectID string `json:"projectID"`
+	// Networks are the networks to which this firewall is connected
+	Networks []string `json:"networks"`
+	// SSHPublicKeys are the public keys which are added to the firewall's authorized keys file after creation
+	SSHPublicKeys []string `json:"sshPublicKeys"`
 
 	// Interval on which rule reconciliation should happen
 	Interval string `json:"interval,omitempty"`
 	// DryRun if set to true, firewall rules are not applied
-	DryRun bool `json:"dryrun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 	// TrafficControl defines where to store the generated ipv4 firewall rules on disk
-	Ipv4RuleFile string `json:"ipv4rulefile,omitempty"`
+	Ipv4RuleFile string `json:"ipv4RuleFile,omitempty"`
 	// RateLimits allows configuration of rate limit rules for interfaces.
 	RateLimits []RateLimit `json:"rateLimits,omitempty"`
 	// InternalPrefixes specify prefixes which are considered local to the partition or all regions.
 	// Traffic to/from these prefixes is accounted as internal traffic
-	// TODO: align to camel-case - rename to internalPrefixes
-	InternalPrefixes []string `json:"internalprefixes,omitempty"`
-	// EgressRules
+	InternalPrefixes []string `json:"internalPrefixes,omitempty"`
+	// EgressRules contains egress rules configured for this firewall
 	EgressRules []EgressRuleSNAT `json:"egressRules,omitempty"`
 
 	// ControllerVersion holds the firewall-controller version to reconcile.
@@ -66,17 +73,57 @@ type FirewallSpec struct {
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
 }
 
+// EgressRuleSNAT holds a Source-NAT rule
+type EgressRuleSNAT struct {
+	NetworkID string   `json:"networkID"`
+	IPs       []string `json:"ips"`
+}
+
+// RateLimit contains the rate limit rule for a network.
+type RateLimit struct {
+	// NetworkID specifies the network which should be rate limited
+	NetworkID string `json:"networkID"`
+	// Rate is the input rate in MiB/s
+	Rate uint32 `json:"rate"`
+}
+
 // FirewallStatus defines the observed state of Firewall
 type FirewallStatus struct {
-	MachineStatus MachineStatus `json:"machineStatus"`
-
-	LastError string `json:"lastError"`
+	// MachineStatus holds the status of the firewall machine
+	MachineStatus *MachineStatus `json:"machineStatus,omitempty"`
 
 	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
 	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 
-	// FirewallNetworks holds the networks known at the metal-api for this firewall machine
-	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
+	// FirewallNetworks holds refined information about the networks that this firewall is connected to
+	// the information is used by the firewall-controller in order to reconcile this firewall
+	FirewallNetworks []FirewallNetwork `json:"firewallNetworks"`
+}
+
+// FirewallConditionType describes the condition types of Firewalls.
+type FirewallConditionType string
+
+const (
+	// FirewallCreated indicates if the firewall was created at the metal-api
+	FirewallCreated FirewallConditionType = "FirewallCreated"
+	// FirewallReady indicates that the firewall is running and and according to the metal-api in a healthy, working state
+	FirewallReady FirewallConditionType = "FirewallReady"
+	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
+	FirewallControllerConnected FirewallConditionType = "FirewallControllerConnected"
+)
+
+// FirewallCondition describes the state of a Firewall at a certain point.
+type FirewallCondition struct {
+	// Type of Firewall condition.
+	Type FirewallConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status corev1.ConditionStatus
+	// The last time this condition was updated.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 type MachineStatus struct {
@@ -100,7 +147,7 @@ type ControllerStatus struct {
 type FirewallStats struct {
 	RuleStats   RuleStatsByAction   `json:"rules"`
 	DeviceStats DeviceStatsByDevice `json:"devices"`
-	IDSStats    IDSStatsByDevice    `json:"idsstats"`
+	IDSStats    IDSStatsByDevice    `json:"idsStats"`
 }
 
 // RuleStatsByAction contains firewall rule statistics groups by action: e.g. accept, drop, policy, masquerade
@@ -120,20 +167,6 @@ type Counter struct {
 	Packets uint64 `json:"packets"`
 }
 
-// EgressRuleSNAT holds a Source-NAT rule
-type EgressRuleSNAT struct {
-	NetworkID string   `json:"networkid" yaml:"networkid"`
-	IPs       []string `json:"ips" yaml:"ips"`
-}
-
-// RateLimit contains the rate limit rule for a network.
-type RateLimit struct {
-	// NetworkID specifies the network which should be rate limited
-	NetworkID string `json:"networkid" yaml:"networkid"`
-	// Rate is the input rate in MiB/s
-	Rate uint32 `json:"rate" yaml:"rate"`
-}
-
 // DeviceStatsByDevice contains DeviceStatistics grouped by device name
 type DeviceStatsByDevice map[string]DeviceStat
 
@@ -149,17 +182,17 @@ type IDSStatsByDevice map[string]InterfaceStat
 
 type InterfaceStat struct {
 	Drop             int `json:"drop"`
-	InvalidChecksums int `json:"invalidchecksums"`
+	InvalidChecksums int `json:"invalidChecksums"`
 	Packets          int `json:"packets"`
 }
 
 type FirewallNetwork struct {
 	Asn                 *int64   `json:"asn"`
-	Destinationprefixes []string `json:"destinationprefixes"`
+	Destinationprefixes []string `json:"destinationPrefixes"`
 	Ips                 []string `json:"ips"`
 	Nat                 *bool    `json:"nat"`
-	Networkid           *string  `json:"networkid"`
-	Networktype         *string  `json:"networktype"`
+	Networkid           *string  `json:"networkID"`
+	Networktype         *string  `json:"networkType"`
 	Prefixes            []string `json:"prefixes"`
 	Vrf                 *int64   `json:"vrf"`
 }

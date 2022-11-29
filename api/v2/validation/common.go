@@ -18,12 +18,16 @@ type genericValidation[O client.Object] interface {
 	ValidateUpdate(old, new O) field.ErrorList
 }
 
-type genericValidator[O client.Object] struct {
-	v genericValidation[O]
+type genericValidator[O client.Object, V genericValidation[O]] struct{}
+
+func (g *genericValidator[O, V]) Instance() V {
+	var v V
+	return v
 }
 
-func (g *genericValidator[O]) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime.Object) error {
 	var (
+		v       = g.Instance()
 		o, ok   = obj.(O)
 		allErrs field.ErrorList
 	)
@@ -38,7 +42,7 @@ func (g *genericValidator[O]) ValidateCreate(ctx context.Context, obj runtime.Ob
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(accessor, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, g.v.ValidateCreate(o)...)
+	allErrs = append(allErrs, v.ValidateCreate(o)...)
 
 	if len(allErrs) == 0 {
 		return nil
@@ -51,8 +55,9 @@ func (g *genericValidator[O]) ValidateCreate(ctx context.Context, obj runtime.Ob
 	)
 }
 
-func (g *genericValidator[O]) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
 	var (
+		v           = g.Instance()
 		oldO, oldOk = oldObj.(O)
 		newO, newOk = newObj.(O)
 		allErrs     field.ErrorList
@@ -75,7 +80,7 @@ func (g *genericValidator[O]) ValidateUpdate(ctx context.Context, oldObj, newObj
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(newAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, g.v.ValidateUpdate(oldO, newO)...)
+	allErrs = append(allErrs, v.ValidateUpdate(oldO, newO)...)
 
 	if len(allErrs) == 0 {
 		return nil
@@ -88,7 +93,7 @@ func (g *genericValidator[O]) ValidateUpdate(ctx context.Context, oldObj, newObj
 	)
 }
 
-func (_ *genericValidator[O]) ValidateDelete(ctx context.Context, obj runtime.Object) error {
+func (_ *genericValidator[O, V]) ValidateDelete(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 
@@ -96,18 +101,18 @@ type (
 	requiredFields []*requiredField
 	requiredField  struct {
 		value any
-		path  string
+		path  *field.Path
 	}
 )
 
-func (rs requiredFields) check(fldPath *field.Path) field.ErrorList {
+func (rs requiredFields) check() field.ErrorList {
 	var allErrs field.ErrorList
 
 	for _, r := range rs {
 		r := r
 
 		if reflect.ValueOf(r.value).IsZero() {
-			allErrs = append(allErrs, field.Required(fldPath.Child(r.path), fmt.Sprintf("%s is required", r.path)))
+			allErrs = append(allErrs, field.Required(r.path, "field is required"))
 		}
 	}
 
