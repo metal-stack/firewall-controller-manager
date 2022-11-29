@@ -2,8 +2,6 @@ export CGO_ENABLED := 0
 
 # Image URL to use all building/pushing image targets
 IMG ?= firewall-controller-manager:latest
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd"
 
 SHA := $(shell git rev-parse --short=8 HEAD)
 GITVERSION := $(shell git describe --long --all)
@@ -39,24 +37,25 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443
+	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443 --cert-dir config/examples/certs
 
 # Install CRDs into a cluster
 install: manifests
-	kustomize build config/crd | kubectl apply -f -
+	kustomize build config/crds | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
 uninstall: manifests
-	kustomize build config/crd | kubectl delete -f -
+	kustomize build config/crds | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
 	cd config/manager && kustomize edit set image controller=${IMG}
-	kustomize build config/default | kubectl apply -f -
+	kustomize build config | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) +crd paths="./..." +output:dir=config/crds
+	$(CONTROLLER_GEN) +webhook paths="./..." +output:dir=config/webhooks
 
 # Run go fmt against code
 fmt:
@@ -68,15 +67,7 @@ vet:
 
 # Generate code
 generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-
-# Push the docker image
-docker-push:
-	docker push ${IMG}
+	$(CONTROLLER_GEN) object paths="./..."
 
 # find or download controller-gen
 # download controller-gen if necessary

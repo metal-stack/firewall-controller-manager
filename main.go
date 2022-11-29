@@ -61,27 +61,31 @@ func init() {
 
 func main() {
 	var (
-		logLevel              string
-		metricsAddr           string
-		enableLeaderElection  bool
-		shootKubeconfig       string
-		namespace             string
-		reconcileInterval     time.Duration
-		firewallHealthTimeout time.Duration
-		clusterID             string
-		clusterApiURL         string
+		logLevel                string
+		metricsAddr             string
+		enableLeaderElection    bool
+		shootKubeconfig         string
+		namespace               string
+		gracefulShutdownTimeout time.Duration
+		reconcileInterval       time.Duration
+		firewallHealthTimeout   time.Duration
+		clusterID               string
+		clusterApiURL           string
+		certDir                 string
 	)
-	flag.StringVar(&logLevel, "log-level", "", "The log level of the controller.")
-	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "The address the metric endpoint binds to.")
+	flag.StringVar(&logLevel, "log-level", "", "the log level of the controller")
+	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "the address the metric endpoint binds to")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&namespace, "namespace", "default", "The namespace this controller is running.")
-	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "The path to the kubeconfig to talk to the shoot")
+			"Enabling this will ensure there is only one active controller manager")
+	flag.StringVar(&namespace, "namespace", "default", "the namespace this controller is running")
+	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "the path to the kubeconfig to talk to the shoot")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 1*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
+	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
-	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfi")
+	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
+	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 
 	flag.Parse()
 
@@ -117,7 +121,6 @@ func main() {
 
 	restConfig := ctrl.GetConfigOrDie()
 
-	disabledTimeout := time.Duration(-1) // wait for all runnables to finish before dying
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
@@ -125,8 +128,9 @@ func main() {
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
 		Namespace:               namespace,
-		GracefulShutdownTimeout: &disabledTimeout,
+		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 		SyncPeriod:              &reconcileInterval,
+		CertDir:                 certDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start firewall-controller-manager")

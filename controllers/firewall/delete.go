@@ -38,7 +38,7 @@ func (c *controller) Delete(ctx context.Context, log logr.Logger, fw *v2.Firewal
 
 		log.Info("deleted firewall", "name", f.Name, "id", *resp.Payload.ID)
 
-		c.Recorder.Event(fw, "Normal", "Delete", fmt.Sprintf("deleted firewall %s id %s", fw.Name, *resp.Payload.ID))
+		c.Recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s id %s", fw.Name, *resp.Payload.ID)
 	}
 
 	return nil

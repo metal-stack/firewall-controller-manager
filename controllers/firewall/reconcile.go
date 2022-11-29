@@ -14,11 +14,6 @@ import (
 )
 
 func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Firewall) error {
-	err := fw.Validate() // TODO: add a validating webhook to perform this validation immediately (https://book.kubebuilder.io/cronjob-tutorial/webhook-implementation.html)
-	if err != nil {
-		return err
-	}
-
 	fws, err := c.findAssociatedFirewalls(ctx, fw)
 	if err != nil {
 		return fmt.Errorf("firewall find error: %w", err)
@@ -112,7 +107,7 @@ func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		return nil, fmt.Errorf("firewall create error: %w", err)
 	}
 
-	c.Recorder.Event(fw, "Normal", "Create", fmt.Sprintf("created firewall %s id %s", fw.Name, *resp.Payload.ID))
+	c.Recorder.Eventf(fw, "Normal", "Create", "created firewall %s id %s", fw.Name, *resp.Payload.ID)
 
 	return resp.Payload, nil
 }

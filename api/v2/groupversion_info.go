@@ -1,22 +1,8 @@
-/*
-
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-// Package v1 contains API Schema definitions for the firewall v1 API group
 // +kubebuilder:object:generate=true
 // +groupName=metal-stack.io
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewall,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewall,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewallset,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewallset,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewalldeployment,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewalldeployments,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
 package v2
 
 import (

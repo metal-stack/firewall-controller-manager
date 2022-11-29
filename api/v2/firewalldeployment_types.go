@@ -1,24 +1,6 @@
-/*
-
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package v2
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -67,23 +49,4 @@ type FirewallDeploymentStatus struct {
 	ProgressingReplicas int `json:"progressingReplicas"`
 	ReadyReplicas       int `json:"readyReplicas"`
 	UnhealthyReplicas   int `json:"unhealthyReplicas"`
-}
-
-func (fl *FirewallDeploymentList) Validate() error {
-	for _, f := range fl.Items {
-		return f.Validate()
-	}
-
-	return nil
-}
-
-func (f *FirewallDeployment) Validate() error {
-	if f.Spec.Replicas > 1 {
-		return fmt.Errorf("for now, no more than a single firewall replica is allowed")
-	}
-	if f.Spec.Strategy != StrategyRecreate && f.Spec.Strategy != StrategyRollingUpdate {
-		return fmt.Errorf("unknown strategy: %s", f.Spec.Strategy)
-	}
-
-	return nil
 }

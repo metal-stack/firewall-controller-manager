@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 
 	metalgo "github.com/metal-stack/metal-go"
@@ -80,12 +81,20 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		ControllerConfig: &c.ControllerConfig,
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	err := ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallDeployment{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("FirewallDeployment").
 		Owns(&v2.FirewallSet{}).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
+	if err != nil {
+		return err
+	}
+
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&v2.FirewallDeployment{}).
+		WithValidator(validation.NewFirewallDeploymentValidator()).
+		Complete()
 }
 
 func (c *controller) New() *v2.FirewallDeployment {

@@ -12,15 +12,11 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Reconcile(ctx context.Context, log logr.Logger, set *v2.FirewallSet) error {
-	err := set.Validate() // TODO: add a validating webhook to perform this validation immediately (https://book.kubebuilder.io/cronjob-tutorial/webhook-implementation.html)
-	if err != nil {
-		return err
-	}
-
 	ownedFirewalls, err := controllers.GetOwnedResources(ctx, c.Seed, set, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
@@ -46,31 +42,43 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, set *v2.Fir
 				return err
 			}
 			log.Info("firewall created", "name", fw.Name)
-			c.Recorder.Event(set, "Normal", "Create", fmt.Sprintf("created firewall %s", fw.Name))
+			c.Recorder.Eventf(set, "Normal", "Create", "created firewall %s", fw.Name)
 		}
 	}
 
 	if currentAmount > set.Spec.Replicas {
+		ownedFirewallSet := sets.NewString()
+		for _, fw := range ownedFirewalls {
+			ownedFirewallSet.Insert(fw.Name)
+		}
+
 		for i := set.Spec.Replicas; i < currentAmount; i++ {
-			fw, err := c.deleteOneFirewall(ctx, ownedFirewalls)
+			// TODO: should we prefer deleting some firewalls over others?
+			name, ok := ownedFirewallSet.PopAny()
+			if !ok {
+				return fmt.Errorf("no firewall found for deletion")
+			}
+
+			fw, err := c.deleteFirewallByName(ctx, name)
 			if err != nil {
 				return err
 			}
+
 			log.Info("firewall deleted", "name", fw.Name)
-			c.Recorder.Event(set, "Normal", "Delete", fmt.Sprintf("deleted firewall %s", fw.Name))
+			c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewall %s", fw.Name)
 		}
 	}
 
 	return c.checkOrphans(ctx, log, set)
 }
 
-func (c *controller) deleteOneFirewall(ctx context.Context, ownedFirewalls []*v2.Firewall) (*v2.Firewall, error) {
-	if len(ownedFirewalls) == 0 {
-		return nil, fmt.Errorf("no firewall found for deletion")
+func (c *controller) deleteFirewallByName(ctx context.Context, name string) (*v2.Firewall, error) {
+	fw := &v2.Firewall{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: c.Namespace,
+		},
 	}
-
-	// TODO: should we prefer deleting some firewalls over others?
-	fw := ownedFirewalls[0]
 
 	err := c.Seed.Delete(ctx, fw, &client.DeleteOptions{})
 	if err != nil {
@@ -158,7 +166,7 @@ func (c *controller) checkOrphans(ctx context.Context, log logr.Logger, set *v2.
 			return fmt.Errorf("error deleting orphaned firewall: %w", err)
 		}
 
-		c.Recorder.Event(set, "Normal", "Delete", fmt.Sprintf("deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID))
+		c.Recorder.Eventf(set, "Normal", "Delete", "deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID)
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	metalgo "github.com/metal-stack/metal-go"
 	"k8s.io/client-go/tools/record"
@@ -75,12 +76,20 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		ControllerConfig: &c.ControllerConfig,
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	err := ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallSet{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("FirewallSet").
 		Owns(&v2.Firewall{}).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
+	if err != nil {
+		return err
+	}
+
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&v2.FirewallSet{}).
+		WithValidator(validation.NewFirewallSetValidator()).
+		Complete()
 }
 
 func (c *controller) New() *v2.FirewallSet {

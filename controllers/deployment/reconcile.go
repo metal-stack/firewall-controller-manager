@@ -16,13 +16,8 @@ import (
 )
 
 func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment) error {
-	err := deploy.Validate() // TODO: add a validating webhook to perform this validation immediately (https://book.kubebuilder.io/cronjob-tutorial/webhook-implementation.html)
-	if err != nil {
-		return err
-	}
-
 	log.Info("ensuring firewall controller rbac")
-	err = c.ensureFirewallControllerRBAC(ctx)
+	err := c.ensureFirewallControllerRBAC(ctx)
 	if err != nil {
 		return err
 	}
@@ -47,7 +42,7 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 			return fmt.Errorf("unable to create firewall set: %w", err)
 		}
 
-		c.Recorder.Event(set, "Normal", "Create", fmt.Sprintf("created firewallset %s", set.Name))
+		c.Recorder.Eventf(set, "Normal", "Create", "created firewallset %s", set.Name)
 
 		return nil
 	}
@@ -74,7 +69,7 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 
 		log.Info("updated firewall set", "name", lastSet.Name)
 
-		c.Recorder.Event(lastSet, "Normal", "Update", fmt.Sprintf("updated firewallset %s", lastSet.Name))
+		c.Recorder.Eventf(lastSet, "Normal", "Update", "updated firewallset %s", lastSet.Name)
 	} else {
 		// this is recreate strategy: TODO implement rolling update
 
@@ -88,7 +83,7 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 
 		oldSets = append(oldSets, lastSet.DeepCopy())
 
-		c.Recorder.Event(newSet, "Normal", "Recreate", fmt.Sprintf("recreated firewallset old: %s new: %s", lastSet.Name, newSet.Name))
+		c.Recorder.Eventf(newSet, "Normal", "Recreate", "recreated firewallset old: %s new: %s", lastSet.Name, newSet.Name)
 	}
 
 	for _, oldSet := range oldSets {
@@ -102,7 +97,7 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 
 		log.Info("deleted old firewall set", "name", oldSet.Name)
 
-		c.Recorder.Event(oldSet, "Normal", "Delete", fmt.Sprintf("deleted firewallset %s", oldSet.Name))
+		c.Recorder.Eventf(oldSet, "Normal", "Delete", "deleted firewallset %s", oldSet.Name)
 	}
 
 	return nil

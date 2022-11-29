@@ -28,7 +28,7 @@ func (c *controller) Delete(ctx context.Context, log logr.Logger, deploy *v2.Fir
 			return err
 		}
 
-		c.Recorder.Event(s, "Normal", "Delete", fmt.Sprintf("deleted firewallset %s", s.Name))
+		c.Recorder.Eventf(s, "Normal", "Delete", "deleted firewallset %s", s.Name)
 	}
 
 	return nil
