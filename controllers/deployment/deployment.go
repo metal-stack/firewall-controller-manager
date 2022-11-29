@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +27,7 @@ import (
 
 	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // Reconciler reconciles a Firewall object
@@ -40,6 +41,7 @@ type Reconciler struct {
 	ClusterID     string
 	ClusterTag    string
 	ClusterAPIURL string
+	Recorder      record.EventRecorder
 }
 
 // SetupWithManager boilerplate to setup the Reconciler
@@ -147,11 +149,11 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 	if lastSet == nil {
 		r.Log.Info("no firewall set is present, creating a new one")
 
-		_, err := r.createFirewallSet(ctx, deploy)
+		set, err := r.createFirewallSet(ctx, deploy)
 		if err != nil {
 			return fmt.Errorf("unable to create firewall set: %w", err)
 		}
-
+		r.Recorder.Event(set, "Normal", "Create", fmt.Sprintf("created firewallset %s", set.Name))
 		return nil
 	}
 
@@ -177,6 +179,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		if err != nil {
 			return fmt.Errorf("unable to update firewall set: %w", err)
 		}
+		r.Recorder.Event(lastSet, "Normal", "Update", fmt.Sprintf("updated firewallset %s", lastSet.Name))
 	} else {
 		// this is recreate strategy: TODO implement rolling update
 
@@ -188,6 +191,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		r.Log.Info("created new firewall set", "name", newSet.Name)
 
 		oldSets = append(oldSets, lastSet.DeepCopy())
+		r.Recorder.Event(newSet, "Normal", "Recreate", fmt.Sprintf("recreated firewallset old: %s new: %s", lastSet.Name, newSet.Name))
 	}
 
 	for _, oldSet := range oldSets {
@@ -198,6 +202,7 @@ func (r *Reconciler) reconcile(ctx context.Context, deploy *v2.FirewallDeploymen
 		if err != nil {
 			return err
 		}
+		r.Recorder.Event(oldSet, "Normal", "Delete", fmt.Sprintf("deleted firewallset %s", oldSet.Name))
 	}
 
 	return nil

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -34,6 +35,7 @@ type Reconciler struct {
 	ClusterTag            string
 	ClusterAPIURL         string
 	FirewallHealthTimeout time.Duration
+	Recorder              record.EventRecorder
 }
 
 // SetupWithManager boilerplate to setup the Reconciler
@@ -146,6 +148,7 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFi
 				return err
 			}
 			r.Log.Info("firewall created", "name", fw.Name)
+			r.Recorder.Event(set, "Normal", "Create", fmt.Sprintf("created firewall %s", fw.Name))
 		}
 	}
 
@@ -156,6 +159,7 @@ func (r *Reconciler) reconcile(ctx context.Context, set *v2.FirewallSet, ownedFi
 				return err
 			}
 			r.Log.Info("firewall deleted", "name", fw.Name)
+			r.Recorder.Event(set, "Normal", "Delete", fmt.Sprintf("deleted firewall %s", fw.Name))
 		}
 	}
 
@@ -211,6 +215,7 @@ func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) erro
 		if err != nil {
 			return fmt.Errorf("error deleting orphaned firewall: %w", err)
 		}
+		r.Recorder.Event(set, "Normal", "Delete", fmt.Sprintf("deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID))
 	}
 
 	return nil
@@ -218,7 +223,7 @@ func (r *Reconciler) checkOrphans(ctx context.Context, set *v2.FirewallSet) erro
 
 func (r *Reconciler) deleteFirewallFromSet(ctx context.Context, set *v2.FirewallSet) (*v2.Firewall, error) {
 	// TODO: should we prefer deleting some firewalls over others?
-
+	// FIXME somehow duplicate of next func
 	firewalls := v2.FirewallList{}
 	err := r.Seed.List(ctx, &firewalls, client.InNamespace(r.Namespace))
 	if err != nil {
@@ -296,7 +301,6 @@ func (r *Reconciler) createFirewall(ctx context.Context, set *v2.FirewallSet) (*
 	if err != nil {
 		return nil, fmt.Errorf("unable to create firewall resource: %w", err)
 	}
-
 	return fw, nil
 }
 

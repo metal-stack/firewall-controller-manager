@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/zapr"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -189,6 +189,7 @@ func main() {
 		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 		ClusterAPIURL: clusterApiURL,
 		K8sVersion:    k8sVersion,
+		Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
 		os.Exit(1)
@@ -204,6 +205,7 @@ func main() {
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 		ClusterAPIURL:         clusterApiURL,
 		FirewallHealthTimeout: firewallHealthTimeout,
+		Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "set")
 		os.Exit(1)
@@ -217,6 +219,7 @@ func main() {
 		Namespace:  namespace,
 		ClusterID:  clusterID,
 		ClusterTag: fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		Recorder:   mgr.GetEventRecorderFor("firewall-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "firewall")
 		os.Exit(1)

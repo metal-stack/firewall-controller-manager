@@ -9,6 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,7 @@ type Reconciler struct {
 	Namespace  string
 	ClusterID  string
 	ClusterTag string
+	Recorder   record.EventRecorder
 }
 
 // SetupWithManager boilerplate to setup the Reconciler
@@ -247,6 +249,7 @@ func (r *Reconciler) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		return nil, fmt.Errorf("firewall create error: %w", err)
 	}
 
+	r.Recorder.Event(fw, "Normal", "Create", fmt.Sprintf("created firewall %s id %s", fw.Name, *resp.Payload.ID))
 	return resp.Payload, nil
 }
 
@@ -272,6 +275,7 @@ func (r *Reconciler) deleteFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 
 		r.Log.Info("deleted firewall", "name", fw.Spec.Name, "id", *resp.Payload.ID)
 
+		r.Recorder.Event(fw, "Normal", "Delete", fmt.Sprintf("deleted firewall %s id %s", fw.Spec.Name, *resp.Payload.ID))
 		return resp.Payload, nil
 	default:
 		return nil, fmt.Errorf("multiple firewalls found")
