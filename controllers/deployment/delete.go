@@ -2,33 +2,33 @@ package deployment
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Delete(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment) error {
-	sets := v2.FirewallSetList{}
-	err := c.Seed.List(ctx, &sets, client.InNamespace(c.Namespace))
+	ownedSets, err := controllers.GetOwnedResources(ctx, c.Seed, deploy, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+		return fsl.GetItems()
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get owned sets: %w", err)
 	}
 
-	for _, s := range sets.Items {
+	for _, s := range ownedSets {
 		s := s
-
-		if !metav1.IsControlledBy(&s, deploy) {
-			continue
-		}
 
 		log.Info("deleting firewall set", "name", s.Name)
 
-		err = c.Seed.Delete(ctx, &s, &client.DeleteOptions{})
+		err = c.Seed.Delete(ctx, s, &client.DeleteOptions{})
 		if err != nil {
 			return err
 		}
+
+		c.Recorder.Event(s, "Normal", "Delete", fmt.Sprintf("deleted firewallset %s", s.Name))
 	}
 
 	return nil

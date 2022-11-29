@@ -25,6 +25,8 @@ func (c *controller) Delete(ctx context.Context, log logr.Logger, set *v2.Firewa
 		if err != nil {
 			return err
 		}
+
+		c.Recorder.Event(fw, "Normal", "Delete", fmt.Sprintf("deleted firewall %s", fw.Name))
 	}
 
 	return nil
