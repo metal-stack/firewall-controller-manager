@@ -36,7 +36,9 @@ type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FirewallSpec   `json:"spec,omitempty"`
+	Spec     FirewallSpec `json:"spec"`
+	Userdata string       `json:"userdata"`
+
 	Status FirewallStatus `json:"status,omitempty"`
 }
 
@@ -56,9 +58,6 @@ type FirewallSpec struct {
 	ProjectID     string   `json:"projectID"`
 	Networks      []string `json:"networks"`
 	SSHPublicKeys []string `json:"sshpublickeys"`
-
-	Name     string `json:"name,omitempty"`
-	Userdata string `json:"userdata,omitempty"`
 
 	// Interval on which rule reconciliation should happen
 	Interval string `json:"interval,omitempty"`
@@ -90,7 +89,6 @@ type FirewallStatus struct {
 	LastError string `json:"lastError"`
 
 	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
-	// +kubebuilder:validation:Optional
 	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 
 	// FirewallNetworks holds the networks known at the metal-api for this firewall machine
@@ -98,13 +96,13 @@ type FirewallStatus struct {
 }
 
 type MachineStatus struct {
-	MachineID           string      `json:"machineID"`
-	Event               string      `json:"event"`
-	Message             string      `json:"message"`
-	Liveliness          string      `json:"liveliness"`
-	EventTimestamp      metav1.Time `json:"eventTimestamp"`
-	AllocationTimestamp metav1.Time `json:"allocationTimestamp"`
-	CrashLoop           bool        `json:"crashLoop"`
+	MachineID           string      `json:"machineID,omitempty"`
+	Event               string      `json:"event,omitempty"`
+	Message             string      `json:"message,omitempty"`
+	Liveliness          string      `json:"liveliness,omitempty"`
+	EventTimestamp      metav1.Time `json:"eventTimestamp,omitempty"`
+	AllocationTimestamp metav1.Time `json:"allocationTimestamp,omitempty"`
+	CrashLoop           bool        `json:"crashLoop,omitempty"`
 }
 
 type ControllerStatus struct {
@@ -184,4 +182,12 @@ type FirewallNetwork struct {
 
 func (f *Firewall) Validate() error {
 	return nil
+}
+
+func (f *FirewallList) GetItems() []*Firewall {
+	var result []*Firewall
+	for i := range f.Items {
+		result = append(result, &f.Items[i])
+	}
+	return result
 }

@@ -103,8 +103,6 @@ spec:
                     description: LogAcceptedConnections if set to true, also log accepted
                       connections in the droptailer log
                     type: boolean
-                  name:
-                    type: string
                   networks:
                     items:
                       type: string
@@ -138,8 +136,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  userdata:
-                    type: string
                 required:
                 - image
                 - networks

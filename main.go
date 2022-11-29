@@ -179,47 +179,53 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&deployment.Reconciler{
-		Seed:          mgr.GetClient(),
-		Shoot:         shootClient,
-		Metal:         mclient,
-		Log:           ctrl.Log.WithName("controllers").WithName("deployment"),
-		Namespace:     namespace,
-		ClusterID:     clusterID,
-		ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		ClusterAPIURL: clusterApiURL,
-		K8sVersion:    k8sVersion,
-		Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
+	if err = (&deployment.Config{
+		ControllerConfig: deployment.ControllerConfig{
+			Seed:          mgr.GetClient(),
+			Shoot:         shootClient,
+			Metal:         mclient,
+			Namespace:     namespace,
+			ClusterID:     clusterID,
+			ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			ClusterAPIURL: clusterApiURL,
+			K8sVersion:    k8sVersion,
+			Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
 		os.Exit(1)
 	}
 
-	if err = (&set.Reconciler{
-		Seed:                  mgr.GetClient(),
-		Shoot:                 shootClient,
-		Metal:                 mclient,
-		Log:                   ctrl.Log.WithName("controllers").WithName("set"),
-		Namespace:             namespace,
-		ClusterID:             clusterID,
-		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		ClusterAPIURL:         clusterApiURL,
-		FirewallHealthTimeout: firewallHealthTimeout,
-		Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
+	if err = (&set.Config{
+		ControllerConfig: set.ControllerConfig{
+			Seed:                  mgr.GetClient(),
+			Shoot:                 shootClient,
+			Metal:                 mclient,
+			Namespace:             namespace,
+			ClusterID:             clusterID,
+			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			ClusterAPIURL:         clusterApiURL,
+			FirewallHealthTimeout: firewallHealthTimeout,
+			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("set"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "set")
 		os.Exit(1)
 	}
 
-	if err = (&firewall.Reconciler{
-		Seed:       mgr.GetClient(),
-		Shoot:      shootClient,
-		Metal:      mclient,
-		Log:        ctrl.Log.WithName("controllers").WithName("firewall"),
-		Namespace:  namespace,
-		ClusterID:  clusterID,
-		ClusterTag: fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-		Recorder:   mgr.GetEventRecorderFor("firewall-controller"),
+	if err = (&firewall.Config{
+		ControllerConfig: firewall.ControllerConfig{
+			Seed:       mgr.GetClient(),
+			Shoot:      shootClient,
+			Metal:      mclient,
+			Namespace:  namespace,
+			ClusterID:  clusterID,
+			ClusterTag: fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			Recorder:   mgr.GetEventRecorderFor("firewall-controller"),
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "firewall")
 		os.Exit(1)

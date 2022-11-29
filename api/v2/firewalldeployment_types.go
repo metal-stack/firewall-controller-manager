@@ -85,12 +85,5 @@ func (f *FirewallDeployment) Validate() error {
 		return fmt.Errorf("unknown strategy: %s", f.Spec.Strategy)
 	}
 
-	if f.Spec.Template.Name != "" {
-		return fmt.Errorf("name will be set by the controller, cannot be set by the user")
-	}
-	if f.Spec.Template.Userdata != "" {
-		return fmt.Errorf("userdata will be set by the controller, cannot be set by the user")
-	}
-
 	return nil
 }

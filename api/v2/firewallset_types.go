@@ -17,8 +17,6 @@ limitations under the License.
 package v2
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,7 +42,9 @@ type FirewallSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FirewallSetSpec   `json:"spec,omitempty"`
+	Spec     FirewallSetSpec `json:"spec,omitempty"`
+	Userdata string          `json:"userdata"`
+
 	Status FirewallSetStatus `json:"status,omitempty"`
 }
 
@@ -60,9 +60,13 @@ type FirewallSetStatus struct {
 }
 
 func (f *FirewallSet) Validate() error {
-	if f.Spec.Template.Name != "" {
-		return fmt.Errorf("name will be set by the controller, cannot be set by the user")
-	}
-
 	return nil
+}
+
+func (f *FirewallSetList) GetItems() []*FirewallSet {
+	var result []*FirewallSet
+	for i := range f.Items {
+		result = append(result, &f.Items[i])
+	}
+	return result
 }
