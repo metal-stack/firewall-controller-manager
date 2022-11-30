@@ -21,7 +21,7 @@ spec:
     - jsonPath: .status.machineStatus.machineID
       name: Machine ID
       type: string
-    - jsonPath: .status.machineStatus.event
+    - jsonPath: .status.machineStatus.lastEvent.event
       name: Last Event
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -147,6 +147,44 @@ spec:
           status:
             description: FirewallStatus defines the observed state of Firewall
             properties:
+              conditions:
+                description: Conditions contain the latest available observations
+                  of a firewall's current state.
+                items:
+                  description: Condition holds the information about the state of
+                    a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: Last time the condition was updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of the condition.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - lastUpdateTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               controllerStatus:
                 description: ControllerStatus holds the status of the firewall-controller
                   reconciling this firewall
@@ -285,18 +323,31 @@ spec:
                     type: string
                   crashLoop:
                     type: boolean
-                  event:
-                    type: string
-                  eventTimestamp:
-                    format: date-time
-                    type: string
+                  lastEvent:
+                    properties:
+                      event:
+                        type: string
+                      message:
+                        type: string
+                      timestamp:
+                        format: date-time
+                        type: string
+                    required:
+                    - event
+                    - message
+                    - timestamp
+                    type: object
                   liveliness:
                     type: string
                   machineID:
                     type: string
-                  message:
-                    type: string
+                required:
+                - allocationTimestamp
+                - liveliness
+                - machineID
                 type: object
+            required:
+            - conditions
             type: object
           userdata:
             type: string

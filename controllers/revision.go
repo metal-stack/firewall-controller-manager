@@ -18,7 +18,7 @@ const (
 )
 
 // Revision returns the revision number of the input object.
-func Revision(obj runtime.Object) (int64, error) {
+func Revision(obj runtime.Object) (int, error) {
 	acc, err := meta.Accessor(obj)
 	if err != nil {
 		return 0, err
@@ -27,13 +27,13 @@ func Revision(obj runtime.Object) (int64, error) {
 	if !ok {
 		return 0, nil
 	}
-	return strconv.ParseInt(v, 10, 64)
+	return strconv.Atoi(v)
 }
 
 // MaxRevisionOf finds the highest revision in the firewall sets
 func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	var (
-		max    int64
+		max    int
 		result *v2.FirewallSet
 	)
 
@@ -66,7 +66,7 @@ func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 // MinRevisionOf finds the lowest revision in the firewall sets
 func MinRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	var (
-		min    int64
+		min    int
 		result *v2.FirewallSet
 	)
 
@@ -130,13 +130,8 @@ func Except[O client.Object](sets []O, except ...O) []O {
 	return result
 }
 
-func NextRevision(set *v2.FirewallSet) (int, error) {
-	v, ok := set.Annotations[RevisionAnnotation]
-	if !ok {
-		return 0, fmt.Errorf("unable to increment revision because annotation is missing")
-	}
-
-	i, err := strconv.Atoi(v)
+func NextRevision(o runtime.Object) (int, error) {
+	i, err := Revision(o)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
 	}

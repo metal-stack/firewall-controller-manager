@@ -20,7 +20,6 @@ type (
 		New() O
 		Reconcile(ctx context.Context, log logr.Logger, o O) error
 		Delete(ctx context.Context, log logr.Logger, o O) error
-		Status(ctx context.Context, log logr.Logger, o O) error
 	}
 
 	GenericController[O client.Object] struct {
@@ -32,15 +31,16 @@ type (
 )
 
 type requeueError struct {
-	after time.Duration
+	reason string
+	after  time.Duration
 }
 
 func (e *requeueError) Error() string {
-	return fmt.Sprintf("requeuing reconciliation after %s", e.after.String())
+	return fmt.Sprintf("requeuing after %s: %s", e.after.String(), e.reason)
 }
 
-func RequeueAfter(d time.Duration) error {
-	return &requeueError{after: d}
+func RequeueAfter(d time.Duration, reason string) error {
+	return &requeueError{after: d, reason: reason}
 }
 
 func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) GenericController[O] {
@@ -107,21 +107,9 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	defer func() {
-		o := g.reconciler.New()
-		if err := g.c.Get(ctx, req.NamespacedName, o, &client.GetOptions{}); err != nil {
-			log.Error(fmt.Errorf("error retrieving resource: %w", err), "cannot update status")
-			return
-		}
-
 		log.Info("updating status")
 
-		err := g.reconciler.Status(ctx, log, o)
-		if err != nil {
-			log.Error(err, "status could not be reconciled, not updating")
-			return
-		}
-
-		err = g.c.Status().Update(ctx, o)
+		err := g.c.Status().Update(ctx, o)
 		if err != nil {
 			log.Error(err, "status could not be updated")
 		}

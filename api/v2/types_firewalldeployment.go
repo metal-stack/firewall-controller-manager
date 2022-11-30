@@ -46,7 +46,21 @@ type FirewallDeploymentSpec struct {
 }
 
 type FirewallDeploymentStatus struct {
-	ProgressingReplicas int `json:"progressingReplicas"`
-	ReadyReplicas       int `json:"readyReplicas"`
-	UnhealthyReplicas   int `json:"unhealthyReplicas"`
+	TargetReplicas      int        `json:"targetReplicas"`
+	ProgressingReplicas int        `json:"progressingReplicas"`
+	ReadyReplicas       int        `json:"readyReplicas"`
+	UnhealthyReplicas   int        `json:"unhealthyReplicas"`
+	ObservedRevision    int        `json:"observedRevision"`
+	Conditions          Conditions `json:"conditions"`
 }
+
+const (
+	// FirewallDeplomentAvailable indicates whether the deployment has reached the desired amount of replicas or not.
+	FirewallDeplomentAvailable ConditionType = "Available"
+	// FirewallDeplomentAvailable indicates whether the deployment has reached the desired amount of replicas or not.
+	FirewallDeplomentProgressing ConditionType = "Progressing"
+	// FirewallDeplomentRBACProvisioned indicates whether the rbac permissions for the firewall-controller to communicate with the api server were provisioned.
+	FirewallDeplomentRBACProvisioned ConditionType = "RBACProvisioned"
+	// FirewallDeplomentEgressIPs indicates whether the egress ips of the firewall are properly configured and annotated with ip tags.
+	FirewallDeplomentEgressIPs ConditionType = "EgressIPs"
+)

@@ -69,6 +69,11 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, set *v2.Fir
 		}
 	}
 
+	err = c.setStatus(ctx, set)
+	if err != nil {
+		return err
+	}
+
 	// TODO: if managed firewall does not ready state, recreate after ~10m
 
 	return c.checkOrphans(ctx, log, set)

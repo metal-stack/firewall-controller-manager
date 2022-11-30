@@ -21,8 +21,16 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 	log.Info("ensuring firewall controller rbac")
 	err := c.ensureFirewallControllerRBAC(ctx)
 	if err != nil {
+		log.Error(err, "unable to ensure firewall controller rbac")
+
+		cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionFalse, "Error", fmt.Sprintf("RBAC resources could not be provisioned %s", err))
+		deploy.Status.Conditions.Set(cond)
+
 		return err
 	}
+
+	cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, "Provisioned", "RBAC provisioned successfully.")
+	deploy.Status.Conditions.Set(cond)
 
 	switch s := deploy.Spec.Strategy; s {
 	case v2.StrategyRecreate:
@@ -32,24 +40,42 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 	default:
 		err = fmt.Errorf("unknown deployment strategy: %s", s)
 	}
+
+	statusErr := c.setStatus(ctx, deploy)
+
 	if err != nil {
+		return err
+	}
+	if statusErr != nil {
 		return err
 	}
 
 	log.Info("reonciling egress ips")
 	err = c.reconcileEgressIPs(ctx, &deploy.Spec.Template)
 	if err != nil {
-		log.Error(err, "unable to reconcile egress ips, requeuing...")
-		return controllers.RequeueAfter(1 * time.Minute)
+		log.Error(err, "unable to reconcile egress ips")
+
+		cond := v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionFalse, "Error", fmt.Sprintf("Egress IPs could not be reconciled: %s", err))
+		deploy.Status.Conditions.Set(cond)
+
+		return controllers.RequeueAfter(2*time.Minute, "backing off because egress ips can probably not be repaired by retrying")
 	}
+
+	var ips []string
+	for _, ip := range deploy.Spec.Template.EgressRules {
+		ips = append(ips, ip.IPs...)
+	}
+	cond = v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionTrue, "Reconciled", fmt.Sprintf("Egress IPs reconciled successfully. %v", ips))
+	deploy.Status.Conditions.Set(cond)
 
 	return nil
 }
 
 func (c *controller) createFirewallSet(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, revision int) (*v2.FirewallSet, error) {
 	if lastCreation, ok := c.lastSetCreation[deploy.Name]; ok && time.Since(lastCreation) < c.safetyBackoff {
-		log.Info("backing off from firewall set creation as last creation is only seoncds ago, requeueing in 10s", "ago", time.Since(lastCreation).String())
-		return nil, controllers.RequeueAfter(10 * time.Second)
+		// this is just for safety reasons to prevent mass-allocations
+		log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
+		return nil, controllers.RequeueAfter(10*time.Second, "delaying firewall set creation")
 	}
 
 	uuid, err := uuid.NewUUID()

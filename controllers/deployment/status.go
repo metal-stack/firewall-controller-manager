@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 )
 
-func (c *controller) Status(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment) error {
+func (c *controller) setStatus(ctx context.Context, deploy *v2.FirewallDeployment) error {
 	ownedSets, err := controllers.GetOwnedResources(ctx, c.Seed, deploy, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
@@ -22,15 +21,26 @@ func (c *controller) Status(ctx context.Context, log logr.Logger, deploy *v2.Fir
 		return err
 	}
 
-	status := v2.FirewallDeploymentStatus{}
+	deploy.Status.TargetReplicas = deploy.Spec.Replicas
 
 	if lastSet != nil {
-		status.ProgressingReplicas = lastSet.Status.ProgressingReplicas
-		status.UnhealthyReplicas = lastSet.Status.UnhealthyReplicas
-		status.ReadyReplicas = lastSet.Status.ReadyReplicas
+		revision, err := controllers.Revision(lastSet)
+		if err != nil {
+			return err
+		}
+		deploy.Status.ObservedRevision = revision
+		deploy.Status.ProgressingReplicas = lastSet.Status.ProgressingReplicas
+		deploy.Status.UnhealthyReplicas = lastSet.Status.UnhealthyReplicas
+		deploy.Status.ReadyReplicas = lastSet.Status.ReadyReplicas
 	}
 
-	deploy.Status = status
+	if deploy.Status.ReadyReplicas >= deploy.Spec.Replicas {
+		cond := v2.NewCondition(v2.FirewallDeplomentAvailable, v2.ConditionTrue, "MinimumReplicasAvailable", "Deployment has minimum availability.")
+		deploy.Status.Conditions.Set(cond)
+	} else {
+		cond := v2.NewCondition(v2.FirewallDeplomentAvailable, v2.ConditionFalse, "MinimumReplicasUnavailable", "Deployment does not have minimum availability.")
+		deploy.Status.Conditions.Set(cond)
+	}
 
 	return nil
 }

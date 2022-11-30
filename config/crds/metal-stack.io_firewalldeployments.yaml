@@ -161,15 +161,58 @@ spec:
             type: object
           status:
             properties:
+              conditions:
+                items:
+                  description: Condition holds the information about the state of
+                    a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: Last time the condition was updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of the condition.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - lastUpdateTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedRevision:
+                type: integer
               progressingReplicas:
                 type: integer
               readyReplicas:
                 type: integer
+              targetReplicas:
+                type: integer
               unhealthyReplicas:
                 type: integer
             required:
+            - conditions
+            - observedRevision
             - progressingReplicas
             - readyReplicas
+            - targetReplicas
             - unhealthyReplicas
             type: object
         type: object

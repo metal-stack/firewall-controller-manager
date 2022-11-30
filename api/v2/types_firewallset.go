@@ -38,9 +38,11 @@ type FirewallSetSpec struct {
 }
 
 type FirewallSetStatus struct {
+	TargetReplicas      int `json:"targetReplicas"`
 	ProgressingReplicas int `json:"progressingReplicas"`
 	ReadyReplicas       int `json:"readyReplicas"`
 	UnhealthyReplicas   int `json:"unhealthyReplicas"`
+	ObservedRevision    int `json:"observedRevision"`
 }
 
 func (f *FirewallSetList) GetItems() []*FirewallSet {

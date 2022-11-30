@@ -158,15 +158,21 @@ spec:
             type: object
           status:
             properties:
+              observedRevision:
+                type: integer
               progressingReplicas:
                 type: integer
               readyReplicas:
                 type: integer
+              targetReplicas:
+                type: integer
               unhealthyReplicas:
                 type: integer
             required:
+            - observedRevision
             - progressingReplicas
             - readyReplicas
+            - targetReplicas
             - unhealthyReplicas
             type: object
           userdata:

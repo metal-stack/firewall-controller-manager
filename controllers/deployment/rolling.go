@@ -28,8 +28,14 @@ func (c *controller) rollingUpdateStrategy(ctx context.Context, log logr.Logger,
 
 		set, err := c.createFirewallSet(ctx, log, deploy, 0)
 		if err != nil {
+			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s", err))
+			deploy.Status.Conditions.Set(cond)
+
 			return fmt.Errorf("unable to create firewall set: %w", err)
 		}
+
+		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", set.Name))
+		deploy.Status.Conditions.Set(cond)
 
 		c.Recorder.Eventf(set, "Normal", "Create", "created firewallset %s", set.Name)
 
@@ -51,10 +57,16 @@ func (c *controller) rollingUpdateStrategy(ctx context.Context, log logr.Logger,
 
 		newSet, err := c.createFirewallSet(ctx, log, deploy, revision)
 		if err != nil {
+			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s", err))
+			deploy.Status.Conditions.Set(cond)
+
 			return err
 		}
 
 		log.Info("created new firewall set", "name", newSet.Name)
+
+		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", newSet.Name))
+		deploy.Status.Conditions.Set(cond)
 
 		c.Recorder.Eventf(newSet, "Normal", "Create", "created firewallset %s", newSet.Name)
 
@@ -75,13 +87,25 @@ func (c *controller) rollingUpdateStrategy(ctx context.Context, log logr.Logger,
 
 	log.Info("updated firewall set", "name", newestSet.Name)
 
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q", newestSet.Name))
+	deploy.Status.Conditions.Set(cond)
+
+	// message: ReplicaSet "metal-api-5579f7c8c7" has successfully progressed.
+	// reason: NewReplicaSetAvailable
+
 	c.Recorder.Eventf(newestSet, "Normal", "Update", "updated firewallset %s", newestSet.Name)
 
 	if newestSet.Status.ReadyReplicas != newestSet.Spec.Replicas {
 		log.Info("set replicas are not yet ready, delaying old set cleanup")
 
+		// TODO: detect when it's not finishing and set to ProgressDeadlineExceeded
+		// when the set does not show any progress within the given deadline (progressDeadlineSeconds)
+
 		return c.cleanupIntermediateSets(ctx, log, ownedSets)
 	}
+
+	cond = v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", newestSet.Name))
+	deploy.Status.Conditions.Set(cond)
 
 	log.Info("ensuring old sets are cleaned up")
 

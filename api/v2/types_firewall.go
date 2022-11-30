@@ -1,7 +1,6 @@
 package v2
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -13,7 +12,7 @@ import (
 // +kubebuilder:resource:shortName=fw
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".status.machineStatus.machineID"
-// +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.event"
+// +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.lastEvent.event"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -89,49 +88,36 @@ type RateLimit struct {
 type FirewallStatus struct {
 	// MachineStatus holds the status of the firewall machine
 	MachineStatus *MachineStatus `json:"machineStatus,omitempty"`
-
 	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
 	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
-
 	// FirewallNetworks holds refined information about the networks that this firewall is connected to
 	// the information is used by the firewall-controller in order to reconcile this firewall
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
+	// Conditions contain the latest available observations of a firewall's current state.
+	Conditions Conditions `json:"conditions"`
 }
-
-// FirewallConditionType describes the condition types of Firewalls.
-type FirewallConditionType string
 
 const (
 	// FirewallCreated indicates if the firewall was created at the metal-api
-	FirewallCreated FirewallConditionType = "FirewallCreated"
+	FirewallCreated ConditionType = "Created"
 	// FirewallReady indicates that the firewall is running and and according to the metal-api in a healthy, working state
-	FirewallReady FirewallConditionType = "FirewallReady"
+	FirewallReady ConditionType = "Ready"
 	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
-	FirewallControllerConnected FirewallConditionType = "FirewallControllerConnected"
+	FirewallControllerConnected ConditionType = "Connected"
 )
 
-// FirewallCondition describes the state of a Firewall at a certain point.
-type FirewallCondition struct {
-	// Type of Firewall condition.
-	Type FirewallConditionType
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus
-	// The last time this condition was updated.
-	LastTransitionTime metav1.Time
-	// The reason for the condition's last transition.
-	Reason string
-	// A human readable message indicating details about the transition.
-	Message string
+type MachineStatus struct {
+	MachineID           string            `json:"machineID"`
+	AllocationTimestamp metav1.Time       `json:"allocationTimestamp"`
+	Liveliness          string            `json:"liveliness"`
+	CrashLoop           bool              `json:"crashLoop,omitempty"`
+	LastEvent           *MachineLastEvent `json:"lastEvent,omitempty"`
 }
 
-type MachineStatus struct {
-	MachineID           string      `json:"machineID,omitempty"`
-	Event               string      `json:"event,omitempty"`
-	Message             string      `json:"message,omitempty"`
-	Liveliness          string      `json:"liveliness,omitempty"`
-	EventTimestamp      metav1.Time `json:"eventTimestamp,omitempty"`
-	AllocationTimestamp metav1.Time `json:"allocationTimestamp,omitempty"`
-	CrashLoop           bool        `json:"crashLoop,omitempty"`
+type MachineLastEvent struct {
+	Event     string      `json:"event"`
+	Timestamp metav1.Time `json:"timestamp"`
+	Message   string      `json:"message"`
 }
 
 type ControllerStatus struct {
