@@ -1,7 +1,8 @@
 package validation
 
 import (
-	"net"
+	"fmt"
+	"net/netip"
 	"net/url"
 	"time"
 
@@ -85,15 +86,15 @@ func (_ *firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path
 		allErrs = append(allErrs, r.check()...)
 
 		for _, ip := range rule.IPs {
-			if parsed := net.ParseIP(ip); parsed == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("egressRules").Child("ips"), ip, "ip must be a parsable ip adddress"))
+			if _, err := netip.ParseAddr(ip); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("egressRules").Child("ips"), ip, fmt.Sprintf("error parsing ip: %v", err)))
 			}
 		}
 	}
 
 	for _, prefix := range f.InternalPrefixes {
-		if _, _, err := net.ParseCIDR(prefix); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("internalPrefixes"), prefix, "prefix must be a parsable network cidr"))
+		if _, err := netip.ParsePrefix(prefix); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("internalPrefixes"), prefix, fmt.Sprintf("error parsing prefix: %v", err)))
 		}
 	}
 
