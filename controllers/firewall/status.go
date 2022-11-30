@@ -17,7 +17,9 @@ func (c *controller) Status(ctx context.Context, log logr.Logger, fw *v2.Firewal
 		return fmt.Errorf("firewall find error: %w", err)
 	}
 
-	status := v2.FirewallStatus{}
+	status := v2.FirewallStatus{
+		MachineStatus: &v2.MachineStatus{},
+	}
 
 	if status.MachineStatus == nil {
 		status.MachineStatus = &v2.MachineStatus{}
@@ -92,103 +94,3 @@ func (c *controller) Status(ctx context.Context, log logr.Logger, fw *v2.Firewal
 
 	return nil
 }
-
-// func reconcileEgressIPs(ctx context.Context, r *egressIPReconciler) error {
-// 	currentEgressIPs := sets.NewString()
-
-// 	resp, err := r.mclient.IP().FindIPs(ip.NewFindIPsParams().WithBody(&models.V1IPFindRequest{
-// 		Projectid: r.infrastructureConfig.ProjectID,
-// 		Tags:      []string{r.egressTag},
-// 		Type:      models.V1IPBaseTypeStatic,
-// 	}).WithContext(ctx), nil)
-// 	if err != nil {
-// 		return &reconciler.RequeueAfterError{
-// 			Cause:        fmt.Errorf("failed to list egress ips of cluster %w", err),
-// 			RequeueAfter: 30 * time.Second,
-// 		}
-// 	}
-
-// 	for _, ip := range resp.Payload {
-// 		currentEgressIPs.Insert(*ip.Ipaddress)
-// 	}
-
-// 	wantEgressIPs := sets.NewString()
-// 	for _, egressRule := range r.infrastructureConfig.Firewall.EgressRules {
-// 		wantEgressIPs.Insert(egressRule.IPs...)
-
-// 		for _, ip := range egressRule.IPs {
-// 			ip := ip
-// 			if currentEgressIPs.Has(ip) {
-// 				continue
-// 			}
-
-// 			resp, err := r.mclient.IP().FindIPs(metalip.NewFindIPsParams().WithBody(&models.V1IPFindRequest{
-// 				Ipaddress: ip,
-// 				Projectid: r.infrastructureConfig.ProjectID,
-// 				Networkid: egressRule.NetworkID,
-// 			}).WithContext(ctx), nil)
-// 			if err != nil {
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("error when retrieving ip %s for egress rule %w", ip, err),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			}
-
-// 			switch len(resp.Payload) {
-// 			case 0:
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("ip %s for egress rule does not exist", ip),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			case 1:
-// 			default:
-// 				return fmt.Errorf("ip %s found multiple times", ip)
-// 			}
-
-// 			dbIP := resp.Payload[0]
-// 			if dbIP.Type != nil && *dbIP.Type != models.V1IPBaseTypeStatic {
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("ips for egress rule must be static, but %s is not static", ip),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			}
-
-// 			if len(dbIP.Tags) > 0 {
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("won't use ip %s for egress rules because it does not have an egress tag but it has other tags", *dbIP.Ipaddress),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			}
-
-// 			_, err = r.mclient.IP().UpdateIP(metalip.NewUpdateIPParams().WithBody(&models.V1IPUpdateRequest{
-// 				Ipaddress: dbIP.Ipaddress,
-// 				Tags:      []string{r.egressTag},
-// 			}).WithContext(ctx), nil)
-// 			if err != nil {
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("could not tag ip %s for egress usage %w", ip, err),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	if !currentEgressIPs.Equal(wantEgressIPs) {
-// 		toUnTag := currentEgressIPs.Difference(wantEgressIPs)
-// 		for _, ip := range toUnTag.List() {
-// 			err := clearIPTags(ctx, r.mclient, ip)
-// 			if err != nil {
-// 				return &reconciler.RequeueAfterError{
-// 					Cause:        fmt.Errorf("could not remove egress tag from ip %s %w", ip, err),
-// 					RequeueAfter: 30 * time.Second,
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-// func egressTag(clusterID string) string {
-// 	return fmt.Sprintf("%s=%s", tag.ClusterEgress, clusterID)
-// }

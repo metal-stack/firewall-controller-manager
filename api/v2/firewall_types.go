@@ -12,10 +12,8 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fw
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Interval",type=string,JSONPath=`.spec.interval`
-// +kubebuilder:printcolumn:name="InternalPrefixes",type=string,JSONPath=`.spec.internalprefixes`
-// +kubebuilder:printcolumn:name="ID",type="string",JSONPath=".status.machineStatus.machineID"
-// +kubebuilder:printcolumn:name="Event",type="string",JSONPath=".status.machineStatus.event"
+// +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".status.machineStatus.machineID"
+// +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.event"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -49,7 +47,7 @@ type FirewallSpec struct {
 	// Networks are the networks to which this firewall is connected
 	Networks []string `json:"networks"`
 	// SSHPublicKeys are the public keys which are added to the firewall's authorized keys file after creation
-	SSHPublicKeys []string `json:"sshPublicKeys"`
+	SSHPublicKeys []string `json:"sshPublicKeys,omitempty"`
 
 	// Interval on which rule reconciliation should happen
 	Interval string `json:"interval,omitempty"`
@@ -97,7 +95,7 @@ type FirewallStatus struct {
 
 	// FirewallNetworks holds refined information about the networks that this firewall is connected to
 	// the information is used by the firewall-controller in order to reconcile this firewall
-	FirewallNetworks []FirewallNetwork `json:"firewallNetworks"`
+	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 }
 
 // FirewallConditionType describes the condition types of Firewalls.

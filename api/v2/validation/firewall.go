@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -13,15 +14,11 @@ import (
 
 type firewallValidator struct{}
 
-func NewFirewallValidator() *genericValidator[*v2.Firewall, *firewallValidator] {
-	return &genericValidator[*v2.Firewall, *firewallValidator]{}
+func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *firewallValidator] {
+	return &genericValidator[*v2.Firewall, *firewallValidator]{log: log}
 }
 
-func (*firewallValidator) New() *firewallValidator {
-	return &firewallValidator{}
-}
-
-func (v *firewallValidator) ValidateCreate(f *v2.Firewall) field.ErrorList {
+func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
@@ -29,7 +26,7 @@ func (v *firewallValidator) ValidateCreate(f *v2.Firewall) field.ErrorList {
 	return allErrs
 }
 
-func (v *firewallValidator) ValidateUpdate(oldF, newF *v2.Firewall) field.ErrorList {
+func (v *firewallValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)

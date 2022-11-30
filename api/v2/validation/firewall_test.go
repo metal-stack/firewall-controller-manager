@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
@@ -69,7 +70,7 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewFirewallValidator()
+			v := NewFirewallValidator(testr.New(t))
 
 			got := v.ValidateCreate(context.TODO(), tt.mutateFn(valid.DeepCopy()))
 			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {
@@ -151,7 +152,7 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewFirewallValidator()
+			v := NewFirewallValidator(testr.New(t))
 
 			got := v.ValidateUpdate(context.TODO(), tt.oldF, tt.newF)
 			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {

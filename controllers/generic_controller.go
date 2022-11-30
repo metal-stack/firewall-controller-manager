@@ -31,10 +31,16 @@ type (
 	}
 )
 
-var progressingError = fmt.Errorf("reconcile is still progressing")
+type requeueError struct {
+	after time.Duration
+}
 
-func StillProgressing() error {
-	return progressingError
+func (e *requeueError) Error() string {
+	return fmt.Sprintf("requeuing reconciliation after %s", e.after.String())
+}
+
+func RequeueAfter(d time.Duration) error {
+	return &requeueError{after: d}
 }
 
 func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) GenericController[O] {
@@ -74,8 +80,14 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Info("reconciling resource deletion flow")
 			err := g.reconciler.Delete(ctx, log, o)
 			if err != nil {
+				var requeueErr *requeueError
+				if errors.As(err, &requeueErr) {
+					log.Info(requeueErr.Error())
+					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
+				}
+
 				log.Error(err, "error during deletion flow")
-				return ctrl.Result{Requeue: true}, nil //nolint:nilerr we need to return nil such that the requeue works
+				return ctrl.Result{}, err
 			}
 
 			controllerutil.RemoveFinalizer(o, FinalizerName)
@@ -119,11 +131,13 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	log.Info("reconciling resource")
 	err := g.reconciler.Reconcile(ctx, log, o)
 	if err != nil {
-		if errors.Is(err, progressingError) {
-			log.Info("still progressing, requeuing...")
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil //nolint:nilerr we need to return nil such that the requeue works
+		var requeueErr *requeueError
+		if errors.As(err, &requeueErr) {
+			log.Info(requeueErr.Error())
+			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 		}
-		log.Error(err, "error during reconcile, requeueing")
+
+		log.Error(err, "error during reconcile")
 		return ctrl.Result{}, err
 	}
 

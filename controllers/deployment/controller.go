@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
@@ -37,6 +38,8 @@ type (
 
 	controller struct {
 		*ControllerConfig
+		safetyBackoff   time.Duration
+		lastSetCreation map[string]time.Time
 	}
 )
 
@@ -79,6 +82,8 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.FirewallDeployment](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
+		safetyBackoff:    10 * time.Second,
+		lastSetCreation:  map[string]time.Time{},
 	})
 
 	err := ctrl.NewControllerManagedBy(mgr).
@@ -93,7 +98,8 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&v2.FirewallDeployment{}).
-		WithValidator(validation.NewFirewallDeploymentValidator()).
+		WithDefaulter(v2.NewFirewallDeploymentDefaulter(c.Log.WithName("defaulting-webhook"))).
+		WithValidator(validation.NewFirewallDeploymentValidator(c.Log.WithName("validating-webhook"))).
 		Complete()
 }
 

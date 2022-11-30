@@ -18,17 +18,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.interval
-      name: Interval
-      type: string
-    - jsonPath: .spec.internalprefixes
-      name: InternalPrefixes
-      type: string
     - jsonPath: .status.machineStatus.machineID
-      name: ID
+      name: Machine ID
       type: string
     - jsonPath: .status.machineStatus.event
-      name: Event
+      name: Last Event
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -149,7 +143,6 @@ spec:
             - partitionID
             - projectID
             - size
-            - sshPublicKeys
             type: object
           status:
             description: FirewallStatus defines the observed state of Firewall
@@ -304,8 +297,6 @@ spec:
                   message:
                     type: string
                 type: object
-            required:
-            - firewallNetworks
             type: object
           userdata:
             type: string

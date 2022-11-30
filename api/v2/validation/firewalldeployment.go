@@ -3,6 +3,7 @@ package validation
 import (
 	"fmt"
 
+	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -10,24 +11,24 @@ import (
 
 type firewallDeploymentValidator struct{}
 
-func NewFirewallDeploymentValidator() *genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator] {
-	return &genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator]{}
+func NewFirewallDeploymentValidator(log logr.Logger) *genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator] {
+	return &genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator]{log: log}
 }
 
-func (v *firewallDeploymentValidator) ValidateCreate(f *v2.FirewallDeployment) field.ErrorList {
+func (v *firewallDeploymentValidator) ValidateCreate(log logr.Logger, f *v2.FirewallDeployment) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, NewFirewallValidator().Instance().validateSpec(&f.Spec.Template, field.NewPath("spec").Child("template"))...)
+	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpec(&f.Spec.Template, field.NewPath("spec").Child("template"))...)
 
 	return allErrs
 }
 
-func (v *firewallDeploymentValidator) ValidateUpdate(oldF, newF *v2.FirewallDeployment) field.ErrorList {
+func (v *firewallDeploymentValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.FirewallDeployment) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, NewFirewallValidator().Instance().validateSpecUpdate(&oldF.Spec.Template, &newF.Spec.Template, field.NewPath("spec").Child("template"))...)
+	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpecUpdate(&oldF.Spec.Template, &newF.Spec.Template, field.NewPath("spec").Child("template"))...)
 
 	return allErrs
 }
