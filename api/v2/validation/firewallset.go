@@ -39,7 +39,7 @@ func (v *firewallSetValidator) validateSpecUpdate(_, fNew *v2.FirewallSetSpec, f
 	return allErrs
 }
 
-func (_ *firewallSetValidator) validateSpec(f *v2.FirewallSetSpec, fldPath *field.Path) field.ErrorList {
+func (*firewallSetValidator) validateSpec(f *v2.FirewallSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if f.Replicas < 0 {

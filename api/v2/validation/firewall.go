@@ -17,7 +17,7 @@ func NewFirewallValidator() *genericValidator[*v2.Firewall, *firewallValidator] 
 	return &genericValidator[*v2.Firewall, *firewallValidator]{}
 }
 
-func (_ *firewallValidator) New() *firewallValidator {
+func (*firewallValidator) New() *firewallValidator {
 	return &firewallValidator{}
 }
 
@@ -48,7 +48,7 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	return allErrs
 }
 
-func (_ *firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
+func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	r := requiredFields{
