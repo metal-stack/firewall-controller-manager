@@ -19,6 +19,10 @@ func (c *controller) Status(ctx context.Context, log logr.Logger, fw *v2.Firewal
 
 	status := v2.FirewallStatus{}
 
+	if status.MachineStatus == nil {
+		status.MachineStatus = &v2.MachineStatus{}
+	}
+
 	if len(fws) == 0 {
 		status.MachineStatus.Message = "no firewall created"
 		return nil
