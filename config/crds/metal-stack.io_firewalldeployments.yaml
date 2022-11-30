@@ -153,7 +153,6 @@ spec:
                 - partitionID
                 - projectID
                 - size
-                - sshPublicKeys
                 type: object
             required:
             - replicas

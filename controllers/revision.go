@@ -2,18 +2,19 @@ package controllers
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// most of the stuff copied/inspired from/by k8s deployment controller util
+// most of the stuff inspired from/by k8s deployment controller util
 
 const (
-	// RevisionAnnotation is the revision annotation of a deployment's replica sets which records its rollout sequence
-	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	RevisionAnnotation = "firewall-deployment.metal-stack.io/revision"
 )
 
 // Revision returns the revision number of the input object.
@@ -31,13 +32,26 @@ func Revision(obj runtime.Object) (int64, error) {
 
 // MaxRevisionOf finds the highest revision in the firewall sets
 func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
-	var result *v2.FirewallSet
-	max := int64(0)
+	var (
+		max    int64
+		result *v2.FirewallSet
+	)
+
+	if len(sets) == 0 {
+		return result, nil
+	} else {
+		set := sets[0]
+		v, err := Revision(set)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
+		}
+		max = v
+		result = set
+	}
+
 	for _, set := range sets {
 		set := set
-		if result == nil {
-			result = set
-		}
+
 		if v, err := Revision(set); err != nil {
 			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
 		} else if v > max {
@@ -45,17 +59,89 @@ func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 			result = set
 		}
 	}
+
 	return result, nil
 }
 
-func Except(sets []*v2.FirewallSet, set *v2.FirewallSet) []*v2.FirewallSet {
-	var result []*v2.FirewallSet
+// MinRevisionOf finds the lowest revision in the firewall sets
+func MinRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
+	var (
+		min    int64
+		result *v2.FirewallSet
+	)
+
+	if len(sets) == 0 {
+		return result, nil
+	} else {
+		set := sets[0]
+		v, err := Revision(set)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
+		}
+		min = v
+		result = set
+	}
+
+	for _, set := range sets {
+		set := set
+
+		if v, err := Revision(set); err != nil {
+			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
+		} else if v < min {
+			min = v
+			result = set
+		}
+	}
+
+	return result, nil
+}
+
+func Except[O client.Object](sets []O, except ...O) []O {
+	var result []O
+
 	for _, s := range sets {
 		s := s
-		if set.UID == s.UID {
+
+		if reflect.ValueOf(s).IsNil() {
 			continue
 		}
+
+		found := false
+		for _, e := range except {
+			e := e
+
+			if reflect.ValueOf(e).IsNil() {
+				continue
+			}
+
+			if e.GetUID() == s.GetUID() {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			continue
+		}
+
 		result = append(result, s)
 	}
+
 	return result
+}
+
+func NextRevision(set *v2.FirewallSet) (int, error) {
+	v, ok := set.Annotations[RevisionAnnotation]
+	if !ok {
+		return 0, fmt.Errorf("unable to increment revision because annotation is missing")
+	}
+
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
+	}
+
+	i++
+
+	return i, nil
 }

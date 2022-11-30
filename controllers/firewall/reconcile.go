@@ -3,6 +3,7 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -23,16 +24,19 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Fire
 	case 0:
 		_, err := c.createFirewall(ctx, fw)
 		if err != nil {
-			return err
+			log.Error(err, "unable to create firewall, backing off and retrying in 30s")
+			return controllers.RequeueAfter(30 * time.Second)
 		}
-		return controllers.StillProgressing()
+		// requeueing in order to check progression
+		return controllers.RequeueAfter(10 * time.Second)
 	case 1:
 		f := fws[0]
 		if isFirewallReady(f) {
 			log.Info("firewall is phoning home")
 			return nil
 		} else if isFirewallProgressing(f) {
-			return controllers.StillProgressing()
+			log.Info("firewall creation is still progressing, checking again in 10s")
+			return controllers.RequeueAfter(10 * time.Second)
 		}
 		return fmt.Errorf("firewall is not finishing")
 	default:
@@ -73,7 +77,10 @@ func isFirewallReady(fw *models.V1FirewallResponse) bool {
 }
 
 func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1FirewallResponse, error) {
-	var networks []*models.V1MachineAllocationNetwork
+	var (
+		networks []*models.V1MachineAllocationNetwork
+		tags     = []string{c.ClusterTag}
+	)
 	for _, n := range fw.Spec.Networks {
 		n := n
 		network := &models.V1MachineAllocationNetwork{
@@ -84,8 +91,8 @@ func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 	}
 
 	ref := metav1.GetControllerOf(fw)
-	if ref == nil {
-		return nil, fmt.Errorf("firewall object has no owner reference")
+	if ref != nil {
+		tags = append(tags, controllers.FirewallSetTag(ref.Name))
 	}
 
 	createRequest := &models.V1FirewallCreateRequest{
@@ -99,7 +106,7 @@ func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		SSHPubKeys:  fw.Spec.SSHPublicKeys,
 		Networks:    networks,
 		UserData:    fw.Userdata,
-		Tags:        []string{c.ClusterTag, controllers.FirewallSetTag(ref.Name)},
+		Tags:        tags,
 	}
 
 	resp, err := c.Metal.Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(ctx), nil)

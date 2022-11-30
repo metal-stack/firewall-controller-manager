@@ -22,6 +22,12 @@ func (c *controller) Status(ctx context.Context, log logr.Logger, set *v2.Firewa
 
 	for _, fw := range ownedFirewalls {
 		fw := fw
+
+		if fw.Status.MachineStatus == nil {
+			status.UnhealthyReplicas++
+			continue
+		}
+
 		// TODO: this has to be revamped
 		if fw.Status.MachineStatus.Event == "Phoned Home" && fw.Status.MachineStatus.Liveliness == "Alive" {
 			// FIXME: enable back in real environment:

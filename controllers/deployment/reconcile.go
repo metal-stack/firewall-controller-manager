@@ -3,6 +3,8 @@ package deployment
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
@@ -22,88 +24,34 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 		return err
 	}
 
-	ownedSets, err := controllers.GetOwnedResources(ctx, c.Seed, deploy, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
-		return fsl.GetItems()
-	})
-	if err != nil {
-		return fmt.Errorf("unable to get owned sets: %w", err)
+	switch s := deploy.Spec.Strategy; s {
+	case v2.StrategyRecreate:
+		err = c.recreateStrategy(ctx, log, deploy)
+	case v2.StrategyRollingUpdate:
+		err = c.rollingUpdateStrategy(ctx, log, deploy)
+	default:
+		err = fmt.Errorf("unknown deployment strategy: %s", s)
 	}
-
-	lastSet, err := controllers.MaxRevisionOf(ownedSets)
-	if err != nil {
-		return err
-	}
-
-	if lastSet == nil {
-		log.Info("no firewall set is present, creating a new one")
-
-		set, err := c.createFirewallSet(ctx, deploy)
-		if err != nil {
-			return fmt.Errorf("unable to create firewall set: %w", err)
-		}
-
-		c.Recorder.Eventf(set, "Normal", "Create", "created firewallset %s", set.Name)
-
-		return nil
-	}
-
-	oldSets := controllers.Except(ownedSets, lastSet)
-
-	log.Info("firewall sets already exist", "current-set-name", lastSet.Name, "old-set-count", len(oldSets))
-
-	newSetRequired, err := c.isNewSetRequired(ctx, log, deploy, lastSet)
 	if err != nil {
 		return err
 	}
 
-	if !newSetRequired {
-		log.Info("existing firewall set does not need to be rolled, only updating the resource")
-
-		lastSet.Spec.Replicas = deploy.Spec.Replicas
-		lastSet.Spec.Template = deploy.Spec.Template
-
-		err = c.Seed.Update(ctx, lastSet, &client.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("unable to update firewall set: %w", err)
-		}
-
-		log.Info("updated firewall set", "name", lastSet.Name)
-
-		c.Recorder.Eventf(lastSet, "Normal", "Update", "updated firewallset %s", lastSet.Name)
-	} else {
-		// this is recreate strategy: TODO implement rolling update
-
-		log.Info("significant changes detected in the spec, creating new firewall set")
-		newSet, err := c.createFirewallSet(ctx, deploy)
-		if err != nil {
-			return err
-		}
-
-		log.Info("created new firewall set", "name", newSet.Name)
-
-		oldSets = append(oldSets, lastSet.DeepCopy())
-
-		c.Recorder.Eventf(newSet, "Normal", "Recreate", "recreated firewallset old: %s new: %s", lastSet.Name, newSet.Name)
-	}
-
-	for _, oldSet := range oldSets {
-		log.Info("deleting old firewall sets")
-
-		oldSet := oldSet
-		err = c.Seed.Delete(ctx, oldSet, &client.DeleteOptions{})
-		if err != nil {
-			return err
-		}
-
-		log.Info("deleted old firewall set", "name", oldSet.Name)
-
-		c.Recorder.Eventf(oldSet, "Normal", "Delete", "deleted firewallset %s", oldSet.Name)
+	log.Info("reonciling egress ips")
+	err = c.reconcileEgressIPs(ctx, &deploy.Spec.Template)
+	if err != nil {
+		log.Error(err, "unable to reconcile egress ips, requeuing...")
+		return controllers.RequeueAfter(1 * time.Minute)
 	}
 
 	return nil
 }
 
-func (c *controller) createFirewallSet(ctx context.Context, deploy *v2.FirewallDeployment) (*v2.FirewallSet, error) {
+func (c *controller) createFirewallSet(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, revision int) (*v2.FirewallSet, error) {
+	if lastCreation, ok := c.lastSetCreation[deploy.Name]; ok && time.Since(lastCreation) < c.safetyBackoff {
+		log.Info("backing off from firewall set creation as last creation is only seoncds ago, requeueing in 10s", "ago", time.Since(lastCreation).String())
+		return nil, controllers.RequeueAfter(10 * time.Second)
+	}
+
 	uuid, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
@@ -123,6 +71,9 @@ func (c *controller) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(deploy, v2.GroupVersion.WithKind("FirewallDeployment")),
 			},
+			Annotations: map[string]string{
+				controllers.RevisionAnnotation: strconv.Itoa(revision),
+			},
 		},
 		Spec: v2.FirewallSetSpec{
 			Replicas: deploy.Spec.Replicas,
@@ -136,7 +87,26 @@ func (c *controller) createFirewallSet(ctx context.Context, deploy *v2.FirewallD
 		return nil, fmt.Errorf("unable to create firewall set: %w", err)
 	}
 
+	c.lastSetCreation[deploy.Name] = time.Now()
+
 	return set, nil
+}
+
+func (c *controller) deleteFirewallSets(ctx context.Context, log logr.Logger, sets []*v2.FirewallSet) error {
+	for _, set := range sets {
+		set := set
+
+		err := c.Seed.Delete(ctx, set, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+
+		log.Info("deleted firewall set", "name", set.Name)
+
+		c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
+	}
+
+	return nil
 }
 
 func (c *controller) isNewSetRequired(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {

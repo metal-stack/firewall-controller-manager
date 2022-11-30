@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -14,11 +15,13 @@ import (
 )
 
 type genericValidation[O client.Object] interface {
-	ValidateCreate(O) field.ErrorList
-	ValidateUpdate(old, new O) field.ErrorList
+	ValidateCreate(log logr.Logger, obj O) field.ErrorList
+	ValidateUpdate(log logr.Logger, old, new O) field.ErrorList
 }
 
-type genericValidator[O client.Object, V genericValidation[O]] struct{}
+type genericValidator[O client.Object, V genericValidation[O]] struct {
+	log logr.Logger
+}
 
 func (g *genericValidator[O, V]) Instance() V {
 	var v V
@@ -41,8 +44,10 @@ func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime
 		return apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
 	}
 
+	g.log.Info("validating resource creation", "name", accessor.GetName(), "namespace", accessor.GetNamespace())
+
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(accessor, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, v.ValidateCreate(o)...)
+	allErrs = append(allErrs, v.ValidateCreate(g.log, o)...)
 
 	if len(allErrs) == 0 {
 		return nil
@@ -79,8 +84,10 @@ func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, new
 		return apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
 	}
 
+	g.log.Info("validating resource update", "name", newAccessor.GetName(), "namespace", newAccessor.GetNamespace())
+
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(newAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, v.ValidateUpdate(oldO, newO)...)
+	allErrs = append(allErrs, v.ValidateUpdate(g.log, oldO, newO)...)
 
 	if len(allErrs) == 0 {
 		return nil

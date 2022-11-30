@@ -1,8 +1,13 @@
 // +kubebuilder:object:generate=true
 // +groupName=metal-stack.io
-// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewall,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewall,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
-// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewallset,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewallset,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
-// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewalldeployment,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewalldeployments,verbs=create;update,versions=v2,name=metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+//
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewall,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewalls,verbs=create;update,versions=v2,name=firewall.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewallset,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewallsets,verbs=create;update,versions=v2,name=firewallset.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-metal-stack-io-v2-firewalldeployment,mutating=false,failurePolicy=fail,groups=metal-stack.io,resources=firewalldeployments,verbs=create;update,versions=v2,name=firewalldeployment.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+//
+// +kubebuilder:webhook:path=/mutate-metal-stack-io-v2-firewall,mutating=true,failurePolicy=fail,groups=metal-stack.io,resources=firewalls,verbs=create;update,versions=v2,name=firewall.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-metal-stack-io-v2-firewallset,mutating=true,failurePolicy=fail,groups=metal-stack.io,resources=firewallsets,verbs=create;update,versions=v2,name=firewallset.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-metal-stack-io-v2-firewalldeployment,mutating=true,failurePolicy=fail,groups=metal-stack.io,resources=firewalldeployments,verbs=create;update,versions=v2,name=firewalldeployment.metal-stack.io,sideEffects=None,admissionReviewVersions=v1
 package v2
 
 import (

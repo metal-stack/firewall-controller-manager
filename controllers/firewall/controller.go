@@ -87,7 +87,8 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&v2.Firewall{}).
-		WithValidator(validation.NewFirewallValidator()).
+		WithDefaulter(v2.NewFirewallDefaulter(c.Log.WithName("defaulting-webhook"))).
+		WithValidator(validation.NewFirewallValidator(c.Log.WithName("validating-webhook"))).
 		Complete()
 }
 
