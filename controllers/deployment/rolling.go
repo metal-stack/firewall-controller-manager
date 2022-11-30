@@ -90,9 +90,6 @@ func (c *controller) rollingUpdateStrategy(ctx context.Context, log logr.Logger,
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q", newestSet.Name))
 	deploy.Status.Conditions.Set(cond)
 
-	// message: ReplicaSet "metal-api-5579f7c8c7" has successfully progressed.
-	// reason: NewReplicaSetAvailable
-
 	c.Recorder.Eventf(newestSet, "Normal", "Update", "updated firewallset %s", newestSet.Name)
 
 	if newestSet.Status.ReadyReplicas != newestSet.Spec.Replicas {
