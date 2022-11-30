@@ -26,7 +26,6 @@ type (
 	}
 	ControllerConfig struct {
 		Seed          client.Client
-		Shoot         client.Client
 		Metal         metalgo.Client
 		K8sVersion    *semver.Version
 		Namespace     string
@@ -46,9 +45,6 @@ type (
 func (c *Config) validate() error {
 	if c.Seed == nil {
 		return fmt.Errorf("seed client must be specified")
-	}
-	if c.Shoot == nil {
-		return fmt.Errorf("shoot client must be specified")
 	}
 	if c.Metal == nil {
 		return fmt.Errorf("metal client must be specified")

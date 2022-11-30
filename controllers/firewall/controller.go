@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -27,13 +26,14 @@ type (
 		ControllerConfig
 	}
 	ControllerConfig struct {
-		Seed       client.Client
-		Shoot      client.Client
-		Metal      metalgo.Client
-		Namespace  string
-		ClusterID  string
-		ClusterTag string
-		Recorder   record.EventRecorder
+		Seed           client.Client
+		Shoot          client.Client
+		Metal          metalgo.Client
+		Namespace      string
+		ShootNamespace string
+		ClusterID      string
+		ClusterTag     string
+		Recorder       record.EventRecorder
 	}
 
 	controller struct {
@@ -53,6 +53,9 @@ func (c *Config) validate() error {
 	}
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
+	}
+	if c.ShootNamespace == "" {
+		return fmt.Errorf("shoot namespace must be specified")
 	}
 	if c.ClusterID == "" {
 		return fmt.Errorf("cluster id must be specified")
@@ -77,7 +80,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	err := ctrl.NewControllerManagedBy(mgr).
-		For(&v2.Firewall{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
+		For(&v2.Firewall{}).
 		Named("Firewall").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)

@@ -13,17 +13,13 @@ import (
 
 // most of the stuff inspired from/by k8s deployment controller util
 
-const (
-	RevisionAnnotation = "firewall-deployment.metal-stack.io/revision"
-)
-
 // Revision returns the revision number of the input object.
 func Revision(obj runtime.Object) (int, error) {
 	acc, err := meta.Accessor(obj)
 	if err != nil {
 		return 0, err
 	}
-	v, ok := acc.GetAnnotations()[RevisionAnnotation]
+	v, ok := acc.GetAnnotations()[v2.RevisionAnnotation]
 	if !ok {
 		return 0, nil
 	}

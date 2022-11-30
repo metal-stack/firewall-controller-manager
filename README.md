@@ -6,13 +6,12 @@ The firewall-controller-manager aka FCM is a collection of controllers which are
 
 ## Objects
 
-There are the following similarities in the resources of FCM compared to a Deployment:
-
 | Custom ResourceObject | Description                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FirewallDeployment`  | A `FirewallDeployment` contains the spec template of a `Firewall` resource similar to a `Deployment` and implements update strategies like rolling update.    |
 | `FirewallSet`         | A `FirewallSet` is similar to ReplicaSet. It is typically owned by a `FirewallDeployment` and attempts to run the defined replica amount of the `Firewall`(s) |
 | `Firewall`            | A `Firewall` is similar to a `Pod` and has a 1:1 relationship to a firewall in the metal-stack api.                                                           |
+| `FirewallMonitor`     | Deployed into the cluster of the user (shoot cluster), which is useful for monitoring the firewall or user-triggered actions on the firewall.                 |
 
 If significant changes were made to the `FirewallDeployment` – like changing the OS image, machine size or firewall networks – then a new `FirewallSet` is created and the existing `Firewall` will be eventually replaced.
 
@@ -33,6 +32,14 @@ Creates and deletes `Firewall` objects according to the spec according to the gi
 ### `FirewallController`
 
 Create and delete the physical firewall machine from the spec at the metal-api.
+
+## Rolling a `FirewallSet` through `FirewallMonitor` Annotations
+
+A user can initiate rolling a firewall set by annotation the monitor with the following annotation:
+
+```bash
+$ kubectl annotate fwmon <firewall-name> firewall-deployment.metal-stack.io/roll-set=true
+```
 
 ## Deployment
 

@@ -14,6 +14,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/zapr"
 	metalgo "github.com/metal-stack/metal-go"
+	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	"github.com/metal-stack/metal-lib/rest"
 	"github.com/metal-stack/v"
@@ -28,6 +29,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
+	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
 )
 
@@ -120,11 +122,13 @@ func main() {
 	}
 
 	var (
-		shootClient     = mgr.GetClient()
-		discoveryClient *discovery.DiscoveryClient
+		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(mgr.GetConfig())
+
+		shootClient, _  = client.New(restConfig, client.Options{Scheme: scheme}) // defaults to seed, e.g. for devel purposes
+		shootRestConfig = restConfig                                             // defaults to seed, e.g. for devel purposes
 	)
 	if len(shootKubeconfig) > 0 {
-		shootRestConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		shootRestConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: shootKubeconfig},
 			&clientcmd.ConfigOverrides{},
 		).ClientConfig()
@@ -137,13 +141,18 @@ func main() {
 			setupLog.Error(err, "unable to create shoot client")
 			os.Exit(1)
 		}
-		discoveryClient, err = discovery.NewDiscoveryClientForConfig(shootRestConfig)
-		if err != nil {
-			setupLog.Error(err, "unable to create shoot discovery client")
-			os.Exit(1)
-		}
-	} else {
-		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(mgr.GetConfig())
+	}
+
+	shootMgr, err := ctrl.NewManager(shootRestConfig, ctrl.Options{
+		Scheme:                  scheme,
+		MetricsBindAddress:      "0",
+		LeaderElection:          false,
+		Namespace:               v2.FirewallShootNamespace,
+		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start firewall-controller-manager-monitor")
+		os.Exit(1)
 	}
 
 	mclient, err := getMetalClient()
@@ -158,17 +167,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("shoot kubernetes version", "version", version.String())
+	setupLog.Info("seed kubernetes version", "version", version.String())
 	k8sVersion, err := semver.NewVersion(version.GitVersion)
 	if err != nil {
 		setupLog.Error(err, "unable to parse kubernetes version version")
 		os.Exit(1)
 	}
 
+	// TODO: deploy crds automatically, firewallmonitor to shoot, rest to seed
+
 	if err = (&deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:          mgr.GetClient(),
-			Shoot:         shootClient,
 			Metal:         mclient,
 			Namespace:     namespace,
 			ClusterID:     clusterID,
@@ -186,7 +196,6 @@ func main() {
 	if err = (&set.Config{
 		ControllerConfig: set.ControllerConfig{
 			Seed:                  mgr.GetClient(),
-			Shoot:                 shootClient,
 			Metal:                 mclient,
 			Namespace:             namespace,
 			ClusterID:             clusterID,
@@ -203,13 +212,14 @@ func main() {
 
 	if err = (&firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
-			Seed:       mgr.GetClient(),
-			Shoot:      shootClient,
-			Metal:      mclient,
-			Namespace:  namespace,
-			ClusterID:  clusterID,
-			ClusterTag: fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			Recorder:   mgr.GetEventRecorderFor("firewall-controller"),
+			Seed:           mgr.GetClient(),
+			Shoot:          shootClient,
+			Metal:          mclient,
+			Namespace:      namespace,
+			ShootNamespace: v2.FirewallShootNamespace,
+			ClusterID:      clusterID,
+			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}).SetupWithManager(mgr); err != nil {
@@ -217,8 +227,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&monitor.Config{
+		ControllerConfig: monitor.ControllerConfig{
+			Seed:          mgr.GetClient(),
+			Shoot:         shootClient,
+			Namespace:     v2.FirewallShootNamespace,
+			SeedNamespace: namespace,
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
+	}).SetupWithManager(shootMgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "monitor")
+		os.Exit(1)
+	}
+
+	stop := ctrl.SetupSignalHandler()
+
+	go func() {
+		setupLog.Info("starting firewall-controller-manager-monitor", "version", v.V)
+		if err := shootMgr.Start(stop); err != nil {
+			setupLog.Error(err, "problem running firewall-controller-manager-monitor")
+			os.Exit(1)
+		}
+	}()
+
 	setupLog.Info("starting firewall-controller-manager", "version", v.V)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(stop); err != nil {
 		setupLog.Error(err, "problem running firewall-controller-manager")
 		os.Exit(1)
 	}

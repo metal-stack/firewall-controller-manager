@@ -27,6 +27,7 @@ type (
 		namespace  string
 		c          client.Client
 		reconciler Reconciler[O]
+		hasStatus  bool
 	}
 )
 
@@ -43,13 +44,19 @@ func RequeueAfter(d time.Duration, reason string) error {
 	return &requeueError{after: d, reason: reason}
 }
 
-func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) GenericController[O] {
-	return GenericController[O]{
+func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) *GenericController[O] {
+	return &GenericController[O]{
 		l:          l,
 		c:          c,
 		namespace:  namespace,
 		reconciler: reconciler,
+		hasStatus:  true,
 	}
+}
+
+func (g *GenericController[O]) WithoutStatus() *GenericController[O] {
+	g.hasStatus = false
+	return g
 }
 
 func (g *GenericController[O]) logger(req ctrl.Request) logr.Logger {
@@ -86,8 +93,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 				}
 
-				log.Error(err, "error during deletion flow")
-				return ctrl.Result{}, err
+				if !apierrors.IsNotFound(err) {
+					log.Error(err, "error during deletion flow")
+					return ctrl.Result{}, err
+				}
 			}
 
 			controllerutil.RemoveFinalizer(o, FinalizerName)
@@ -106,15 +115,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	defer func() {
-		log.Info("updating status")
+	if g.hasStatus {
+		defer func() {
+			log.Info("updating status")
 
-		err := g.c.Status().Update(ctx, o)
-		if err != nil {
-			log.Error(err, "status could not be updated")
-		}
-		return
-	}()
+			err := g.c.Status().Update(ctx, o)
+			if err != nil {
+				log.Error(err, "status could not be updated")
+			}
+			return
+		}()
+	}
 
 	log.Info("reconciling resource")
 	err := g.reconciler.Reconcile(ctx, log, o)

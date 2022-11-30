@@ -29,7 +29,7 @@ func TestMaxRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "a",
 						Annotations: map[string]string{
-							RevisionAnnotation: "0",
+							v2.RevisionAnnotation: "0",
 						},
 					},
 				},
@@ -38,7 +38,7 @@ func TestMaxRevisionOf(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
-						RevisionAnnotation: "0",
+						v2.RevisionAnnotation: "0",
 					},
 				},
 			},
@@ -50,7 +50,7 @@ func TestMaxRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "a",
 						Annotations: map[string]string{
-							RevisionAnnotation: "0",
+							v2.RevisionAnnotation: "0",
 						},
 					},
 				},
@@ -58,7 +58,7 @@ func TestMaxRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "c",
 						Annotations: map[string]string{
-							RevisionAnnotation: "2",
+							v2.RevisionAnnotation: "2",
 						},
 					},
 				},
@@ -66,7 +66,7 @@ func TestMaxRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "b",
 						Annotations: map[string]string{
-							RevisionAnnotation: "1",
+							v2.RevisionAnnotation: "1",
 						},
 					},
 				},
@@ -75,7 +75,7 @@ func TestMaxRevisionOf(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: "c",
 					Annotations: map[string]string{
-						RevisionAnnotation: "2",
+						v2.RevisionAnnotation: "2",
 					},
 				},
 			},
@@ -114,7 +114,7 @@ func TestMinRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "a",
 						Annotations: map[string]string{
-							RevisionAnnotation: "0",
+							v2.RevisionAnnotation: "0",
 						},
 					},
 				},
@@ -123,7 +123,7 @@ func TestMinRevisionOf(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
-						RevisionAnnotation: "0",
+						v2.RevisionAnnotation: "0",
 					},
 				},
 			},
@@ -135,7 +135,7 @@ func TestMinRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "c",
 						Annotations: map[string]string{
-							RevisionAnnotation: "2",
+							v2.RevisionAnnotation: "2",
 						},
 					},
 				},
@@ -143,7 +143,7 @@ func TestMinRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "a",
 						Annotations: map[string]string{
-							RevisionAnnotation: "0",
+							v2.RevisionAnnotation: "0",
 						},
 					},
 				},
@@ -151,7 +151,7 @@ func TestMinRevisionOf(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name: "b",
 						Annotations: map[string]string{
-							RevisionAnnotation: "1",
+							v2.RevisionAnnotation: "1",
 						},
 					},
 				},
@@ -160,7 +160,7 @@ func TestMinRevisionOf(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
-						RevisionAnnotation: "0",
+						v2.RevisionAnnotation: "0",
 					},
 				},
 			},

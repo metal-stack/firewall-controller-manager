@@ -25,6 +25,11 @@ type Condition struct {
 }
 
 const (
+	RollSetAnnotation  = "firewall-deployment.metal-stack.io/roll-set"
+	RevisionAnnotation = "firewall-deployment.metal-stack.io/revision"
+)
+
+const (
 	// ConditionTrue means a resource is in the condition.
 	ConditionTrue ConditionStatus = "True"
 	// ConditionFalse means a resource is not in the condition.

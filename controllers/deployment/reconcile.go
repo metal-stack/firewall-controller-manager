@@ -98,7 +98,7 @@ func (c *controller) createFirewallSet(ctx context.Context, log logr.Logger, dep
 				*metav1.NewControllerRef(deploy, v2.GroupVersion.WithKind("FirewallDeployment")),
 			},
 			Annotations: map[string]string{
-				controllers.RevisionAnnotation: strconv.Itoa(revision),
+				v2.RevisionAnnotation: strconv.Itoa(revision),
 			},
 		},
 		Spec: v2.FirewallSetSpec{
@@ -136,7 +136,16 @@ func (c *controller) deleteFirewallSets(ctx context.Context, log logr.Logger, se
 }
 
 func (c *controller) isNewSetRequired(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
-	ok := sizeHasChanged(deploy, lastSet)
+	v, ok := lastSet.Annotations[v2.RollSetAnnotation]
+	if ok {
+		rollSet, err := strconv.ParseBool(v)
+		if err == nil && rollSet {
+			log.Info("set roll initiated by annotation")
+			return true, nil
+		}
+	}
+
+	ok = sizeHasChanged(deploy, lastSet)
 	if ok {
 		log.Info("firewall size has changed", "size", deploy.Spec.Template.Size)
 		return ok, nil

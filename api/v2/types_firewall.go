@@ -4,6 +4,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	FirewallShootNamespace = "firewall"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -104,6 +108,8 @@ const (
 	FirewallReady ConditionType = "Ready"
 	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
 	FirewallControllerConnected ConditionType = "Connected"
+	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
+	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 )
 
 type MachineStatus struct {

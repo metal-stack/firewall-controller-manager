@@ -34,5 +34,7 @@ func init() {
 		&FirewallSetList{},
 		&FirewallDeployment{},
 		&FirewallDeploymentList{},
+		&FirewallMonitor{},
+		&FirewallMonitorList{},
 	)
 }
