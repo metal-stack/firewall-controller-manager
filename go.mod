@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/Masterminds/semver/v3 v3.2.0
-	github.com/davecgh/go-spew v1.1.1
 	github.com/flatcar/container-linux-config-transpiler v0.9.4
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
@@ -32,6 +31,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.4.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/emicklei/go-restful-openapi/v2 v2.9.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
