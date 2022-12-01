@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -80,7 +81,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	err := ctrl.NewControllerManagedBy(mgr).
-		For(&v2.Firewall{}).
+		For(&v2.Firewall{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("Firewall").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)

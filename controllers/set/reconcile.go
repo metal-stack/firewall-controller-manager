@@ -1,8 +1,8 @@
 package set
 
 import (
-	"context"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -11,7 +11,6 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,7 +40,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 				return err
 			}
 
-			r.Log.Info("firewall created", "name", fw.Name)
+			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
 			c.Recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
 
@@ -50,55 +49,38 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	}
 
 	if currentAmount > r.Target.Spec.Replicas {
-		ownedFirewallSet := sets.NewString()
-		for _, fw := range ownedFirewalls {
-			ownedFirewallSet.Insert(fw.Name)
-		}
+		// TODO: this section needs testing
+		sort.Slice(ownedFirewalls, func(i, j int) bool {
+			// put the oldest at the end of the slice, we will then pop them off
+			return !ownedFirewalls[i].CreationTimestamp.Before(&ownedFirewalls[j].CreationTimestamp)
+		})
 
 		for i := r.Target.Spec.Replicas; i < currentAmount; i++ {
-			// TODO: should we prefer deleting some firewalls over others?
-			name, ok := ownedFirewallSet.PopAny()
-			if !ok {
-				return fmt.Errorf("no firewall found for deletion")
-			}
+			var fw *v2.Firewall
+			fw, ownedFirewalls = pop(ownedFirewalls)
 
-			fw, err := c.deleteFirewallByName(r.Ctx, name)
+			err := c.deleteFirewalls(r, fw)
 			if err != nil {
 				return err
 			}
-
-			r.Log.Info("firewall deleted", "name", fw.Name)
-
-			c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s", fw.Name)
 
 			ownedFirewalls = controllers.Except(ownedFirewalls, fw)
 		}
 	}
 
-	err = c.setStatus(r.Ctx, r.Target)
+	deletedFws, err := c.deleteAfterTimeout(r, ownedFirewalls...)
 	if err != nil {
 		return err
 	}
 
-	// TODO: if managed firewall does not ready state, recreate after ~10m
+	ownedFirewalls = controllers.Except(ownedFirewalls, deletedFws...)
+
+	err = c.setStatus(r, ownedFirewalls)
+	if err != nil {
+		return err
+	}
 
 	return c.checkOrphans(r)
-}
-
-func (c *controller) deleteFirewallByName(ctx context.Context, name string) (*v2.Firewall, error) {
-	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: c.Namespace,
-		},
-	}
-
-	err := c.Seed.Delete(ctx, fw, &client.DeleteOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return fw, nil
 }
 
 func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Firewall, error) {
@@ -172,7 +154,7 @@ func (c *controller) checkOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
 			continue
 		}
 
-		r.Log.Info("found orphan firewall, deleting orphan", "name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
+		r.Log.Info("found orphan firewall, deleting orphan", "firewall-name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
 
 		_, err = c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
 		if err != nil {
@@ -183,4 +165,9 @@ func (c *controller) checkOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
 	}
 
 	return nil
+}
+
+func pop[E any](slice []E) (E, []E) {
+	// stolen from golang slice tricks
+	return slice[len(slice)-1], slice[:len(slice)-1]
 }

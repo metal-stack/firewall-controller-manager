@@ -17,7 +17,7 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 	if newSetRequired {
 		r.Log.Info("significant changes detected in the spec, cleaning up old sets then create new firewall set")
 
-		err = c.deleteFirewallSets(r, ownedSets)
+		err = c.deleteFirewallSets(r, ownedSets...)
 		if err != nil {
 			return err
 		}

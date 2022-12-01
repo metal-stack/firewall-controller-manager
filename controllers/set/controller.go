@@ -34,6 +34,7 @@ type (
 
 	controller struct {
 		*ControllerConfig
+		createTimeout time.Duration // duration after which a firewall in phase creating will be thrown away
 	}
 )
 
@@ -70,6 +71,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.FirewallSet](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
+		createTimeout:    10 * time.Minute,
 	})
 
 	err := ctrl.NewControllerManagedBy(mgr).

@@ -18,6 +18,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
     - jsonPath: .status.machineStatus.machineID
       name: Machine ID
       type: string
@@ -314,8 +317,12 @@ spec:
                 - liveliness
                 - machineID
                 type: object
+              phase:
+                description: Phase describes the firewall phase at the current time.
+                type: string
             required:
             - conditions
+            - phase
             type: object
           userdata:
             description: Userdata contains the userdata used for the creation of the

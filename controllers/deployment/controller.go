@@ -37,8 +37,9 @@ type (
 
 	controller struct {
 		*ControllerConfig
-		safetyBackoff   time.Duration
-		lastSetCreation map[string]time.Time
+		safetyBackoff    time.Duration
+		progressDeadline time.Duration // time after which a deployment is considered not progressing anymore (informational)
+		lastSetCreation  map[string]time.Time
 	}
 )
 
@@ -79,6 +80,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 	g := controllers.NewGenericController[*v2.FirewallDeployment](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
 		safetyBackoff:    10 * time.Second,
+		progressDeadline: 15 * time.Minute,
 		lastSetCreation:  map[string]time.Time{},
 	})
 

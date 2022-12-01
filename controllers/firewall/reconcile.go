@@ -28,9 +28,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 	switch len(fws) {
 	case 0:
+		r.Target.Status.Phase = v2.FirewallPhaseCreating
+
 		f, err := c.createFirewall(r)
 		if err != nil {
-			return controllers.RequeueAfter(30*time.Second, "error creating firewall")
+			return controllers.RequeueAfter(30*time.Second, "error creating firewall, backing off")
 		}
 
 		if err := c.setStatus(r, f); err != nil {
@@ -57,6 +59,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionTrue, "Ready", fmt.Sprintf("Firewall %q is phoning home and alive.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
 			r.Target.Status.Conditions.Set(cond)
 
+			r.Target.Status.Phase = v2.FirewallPhaseRunning
+
 			// to make the controller always sync the status with the metal-api, we requeue
 			return controllers.RequeueAfter(1*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
 
@@ -72,6 +76,10 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		} else {
 
 			r.Log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", pointer.SafeDeref(f.ID))
+
+			if pointer.SafeDeref(r.Target.Status.MachineStatus).CrashLoop {
+				r.Target.Status.Phase = v2.FirewallPhaseCrashing
+			}
 
 			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotFinishing", fmt.Sprintf("Firewall %q is not finishing the provisioning procedure.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
 			r.Target.Status.Conditions.Set(cond)

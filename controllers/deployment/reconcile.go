@@ -125,7 +125,7 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		return nil, fmt.Errorf("unable to create firewall set: %w", err)
 	}
 
-	r.Log.Info("created new firewall set", "name", set.Name)
+	r.Log.Info("created new firewall set", "set-name", set.Name)
 
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", set.Name))
 	r.Target.Status.Conditions.Set(cond)
@@ -144,7 +144,7 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 		return fmt.Errorf("unable to update/sync firewall set: %w", err)
 	}
 
-	r.Log.Info("updated firewall set", "name", set.Name)
+	r.Log.Info("updated firewall set", "set-name", set.Name)
 
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q", set.Name))
 	r.Target.Status.Conditions.Set(cond)

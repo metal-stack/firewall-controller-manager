@@ -16,10 +16,10 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
 		return fmt.Errorf("unable to get owned sets: %w", err)
 	}
 
-	return c.deleteFirewallSets(r, ownedSets)
+	return c.deleteFirewallSets(r, ownedSets...)
 }
 
-func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeployment], sets []*v2.FirewallSet) error {
+func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeployment], sets ...*v2.FirewallSet) error {
 	for _, set := range sets {
 		set := set
 
@@ -28,7 +28,7 @@ func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeploymen
 			return err
 		}
 
-		r.Log.Info("deleted firewall set", "name", set.Name)
+		r.Log.Info("deleted firewall set", "set-name", set.Name)
 
 		c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
 	}

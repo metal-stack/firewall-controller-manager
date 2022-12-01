@@ -1,8 +1,6 @@
 package set
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -10,19 +8,12 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
-func (c *controller) setStatus(ctx context.Context, set *v2.FirewallSet) error {
-	ownedFirewalls, err := controllers.GetOwnedResources(ctx, c.Seed, set, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
-		return fl.GetItems()
-	})
-	if err != nil {
-		return fmt.Errorf("unable to get owned firewalls: %w", err)
-	}
+func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewalls []*v2.Firewall) error {
+	r.Target.Status.TargetReplicas = r.Target.Spec.Replicas
 
-	set.Status.TargetReplicas = set.Spec.Replicas
-
-	set.Status.ReadyReplicas = 0
-	set.Status.ProgressingReplicas = 0
-	set.Status.UnhealthyReplicas = 0
+	r.Target.Status.ReadyReplicas = 0
+	r.Target.Status.ProgressingReplicas = 0
+	r.Target.Status.UnhealthyReplicas = 0
 
 	for _, fw := range ownedFirewalls {
 		var (
@@ -35,23 +26,23 @@ func (c *controller) setStatus(ctx context.Context, set *v2.FirewallSet) error {
 		)
 
 		if created && ready {
-			set.Status.ReadyReplicas++
+			r.Target.Status.ReadyReplicas++
 			continue
 		}
 
 		if created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) < c.FirewallHealthTimeout {
-			set.Status.ProgressingReplicas++
+			r.Target.Status.ProgressingReplicas++
 			continue
 		}
 
-		set.Status.UnhealthyReplicas++
+		r.Target.Status.UnhealthyReplicas++
 	}
 
-	revision, err := controllers.Revision(set)
+	revision, err := controllers.Revision(r.Target)
 	if err != nil {
 		return err
 	}
-	set.Status.ObservedRevision = revision
+	r.Target.Status.ObservedRevision = revision
 
 	return nil
 }

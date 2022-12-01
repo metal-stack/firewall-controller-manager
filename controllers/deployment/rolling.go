@@ -38,7 +38,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	if current.Status.ReadyReplicas != current.Spec.Replicas {
 		r.Log.Info("set replicas are not yet ready, delaying old set cleanup")
 
-		if time.Since(current.CreationTimestamp.Time) > 15*time.Minute {
+		if time.Since(current.CreationTimestamp.Time) > c.progressDeadline {
 			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", current.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}
@@ -53,7 +53,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 
 	oldSets := controllers.Except(ownedSets, current)
 
-	return c.deleteFirewallSets(r, oldSets)
+	return c.deleteFirewallSets(r, oldSets...)
 }
 
 func (c *controller) cleanupIntermediateSets(r *controllers.Ctx[*v2.FirewallDeployment], sets []*v2.FirewallSet) error {
@@ -75,7 +75,7 @@ func (c *controller) cleanupIntermediateSets(r *controllers.Ctx[*v2.FirewallDepl
 	if len(intermediateSets) > 0 {
 		r.Log.Info("cleaning up intermediate sets")
 
-		err = c.deleteFirewallSets(r, intermediateSets)
+		err = c.deleteFirewallSets(r, intermediateSets...)
 		if err != nil {
 			return err
 		}

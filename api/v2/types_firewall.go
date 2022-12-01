@@ -16,6 +16,7 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fw
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".status.machineStatus.machineID"
 // +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.lastEvent.event"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -99,7 +100,21 @@ type FirewallStatus struct {
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`
+	// Phase describes the firewall phase at the current time.
+	Phase FirewallPhase `json:"phase"`
 }
+
+// FirewallPhase describes the firewall phase at the current time.
+type FirewallPhase string
+
+const (
+	// FirewallPhaseCreating means the firewall is currently being created.
+	FirewallPhaseCreating FirewallPhase = "Creating"
+	// FirewallPhaseRunning means the firewall is currently running.
+	FirewallPhaseRunning FirewallPhase = "Running"
+	// FirewallPhaseCrashing means the firewall is currently in a provisioning crashloop.
+	FirewallPhaseCrashing FirewallPhase = "Crashing"
+)
 
 const (
 	// FirewallCreated indicates if the firewall was created at the metal-api
