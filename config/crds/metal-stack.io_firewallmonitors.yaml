@@ -169,7 +169,7 @@ spec:
             - stats
             type: object
           egressRules:
-            description: EgressRules contains egress rules configured for this firewall
+            description: EgressRules contains egress rules configured for this firewall.
             items:
               description: EgressRuleSNAT holds a Source-NAT rule
               properties:
@@ -189,7 +189,7 @@ spec:
               type: object
             type: array
           image:
-            description: Image is the os image installed on the firewall
+            description: Image is the os image of the firewall.
             type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
@@ -198,7 +198,7 @@ spec:
             type: string
           logAcceptedConnections:
             description: LogAcceptedConnections if set to true, also log accepted
-              connections in the droptailer log
+              connections in the droptailer log.
             type: boolean
           machineStatus:
             description: MachineStatus holds the status of the firewall machine
@@ -249,19 +249,18 @@ spec:
           metadata:
             type: object
           networks:
-            description: Networks are the networks to which this firewall is connected
+            description: Networks are the networks to which this firewall is connected.
             items:
               type: string
             type: array
           partition:
-            description: Partition is the partition in which the firewall is running
+            description: Partition is the partition in which the firewall resides.
             type: string
           project:
-            description: Project is the project for which the firewall was created
+            description: Project is the project in which the firewall resides.
             type: string
           rateLimits:
-            description: RateLimits contains the configuration of rate limit rules
-              for interfaces
+            description: RateLimits allows configuration of rate limit rules for interfaces.
             items:
               description: RateLimit contains the rate limit rule for a network.
               properties:
@@ -279,7 +278,7 @@ spec:
               type: object
             type: array
           size:
-            description: Size is the size of the firewall
+            description: Size is the machine size of the firewall.
             type: string
         required:
         - conditions

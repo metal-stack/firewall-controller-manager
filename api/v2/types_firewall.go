@@ -28,19 +28,8 @@ type Firewall struct {
 	// Userdata contains the userdata used for the creation of the firewall.
 	// It is not part of the template as it is generated dynamically by a controller that governs the firewall.
 	Userdata string `json:"userdata"`
-
 	// Status contains current status information on the firewall.
 	Status FirewallStatus `json:"status,omitempty"`
-}
-
-// FirewallList contains a list of firewalls
-// +kubebuilder:object:root=true
-type FirewallList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-
-	// Items contains the list items.
-	Items []Firewall `json:"items"`
 }
 
 // FirewallSpec defines parameters for the firewall creation along with configuration for the firewall-controller.
@@ -174,6 +163,17 @@ type FirewallNetwork struct {
 	Prefixes []string `json:"prefixes"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
+}
+
+// FirewallList contains a list of firewalls
+//
+// +kubebuilder:object:root=true
+type FirewallList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	// Items contains the list items.
+	Items []Firewall `json:"items"`
 }
 
 func (f *FirewallList) GetItems() []*Firewall {

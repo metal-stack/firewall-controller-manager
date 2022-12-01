@@ -33,6 +33,9 @@ spec:
     name: v2
     schema:
       openAPIV3Schema:
+        description: FirewallSet contains the spec template of a firewall resource
+          similar to a Kubernetes ReplicaSet and takes care that the desired amount
+          of firewall replicas is running.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -47,12 +50,14 @@ spec:
           metadata:
             type: object
           spec:
+            description: Spec contains the firewall set specification.
             properties:
               replicas:
+                description: Replicas is the amount of firewall replicas targeted
+                  to be running.
                 type: integer
               template:
-                description: FirewallSpec defines parameters for the firewall creation
-                  along with configuration for the firewall-controller.
+                description: Template is the firewall spec used for creating the firewalls.
                 properties:
                   controllerURL:
                     description: ControllerURL points to the downloadable binary artifact
@@ -169,16 +174,28 @@ spec:
             - template
             type: object
           status:
+            description: Status contains current status information on the firewall
+              set.
             properties:
               observedRevision:
+                description: ObservedRevision is a counter that increases with each
+                  firewall set roll that was made.
                 type: integer
               progressingReplicas:
+                description: ProgressingReplicas is the amount of firewall replicas
+                  that are currently progressing in the latest managed firewall set.
                 type: integer
               readyReplicas:
+                description: ProgressingReplicas is the amount of firewall replicas
+                  that are currently ready in the latest managed firewall set.
                 type: integer
               targetReplicas:
+                description: TargetReplicas is the amount of firewall replicas targeted
+                  to be running.
                 type: integer
               unhealthyReplicas:
+                description: ProgressingReplicas is the amount of firewall replicas
+                  that are currently unhealthy in the latest managed firewall set.
                 type: integer
             required:
             - observedRevision
@@ -188,6 +205,9 @@ spec:
             - unhealthyReplicas
             type: object
           userdata:
+            description: Userdata contains the userdata used for the creation of the
+              firewall. It is not part of the template as it is generated dynamically
+              by a controller that governs the firewall.
             type: string
         required:
         - userdata

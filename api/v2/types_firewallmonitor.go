@@ -18,22 +18,24 @@ type FirewallMonitor struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Size is the size of the firewall
+	// Size is the machine size of the firewall.
 	Size string `json:"size"`
-	// Image is the os image installed on the firewall
+	// Image is the os image of the firewall.
 	Image string `json:"image"`
-	// Partition is the partition in which the firewall is running
+	// Partition is the partition in which the firewall resides.
 	Partition string `json:"partition"`
-	// Project is the project for which the firewall was created
+	// Project is the project in which the firewall resides.
 	Project string `json:"project"`
-	// Networks are the networks to which this firewall is connected
+	// Networks are the networks to which this firewall is connected.
 	Networks []string `json:"networks"`
-	// RateLimits contains the configuration of rate limit rules for interfaces
+
+	// RateLimits allows configuration of rate limit rules for interfaces.
 	RateLimits []RateLimit `json:"rateLimits,omitempty"`
-	// EgressRules contains egress rules configured for this firewall
+	// EgressRules contains egress rules configured for this firewall.
 	EgressRules []EgressRuleSNAT `json:"egressRules,omitempty"`
-	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log
+	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
+
 	// MachineStatus holds the status of the firewall machine
 	MachineStatus *MachineStatus `json:"machineStatus,omitempty"`
 	// ControllerStatus holds the status of the firewall-controller reconciling this firewall
