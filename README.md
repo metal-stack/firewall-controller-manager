@@ -33,7 +33,7 @@ Creates and deletes `Firewall` objects according to the spec according to the gi
 
 Create and delete the physical firewall machine from the spec at the metal-api.
 
-## Rolling a `FirewallSet` through `FirewallMonitor` Annotations
+## Rolling a `FirewallSet` through `FirewallMonitor` Annotation
 
 A user can initiate rolling the latest firewall set by annotating a monitor in the following way:
 
