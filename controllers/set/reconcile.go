@@ -40,8 +40,12 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 			if err != nil {
 				return err
 			}
+
 			r.Log.Info("firewall created", "name", fw.Name)
+
 			c.Recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
+
+			ownedFirewalls = append(ownedFirewalls, fw)
 		}
 	}
 
@@ -64,7 +68,10 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 			}
 
 			r.Log.Info("firewall deleted", "name", fw.Name)
+
 			c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s", fw.Name)
+
+			ownedFirewalls = controllers.Except(ownedFirewalls, fw)
 		}
 	}
 

@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -37,8 +38,10 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	if current.Status.ReadyReplicas != current.Spec.Replicas {
 		r.Log.Info("set replicas are not yet ready, delaying old set cleanup")
 
-		// TODO: detect when it's not finishing and set to ProgressDeadlineExceeded
-		// when the set does not show any progress within the given deadline (progressDeadlineSeconds)
+		if time.Since(current.CreationTimestamp.Time) > 15*time.Minute {
+			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", current.Name))
+			r.Target.Status.Conditions.Set(cond)
+		}
 
 		return c.cleanupIntermediateSets(r, ownedSets)
 	}
