@@ -104,9 +104,6 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		Userdata: r.Target.Userdata,
 	}
 
-	// TODO: for backwards-compatibility create firewall object in the shoot cluster as well
-	// maybe deploy v1 and create v2 api to manage in the new manner
-
 	err = c.Seed.Create(r.Ctx, fw, &client.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create firewall resource: %w", err)

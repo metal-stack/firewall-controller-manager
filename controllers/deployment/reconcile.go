@@ -63,11 +63,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return err
 	}
 
-	err = c.reconcileEgressIPs(r)
-	if err != nil {
-		return controllers.RequeueAfter(2*time.Minute, "backing off because egress ips can probably not be repaired by retrying")
-	}
-
 	return nil
 }
 

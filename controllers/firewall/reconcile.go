@@ -97,8 +97,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "MultipleFirewalls", fmt.Sprintf("Found multiple firewalls with the same name: %s", strings.Join(ids, ", ")))
 		r.Target.Status.Conditions.Set(cond)
 
-		// TODO: should we just remove the other ones?
-
 		return controllers.RequeueAfter(1*time.Minute, "multiple firewalls found with the same name, please investigate")
 	}
 }

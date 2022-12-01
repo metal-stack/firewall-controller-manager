@@ -69,8 +69,6 @@ const (
 	FirewallDeplomentProgressing ConditionType = "Progressing"
 	// FirewallDeplomentRBACProvisioned indicates whether the rbac permissions for the firewall-controller to communicate with the api server were provisioned.
 	FirewallDeplomentRBACProvisioned ConditionType = "RBACProvisioned"
-	// FirewallDeplomentEgressIPs indicates whether the egress ips of the firewall are properly configured and annotated with ip tags.
-	FirewallDeplomentEgressIPs ConditionType = "EgressIPs"
 )
 
 // FirewallDeploymentList contains a list of firewalls deployments
