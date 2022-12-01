@@ -25,8 +25,8 @@ func Test_firewallDeploymentValidator_ValidateCreate(t *testing.T) {
 				ControllerURL:     "https://metal-stack.io/controller.img",
 				ControllerVersion: "v",
 				Image:             "image-a",
-				PartitionID:       "partition-a",
-				ProjectID:         "project-a",
+				Partition:         "partition-a",
+				Project:           "project-a",
 				Size:              "size-a",
 				Networks:          []string{"internet"},
 				EgressRules: []v2.EgressRuleSNAT{
@@ -105,8 +105,8 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 						ControllerURL:     "https://metal-stack.io/controller.img",
 						ControllerVersion: "v",
 						Image:             "image-a",
-						PartitionID:       "partition-a",
-						ProjectID:         "project-a",
+						Partition:         "partition-a",
+						Project:           "project-a",
 						Size:              "size-a",
 						Networks:          []string{"internet"},
 						EgressRules: []v2.EgressRuleSNAT{
@@ -136,8 +136,8 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 						ControllerURL:     "https://metal-stack.io/controller.img",
 						ControllerVersion: "v",
 						Image:             "image-a",
-						PartitionID:       "partition-a",
-						ProjectID:         "project-a",
+						Partition:         "partition-a",
+						Project:           "project-a",
 						Size:              "size-a",
 						Networks:          []string{"internet"},
 						EgressRules: []v2.EgressRuleSNAT{

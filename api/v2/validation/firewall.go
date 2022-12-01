@@ -30,6 +30,7 @@ func (v *firewallValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.Firew
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldF.Userdata, newF.Userdata, field.NewPath("userdata"))...)
 
 	return allErrs
 }
@@ -38,8 +39,8 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpec(fNew, fldPath)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.ProjectID, fOld.ProjectID, fldPath.Child("projectID"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.PartitionID, fOld.PartitionID, fldPath.Child("partitionID"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.SSHPublicKeys, fOld.SSHPublicKeys, fldPath.Child("sshPublicKeys"))...)
 
 	return allErrs
@@ -52,8 +53,8 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		{path: fldPath.Child("controllerURL"), value: f.ControllerURL},
 		{path: fldPath.Child("controllerVersion"), value: f.ControllerVersion},
 		{path: fldPath.Child("image"), value: f.Image},
-		{path: fldPath.Child("partitionID"), value: f.PartitionID},
-		{path: fldPath.Child("projectID"), value: f.ProjectID},
+		{path: fldPath.Child("partition"), value: f.Partition},
+		{path: fldPath.Child("project"), value: f.Project},
 		{path: fldPath.Child("size"), value: f.Size},
 		{path: fldPath.Child("networks"), value: f.Networks},
 	}

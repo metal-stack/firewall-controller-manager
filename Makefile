@@ -24,7 +24,7 @@ clean:
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out -race -timeout 30s
+	go test ./... -coverprofile cover.out -timeout 30s
 
 # Build manager binary
 manager: generate fmt vet

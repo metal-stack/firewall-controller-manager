@@ -22,10 +22,10 @@ type FirewallMonitor struct {
 	Size string `json:"size"`
 	// Image is the os image installed on the firewall
 	Image string `json:"image"`
-	// PartitionID is the partition in which the firewall is running
-	PartitionID string `json:"partitionID"`
-	// ProjectID is the project for which the firewall was created
-	ProjectID string `json:"projectID"`
+	// Partition is the partition in which the firewall is running
+	Partition string `json:"partition"`
+	// Project is the project for which the firewall was created
+	Project string `json:"project"`
 	// Networks are the networks to which this firewall is connected
 	Networks []string `json:"networks"`
 	// RateLimits contains the configuration of rate limit rules for interfaces
@@ -40,6 +40,56 @@ type FirewallMonitor struct {
 	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`
+}
+
+type ControllerStatus struct {
+	Message           string        `json:"message,omitempty"`
+	FirewallStats     FirewallStats `json:"stats"`
+	ControllerVersion string        `json:"controllerVersion,omitempty"`
+	Updated           metav1.Time   `json:"lastRun,omitempty"`
+}
+
+// FirewallStats contains firewall statistics
+type FirewallStats struct {
+	RuleStats   RuleStatsByAction   `json:"rules"`
+	DeviceStats DeviceStatsByDevice `json:"devices"`
+	IDSStats    IDSStatsByDevice    `json:"idsStats"`
+}
+
+// RuleStatsByAction contains firewall rule statistics groups by action: e.g. accept, drop, policy, masquerade
+type RuleStatsByAction map[string]RuleStats
+
+// RuleStats contains firewall rule statistics of all rules of an action
+type RuleStats map[string]RuleStat
+
+// RuleStat contains the statistics for a single nftables rule
+type RuleStat struct {
+	Counter Counter `json:"counter"`
+}
+
+// Counter holds values of a nftables counter object
+type Counter struct {
+	Bytes   uint64 `json:"bytes"`
+	Packets uint64 `json:"packets"`
+}
+
+// DeviceStatsByDevice contains DeviceStatistics grouped by device name
+type DeviceStatsByDevice map[string]DeviceStat
+
+// DeviceStat contains statistics of a device
+type DeviceStat struct {
+	InBytes  uint64 `json:"in"`
+	OutBytes uint64 `json:"out"`
+	// Deprecated: TotalBytes is kept for backwards compatibility
+	TotalBytes uint64 `json:"total"`
+}
+
+type IDSStatsByDevice map[string]InterfaceStat
+
+type InterfaceStat struct {
+	Drop             int `json:"drop"`
+	InvalidChecksums int `json:"invalidChecksums"`
+	Packets          int `json:"packets"`
 }
 
 // +kubebuilder:object:root=true

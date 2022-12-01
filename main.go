@@ -174,7 +174,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: deploy crds automatically, firewallmonitor to shoot, rest to seed
+	// TODO: deploy crds for firewallmonitor automatically into the shoot
+	// seed resources must be deployed by GEPM as it defines the initial fwdeployment
 
 	if err = (&deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{

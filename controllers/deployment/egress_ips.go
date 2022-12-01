@@ -39,7 +39,7 @@ func (c *controller) reconcileEgressIPs(r *controllers.Ctx[*v2.FirewallDeploymen
 	fw := r.Target.Spec.Template
 
 	resp, err := c.Metal.IP().FindIPs(ip.NewFindIPsParams().WithBody(&models.V1IPFindRequest{
-		Projectid: fw.ProjectID,
+		Projectid: fw.Project,
 		Tags:      []string{egressTag(c.ClusterID)},
 		Type:      models.V1IPBaseTypeStatic,
 	}).WithContext(r.Ctx), nil)
@@ -70,7 +70,7 @@ func (c *controller) reconcileEgressIPs(r *controllers.Ctx[*v2.FirewallDeploymen
 
 			resp, err := c.Metal.IP().FindIPs(ip.NewFindIPsParams().WithBody(&models.V1IPFindRequest{
 				Ipaddress: ipAddress,
-				Projectid: fw.ProjectID,
+				Projectid: fw.Project,
 				Networkid: egressRule.NetworkID,
 			}).WithContext(r.Ctx), nil)
 			if err != nil {

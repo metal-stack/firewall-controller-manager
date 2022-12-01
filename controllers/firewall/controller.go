@@ -107,7 +107,7 @@ func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewal
 
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationName:    fw.Name,
-		AllocationProject: fw.Spec.ProjectID,
+		AllocationProject: fw.Spec.Project,
 		Tags:              tags,
 	}).WithContext(ctx), nil)
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -37,8 +36,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	if rollSet {
 		r.Log.Info("initiating firewall set roll as requested by user annotation")
 
-		fw := &v2.Firewall{}
-		err = c.Seed.Get(r.Ctx, types.NamespacedName{Name: r.Target.Name, Namespace: c.SeedNamespace}, fw)
+		fw := &v2.Firewall{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      r.Target.Name,
+				Namespace: c.SeedNamespace,
+			},
+		}
+		err = c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 		if err != nil {
 			r.Log.Error(err, "unable to find out associated firewall in seed")
 			return client.IgnoreNotFound(err)
@@ -50,8 +54,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 			return nil
 		}
 
-		set := &v2.FirewallSet{}
-		err = c.Seed.Get(r.Ctx, types.NamespacedName{Name: ref.Name, Namespace: c.SeedNamespace}, set)
+		set := &v2.FirewallSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ref.Name,
+				Namespace: c.SeedNamespace,
+			},
+		}
+		err = c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(set), set)
 		if err != nil {
 			r.Log.Error(err, "unable to find out associated firewall set in seed")
 			return client.IgnoreNotFound(err)

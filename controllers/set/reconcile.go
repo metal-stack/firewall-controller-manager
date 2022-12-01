@@ -128,7 +128,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 
 func (c *controller) checkOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationProject: r.Target.Spec.Template.ProjectID,
+		AllocationProject: r.Target.Spec.Template.Project,
 		Tags:              []string{c.ClusterTag, controllers.FirewallSetTag(r.Target.Name)},
 	}).WithContext(r.Ctx), nil)
 	if err != nil {

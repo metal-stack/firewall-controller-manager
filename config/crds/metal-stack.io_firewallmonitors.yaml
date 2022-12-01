@@ -174,10 +174,14 @@ spec:
               description: EgressRuleSNAT holds a Source-NAT rule
               properties:
                 ips:
+                  description: IPs contains the ips used as source addresses for packets
+                    leaving the specified network.
                   items:
                     type: string
                   type: array
                 networkID:
+                  description: NetworkID is the network for which the egress rule
+                    will be configured.
                   type: string
               required:
               - ips
@@ -200,17 +204,28 @@ spec:
             description: MachineStatus holds the status of the firewall machine
             properties:
               allocationTimestamp:
+                description: AllocationTimestamp is the timestamp when the machine
+                  was allocated.
                 format: date-time
                 type: string
               crashLoop:
+                description: CrashLoop can occur during provisioning of the firewall
+                  causing the firewall not to get ready.
                 type: boolean
               lastEvent:
+                description: LastEvent contains the last provisioning event of the
+                  machine.
                 properties:
                   event:
+                    description: Event is the provisioning event.
                     type: string
                   message:
+                    description: Message contains a message further describing the
+                      event.
                     type: string
                   timestamp:
+                    description: Timestamp is the point in time when the provisioning
+                      event was received.
                     format: date-time
                     type: string
                 required:
@@ -219,8 +234,12 @@ spec:
                 - timestamp
                 type: object
               liveliness:
+                description: Liveliness expresses the liveliness of the firewall and
+                  can be used to determine the general health state of the machine.
                 type: string
               machineID:
+                description: MachineID is the id of the firewall in the metal-stack
+                  api.
                 type: string
             required:
             - allocationTimestamp
@@ -234,11 +253,11 @@ spec:
             items:
               type: string
             type: array
-          partitionID:
-            description: PartitionID is the partition in which the firewall is running
+          partition:
+            description: Partition is the partition in which the firewall is running
             type: string
-          projectID:
-            description: ProjectID is the project for which the firewall was created
+          project:
+            description: Project is the project for which the firewall was created
             type: string
           rateLimits:
             description: RateLimits contains the configuration of rate limit rules
@@ -248,10 +267,10 @@ spec:
               properties:
                 networkID:
                   description: NetworkID specifies the network which should be rate
-                    limited
+                    limited.
                   type: string
                 rate:
-                  description: Rate is the input rate in MiB/s
+                  description: Rate is the input rate in MiB/s.
                   format: int32
                   type: integer
               required:
@@ -266,8 +285,8 @@ spec:
         - conditions
         - image
         - networks
-        - partitionID
-        - projectID
+        - partition
+        - project
         - size
         type: object
     served: true

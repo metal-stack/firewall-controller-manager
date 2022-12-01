@@ -64,10 +64,10 @@ func (cs Conditions) Get(t ConditionType) *Condition {
 }
 
 // SetCondition updates the conditions to include the provided condition. If the condition that
-// we are about to add already exists and has the same status and reason then we are not going to update.
+// we are about to add already exists and has the same status, reason and message then we are not going to update.
 func (cs *Conditions) Set(condition Condition) {
 	currentCond := cs.Get(condition.Type)
-	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason && currentCond.Message == condition.Message {
 		return
 	}
 	// Do not update lastTransitionTime if the status of the condition doesn't change.
