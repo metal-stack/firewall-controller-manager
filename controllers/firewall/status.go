@@ -13,19 +13,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *controller) setStatus(ctx context.Context, fw *v2.Firewall, m *models.V1FirewallResponse) error {
+func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
 	var errors []error
 
 	machineStatus, err := getMachineStatus(m)
 	if err == nil {
-		fw.Status.MachineStatus = machineStatus
+		r.Target.Status.MachineStatus = machineStatus
 	} else {
 		errors = append(errors, err)
 	}
 
-	firewallNetworks, err := getFirewallNetworks(ctx, c.Metal, m)
+	firewallNetworks, err := getFirewallNetworks(r.Ctx, c.Metal, m)
 	if err == nil {
-		fw.Status.FirewallNetworks = firewallNetworks
+		r.Target.Status.FirewallNetworks = firewallNetworks
 	} else {
 		errors = append(errors, err)
 	}

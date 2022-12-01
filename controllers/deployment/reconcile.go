@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -17,31 +16,45 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment) error {
-	log.Info("ensuring firewall controller rbac")
-	err := c.ensureFirewallControllerRBAC(ctx)
+func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error {
+	err := c.ensureFirewallControllerRBAC(r)
 	if err != nil {
-		log.Error(err, "unable to ensure firewall controller rbac")
-
-		cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionFalse, "Error", fmt.Sprintf("RBAC resources could not be provisioned %s", err))
-		deploy.Status.Conditions.Set(cond)
-
 		return err
 	}
 
-	cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, "Provisioned", "RBAC provisioned successfully.")
-	deploy.Status.Conditions.Set(cond)
+	ownedSets, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+		return fsl.GetItems()
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get owned sets: %w", err)
+	}
 
-	switch s := deploy.Spec.Strategy; s {
+	current, err := controllers.MaxRevisionOf(ownedSets)
+	if err != nil {
+		return err
+	}
+
+	if current == nil {
+		r.Log.Info("no firewall set is present, creating a new one")
+
+		_, err := c.createFirewallSet(r, 0)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	switch s := r.Target.Spec.Strategy; s {
 	case v2.StrategyRecreate:
-		err = c.recreateStrategy(ctx, log, deploy)
+		err = c.recreateStrategy(r, ownedSets, current)
 	case v2.StrategyRollingUpdate:
-		err = c.rollingUpdateStrategy(ctx, log, deploy)
+		err = c.rollingUpdateStrategy(r, ownedSets, current)
 	default:
 		err = fmt.Errorf("unknown deployment strategy: %s", s)
 	}
 
-	statusErr := c.setStatus(ctx, deploy)
+	statusErr := c.setStatus(r)
 
 	if err != nil {
 		return err
@@ -50,31 +63,27 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, deploy *v2.
 		return err
 	}
 
-	log.Info("reonciling egress ips")
-	err = c.reconcileEgressIPs(ctx, &deploy.Spec.Template)
+	err = c.reconcileEgressIPs(r)
 	if err != nil {
-		log.Error(err, "unable to reconcile egress ips")
-
-		cond := v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionFalse, "Error", fmt.Sprintf("Egress IPs could not be reconciled: %s", err))
-		deploy.Status.Conditions.Set(cond)
-
 		return controllers.RequeueAfter(2*time.Minute, "backing off because egress ips can probably not be repaired by retrying")
 	}
-
-	var ips []string
-	for _, ip := range deploy.Spec.Template.EgressRules {
-		ips = append(ips, ip.IPs...)
-	}
-	cond = v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionTrue, "Reconciled", fmt.Sprintf("Egress IPs reconciled successfully. %v", ips))
-	deploy.Status.Conditions.Set(cond)
 
 	return nil
 }
 
-func (c *controller) createFirewallSet(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, revision int) (*v2.FirewallSet, error) {
-	if lastCreation, ok := c.lastSetCreation[deploy.Name]; ok && time.Since(lastCreation) < c.safetyBackoff {
+func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], current *v2.FirewallSet) (*v2.FirewallSet, error) {
+	revision, err := controllers.NextRevision(current)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.createFirewallSet(r, revision)
+}
+
+func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], revision int) (*v2.FirewallSet, error) {
+	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.safetyBackoff {
 		// this is just for safety reasons to prevent mass-allocations
-		log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
+		r.Log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
 		return nil, controllers.RequeueAfter(10*time.Second, "delaying firewall set creation")
 	}
 
@@ -83,105 +92,119 @@ func (c *controller) createFirewallSet(ctx context.Context, log logr.Logger, dep
 		return nil, err
 	}
 
-	userdata, err := c.createUserdata(ctx)
+	userdata, err := c.createUserdata(r.Ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s-%s", deploy.Name, uuid.String()[:5])
+	name := fmt.Sprintf("%s-%s", r.Target.Name, uuid.String()[:5])
 
 	set := &v2.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: deploy.Namespace,
+			Namespace: r.Target.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(deploy, v2.GroupVersion.WithKind("FirewallDeployment")),
+				*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallDeployment")),
 			},
 			Annotations: map[string]string{
 				v2.RevisionAnnotation: strconv.Itoa(revision),
 			},
 		},
 		Spec: v2.FirewallSetSpec{
-			Replicas: deploy.Spec.Replicas,
-			Template: deploy.Spec.Template,
+			Replicas: r.Target.Spec.Replicas,
+			Template: r.Target.Spec.Template,
 		},
 		Userdata: userdata,
 	}
 
-	err = c.Seed.Create(ctx, set, &client.CreateOptions{})
+	err = c.Seed.Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {
+		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s", err))
+		r.Target.Status.Conditions.Set(cond)
+
 		return nil, fmt.Errorf("unable to create firewall set: %w", err)
 	}
 
-	c.lastSetCreation[deploy.Name] = time.Now()
+	r.Log.Info("created new firewall set", "name", set.Name)
+
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", set.Name))
+	r.Target.Status.Conditions.Set(cond)
+
+	c.lastSetCreation[r.Target.Name] = time.Now()
 
 	return set, nil
 }
 
-func (c *controller) deleteFirewallSets(ctx context.Context, log logr.Logger, sets []*v2.FirewallSet) error {
-	for _, set := range sets {
-		set := set
+func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], set *v2.FirewallSet) error {
+	set.Spec.Replicas = r.Target.Spec.Replicas
+	set.Spec.Template = r.Target.Spec.Template
 
-		err := c.Seed.Delete(ctx, set, &client.DeleteOptions{})
-		if err != nil {
-			return err
-		}
-
-		log.Info("deleted firewall set", "name", set.Name)
-
-		c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
+	err := c.Seed.Update(r.Ctx, set)
+	if err != nil {
+		return fmt.Errorf("unable to update/sync firewall set: %w", err)
 	}
+
+	r.Log.Info("updated firewall set", "name", set.Name)
+
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q", set.Name))
+	r.Target.Status.Conditions.Set(cond)
+
+	c.Recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
 
 	return nil
 }
 
-func (c *controller) isNewSetRequired(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
+func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], lastSet *v2.FirewallSet) (bool, error) {
 	v, ok := lastSet.Annotations[v2.RollSetAnnotation]
 	if ok {
 		rollSet, err := strconv.ParseBool(v)
 		if err == nil && rollSet {
-			log.Info("set roll initiated by annotation")
+			r.Log.Info("set roll initiated by annotation")
 			return true, nil
 		}
 	}
 
-	ok = sizeHasChanged(deploy, lastSet)
+	var (
+		newS = &r.Target.Spec.Template
+		oldS = &lastSet.Spec.Template
+	)
+
+	ok = sizeHasChanged(newS, oldS)
 	if ok {
-		log.Info("firewall size has changed", "size", deploy.Spec.Template.Size)
+		r.Log.Info("firewall size has changed", "size", newS.Size)
 		return ok, nil
 	}
 
-	ok, err := osImageHasChanged(ctx, c.Metal, deploy, lastSet)
+	ok, err := osImageHasChanged(r.Ctx, c.Metal, newS, oldS)
 	if err != nil {
 		return false, err
 	}
 	if ok {
-		log.Info("firewall image has changed", "image", deploy.Spec.Template.Image)
+		r.Log.Info("firewall image has changed", "image", newS.Image)
 		return ok, nil
 	}
 
-	ok = networksHaveChanged(deploy, lastSet)
+	ok = networksHaveChanged(newS, oldS)
 	if ok {
-		log.Info("firewall networks have changed", "networks", deploy.Spec.Template.Networks)
+		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
 		return ok, nil
 	}
 
 	return false, nil
 }
 
-func sizeHasChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
-	return lastSet.Spec.Template.Size != deploy.Spec.Template.Size
+func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
+	return newS.Size != oldS.Size
 }
 
-func osImageHasChanged(ctx context.Context, m metalgo.Client, deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) (bool, error) {
-	if lastSet.Spec.Template.Image != deploy.Spec.Template.Image {
-		want := deploy.Spec.Template.Image
-		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(want).WithContext(ctx), nil)
+func osImageHasChanged(ctx context.Context, m metalgo.Client, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
+	if newS.Image != oldS.Image {
+		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(newS.Image).WithContext(ctx), nil)
 		if err != nil {
-			return false, fmt.Errorf("latest firewall image not found:%s %w", want, err)
+			return false, fmt.Errorf("latest firewall image not found:%s %w", newS.Image, err)
 		}
 
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != lastSet.Spec.Template.Image {
+		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != oldS.Image {
 			return true, nil
 		}
 	}
@@ -189,15 +212,6 @@ func osImageHasChanged(ctx context.Context, m metalgo.Client, deploy *v2.Firewal
 	return false, nil
 }
 
-func networksHaveChanged(deploy *v2.FirewallDeployment, lastSet *v2.FirewallSet) bool {
-	currentNetworks := sets.NewString()
-	for _, n := range lastSet.Spec.Template.Networks {
-		currentNetworks.Insert(n)
-	}
-	wantNetworks := sets.NewString()
-	for _, n := range deploy.Spec.Template.Networks {
-		wantNetworks.Insert(n)
-	}
-
-	return !currentNetworks.Equal(wantNetworks)
+func networksHaveChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
+	return !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...))
 }

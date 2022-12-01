@@ -1,12 +1,10 @@
 package firewall
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
@@ -17,49 +15,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Firewall) error {
+func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	defer func() {
-		_, err := c.ensureFirewallMonitor(ctx, fw)
+		_, err := c.ensureFirewallMonitor(r)
 		if err != nil {
-			log.Error(err, "unable to deploy firewall monitor")
-
-			cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionFalse, "Error", fmt.Sprintf("Monitor could not be deployed: %s", err))
-			fw.Status.Conditions.Set(cond)
-
-			return
+			r.Log.Error(err, "unable to deploy firewall monitor")
 		}
-
-		log.Info("firewall monitor deployed")
-
-		cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionTrue, "Deployed", "Successfully deployed firewall-monitor.")
-		fw.Status.Conditions.Set(cond)
-
-		return
 	}()
 
-	fws, err := c.findAssociatedFirewalls(ctx, fw)
+	fws, err := c.findAssociatedFirewalls(r.Ctx, r.Target)
 	if err != nil {
-		return fmt.Errorf("firewall find error: %w", err)
+		return controllers.RequeueAfter(10*time.Second, err.Error())
 	}
 
 	switch len(fws) {
 	case 0:
-		f, err := c.createFirewall(ctx, fw)
+		f, err := c.createFirewall(r)
 		if err != nil {
-			log.Error(err, "error creating firewall")
-
-			cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "Error", fmt.Sprintf("Error creating firewall: %s", err))
-			fw.Status.Conditions.Set(cond)
-
 			return controllers.RequeueAfter(30*time.Second, "error creating firewall")
 		}
 
-		log.Info("firewall created", "id", pointer.SafeDeref(f.ID))
-
-		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
-		fw.Status.Conditions.Set(cond)
-
-		if err := c.setStatus(ctx, fw, f); err != nil {
+		if err := c.setStatus(r, f); err != nil {
 			return err
 		}
 
@@ -69,35 +45,41 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Fire
 		f := fws[0]
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
-		fw.Status.Conditions.Set(cond)
+		r.Target.Status.Conditions.Set(cond)
 
-		err := c.setStatus(ctx, fw, f)
+		err := c.setStatus(r, f)
 		if err != nil {
 			return err
 		}
 
-		if isFirewallReady(fw.Status.MachineStatus) {
-			log.Info("firewall reconciled successfully", "id", pointer.SafeDeref(f.ID))
+		if isFirewallReady(r.Target.Status.MachineStatus) {
+
+			r.Log.Info("firewall reconciled successfully", "id", pointer.SafeDeref(f.ID))
 
 			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionTrue, "Ready", fmt.Sprintf("Firewall %q is phoning home and alive.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
-			fw.Status.Conditions.Set(cond)
+			r.Target.Status.Conditions.Set(cond)
 
 			// to make the controller always sync the status with the metal-api, we requeue
-			return controllers.RequeueAfter(1*time.Minute, "firewall creation succeeded, continue probing regularly")
-		} else if isFirewallProgressing(fw.Status.MachineStatus) {
-			log.Info("firewall is progressing", "id", pointer.SafeDeref(f.ID))
+			return controllers.RequeueAfter(1*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
+
+		} else if isFirewallProgressing(r.Target.Status.MachineStatus) {
+
+			r.Log.Info("firewall is progressing", "id", pointer.SafeDeref(f.ID))
 
 			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotReady", fmt.Sprintf("Firewall %q is not ready.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
-			fw.Status.Conditions.Set(cond)
+			r.Target.Status.Conditions.Set(cond)
 
 			return controllers.RequeueAfter(10*time.Second, "firewall creation is progressing")
+
 		} else {
-			log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", pointer.SafeDeref(f.ID))
+
+			r.Log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", pointer.SafeDeref(f.ID))
 
 			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotFinishing", fmt.Sprintf("Firewall %q is not finishing the provisioning procedure.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
-			fw.Status.Conditions.Set(cond)
+			r.Target.Status.Conditions.Set(cond)
 
 			return controllers.RequeueAfter(1*time.Minute, "firewall creation is not finishing, proceed probing")
+
 		}
 	default:
 		var ids []string
@@ -107,7 +89,7 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Fire
 		}
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "MultipleFirewalls", fmt.Sprintf("Found multiple firewalls with the same name: %s", strings.Join(ids, ", ")))
-		fw.Status.Conditions.Set(cond)
+		r.Target.Status.Conditions.Set(cond)
 
 		// TODO: should we just remove the other ones?
 
@@ -115,12 +97,12 @@ func (c *controller) Reconcile(ctx context.Context, log logr.Logger, fw *v2.Fire
 	}
 }
 
-func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*models.V1FirewallResponse, error) {
+func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V1FirewallResponse, error) {
 	var (
 		networks []*models.V1MachineAllocationNetwork
 		tags     = []string{c.ClusterTag}
 	)
-	for _, n := range fw.Spec.Networks {
+	for _, n := range r.Target.Spec.Networks {
 		n := n
 		network := &models.V1MachineAllocationNetwork{
 			Networkid:   &n,
@@ -129,31 +111,41 @@ func (c *controller) createFirewall(ctx context.Context, fw *v2.Firewall) (*mode
 		networks = append(networks, network)
 	}
 
-	ref := metav1.GetControllerOf(fw)
+	ref := metav1.GetControllerOf(r.Target)
 	if ref != nil {
 		tags = append(tags, controllers.FirewallSetTag(ref.Name))
 	}
 
 	createRequest := &models.V1FirewallCreateRequest{
 		Description: "created by firewall-controller-manager",
-		Name:        fw.Name,
-		Hostname:    fw.Name,
-		Sizeid:      &fw.Spec.Size,
-		Projectid:   &fw.Spec.ProjectID,
-		Partitionid: &fw.Spec.PartitionID,
-		Imageid:     &fw.Spec.Image,
-		SSHPubKeys:  fw.Spec.SSHPublicKeys,
+		Name:        r.Target.Name,
+		Hostname:    r.Target.Name,
+		Sizeid:      &r.Target.Spec.Size,
+		Projectid:   &r.Target.Spec.ProjectID,
+		Partitionid: &r.Target.Spec.PartitionID,
+		Imageid:     &r.Target.Spec.Image,
+		SSHPubKeys:  r.Target.Spec.SSHPublicKeys,
 		Networks:    networks,
-		UserData:    fw.Userdata,
+		UserData:    r.Target.Userdata,
 		Tags:        tags,
 	}
 
-	resp, err := c.Metal.Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(ctx), nil)
+	resp, err := c.Metal.Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(r.Ctx), nil)
 	if err != nil {
+		r.Log.Error(err, "error creating firewall")
+
+		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "Error", fmt.Sprintf("Error creating firewall: %s", err))
+		r.Target.Status.Conditions.Set(cond)
+
 		return nil, fmt.Errorf("firewall create error: %w", err)
 	}
 
-	c.Recorder.Eventf(fw, "Normal", "Create", "created firewall %s id %s", fw.Name, *resp.Payload.ID)
+	r.Log.Info("firewall created", "id", pointer.SafeDeref(resp.Payload.ID))
+
+	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
+	r.Target.Status.Conditions.Set(cond)
+
+	c.Recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s id %s", r.Target.Name, *resp.Payload.ID)
 
 	return resp.Payload, nil
 }
@@ -190,13 +182,27 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	return false
 }
 
-func (c *controller) ensureFirewallMonitor(ctx context.Context, fw *v2.Firewall) (*v2.FirewallMonitor, error) {
+func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v2.FirewallMonitor, error) {
+	var err error
+
+	defer func() {
+		if err != nil {
+			cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionFalse, "Error", fmt.Sprintf("Monitor could not be deployed: %s", err))
+			r.Target.Status.Conditions.Set(cond)
+		}
+
+		r.Log.Info("firewall monitor deployed")
+
+		cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionTrue, "Deployed", "Successfully deployed firewall-monitor.")
+		r.Target.Status.Conditions.Set(cond)
+	}()
+
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.ShootNamespace,
 		},
 	}
-	_, err := controllerutil.CreateOrUpdate(ctx, c.Shoot, ns, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, ns, func() error {
 		return nil
 	})
 	if err != nil {
@@ -205,23 +211,23 @@ func (c *controller) ensureFirewallMonitor(ctx context.Context, fw *v2.Firewall)
 
 	mon := &v2.FirewallMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fw.Name,
+			Name:      r.Target.Name,
 			Namespace: c.ShootNamespace,
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, c.Shoot, mon, func() error {
-		mon.Size = fw.Spec.Size
-		mon.Image = fw.Spec.Image
-		mon.PartitionID = fw.Spec.PartitionID
-		mon.ProjectID = fw.Spec.ProjectID
-		mon.Networks = fw.Spec.Networks
-		mon.RateLimits = fw.Spec.RateLimits
-		mon.EgressRules = fw.Spec.EgressRules
-		mon.LogAcceptedConnections = fw.Spec.LogAcceptedConnections
-		mon.MachineStatus = fw.Status.MachineStatus
-		mon.ControllerStatus = fw.Status.ControllerStatus
-		mon.Conditions = fw.Status.Conditions
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, mon, func() error {
+		mon.Size = r.Target.Spec.Size
+		mon.Image = r.Target.Spec.Image
+		mon.PartitionID = r.Target.Spec.PartitionID
+		mon.ProjectID = r.Target.Spec.ProjectID
+		mon.Networks = r.Target.Spec.Networks
+		mon.RateLimits = r.Target.Spec.RateLimits
+		mon.EgressRules = r.Target.Spec.EgressRules
+		mon.LogAcceptedConnections = r.Target.Spec.LogAcceptedConnections
+		mon.MachineStatus = r.Target.Status.MachineStatus
+		mon.ControllerStatus = r.Target.Status.ControllerStatus
+		mon.Conditions = r.Target.Status.Conditions
 		return nil
 	})
 	if err != nil {

@@ -1,17 +1,15 @@
 package set
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *controller) Delete(ctx context.Context, log logr.Logger, set *v2.FirewallSet) error {
-	ownedFirewalls, err := controllers.GetOwnedResources(ctx, c.Seed, set, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
+	ownedFirewalls, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
@@ -21,7 +19,7 @@ func (c *controller) Delete(ctx context.Context, log logr.Logger, set *v2.Firewa
 	for _, fw := range ownedFirewalls {
 		fw := fw
 
-		err = c.Seed.Delete(ctx, fw, &client.DeleteOptions{})
+		err = c.Seed.Delete(r.Ctx, fw, &client.DeleteOptions{})
 		if err != nil {
 			return err
 		}

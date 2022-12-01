@@ -3,32 +3,33 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/machine"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *controller) Delete(ctx context.Context, log logr.Logger, fw *v2.Firewall) error {
-	err := c.deleteFirewallMonitor(ctx, fw)
+func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
+	err := c.deleteFirewallMonitor(r.Ctx, r.Target)
 	if err != nil {
 		return fmt.Errorf("unable to delete firewall monitor: %w", err)
 	}
 
-	fws, err := c.findAssociatedFirewalls(ctx, fw)
+	fws, err := c.findAssociatedFirewalls(r.Ctx, r.Target)
 	if err != nil {
-		return fmt.Errorf("firewall find error: %w", err)
+		return controllers.RequeueAfter(10*time.Second, err.Error())
 	}
 
 	if len(fws) == 0 {
-		log.Info("firewall already deleted")
+		r.Log.Info("firewall already deleted")
 		return nil
 	}
 
 	if len(fws) > 1 {
-		log.Error(fmt.Errorf("multiple associated firewalls found for deletion"), "deleting all of them", "amount", len(fws))
+		r.Log.Error(fmt.Errorf("multiple associated firewalls found for deletion"), "deleting all of them", "amount", len(fws))
 	}
 
 	for _, f := range fws {
@@ -38,14 +39,14 @@ func (c *controller) Delete(ctx context.Context, log logr.Logger, fw *v2.Firewal
 			continue
 		}
 
-		resp, err := c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(ctx), nil)
+		resp, err := c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(r.Ctx), nil)
 		if err != nil {
 			return fmt.Errorf("firewall delete error: %w", err)
 		}
 
-		log.Info("deleted firewall", "name", f.Name, "id", *resp.Payload.ID)
+		r.Log.Info("deleted firewall", "name", f.Name, "id", *resp.Payload.ID)
 
-		c.Recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s id %s", fw.Name, *resp.Payload.ID)
+		c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
 	}
 
 	return nil

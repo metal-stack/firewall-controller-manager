@@ -35,7 +35,7 @@ Create and delete the physical firewall machine from the spec at the metal-api.
 
 ## Rolling a `FirewallSet` through `FirewallMonitor` Annotations
 
-A user can initiate rolling a firewall set by annotation the monitor with the following annotation:
+A user can initiate rolling the latest firewall set by annotating a monitor in the following way:
 
 ```bash
 $ kubectl annotate fwmon <firewall-name> firewall-deployment.metal-stack.io/roll-set=true

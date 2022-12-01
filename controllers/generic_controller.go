@@ -16,10 +16,15 @@ import (
 )
 
 type (
+	Ctx[O client.Object] struct {
+		Ctx    context.Context
+		Log    logr.Logger
+		Target O
+	}
 	Reconciler[O client.Object] interface {
 		New() O
-		Reconcile(ctx context.Context, log logr.Logger, o O) error
-		Delete(ctx context.Context, log logr.Logger, o O) error
+		Reconcile(rctx *Ctx[O]) error
+		Delete(rctx *Ctx[O]) error
 	}
 
 	GenericController[O client.Object] struct {
@@ -69,8 +74,13 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	var (
-		o   = g.reconciler.New()
-		log = g.logger(req)
+		o    = g.reconciler.New()
+		log  = g.logger(req)
+		rctx = &Ctx[O]{
+			Ctx:    ctx,
+			Log:    log,
+			Target: o,
+		}
 	)
 
 	if err := g.c.Get(ctx, req.NamespacedName, o, &client.GetOptions{}); err != nil {
@@ -85,7 +95,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !o.GetDeletionTimestamp().IsZero() {
 		if controllerutil.ContainsFinalizer(o, FinalizerName) {
 			log.Info("reconciling resource deletion flow")
-			err := g.reconciler.Delete(ctx, log, o)
+			err := g.reconciler.Delete(rctx)
 			if err != nil {
 				var requeueErr *requeueError
 				if errors.As(err, &requeueErr) {
@@ -128,7 +138,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	log.Info("reconciling resource")
-	err := g.reconciler.Reconcile(ctx, log, o)
+	err := g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
 		if errors.As(err, &requeueErr) {

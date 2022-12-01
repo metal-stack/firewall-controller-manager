@@ -1,132 +1,78 @@
 package deployment
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *controller) rollingUpdateStrategy(ctx context.Context, log logr.Logger, deploy *v2.FirewallDeployment) error {
-	ownedSets, err := controllers.GetOwnedResources(ctx, c.Seed, deploy, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
-		return fsl.GetItems()
-	})
-	if err != nil {
-		return fmt.Errorf("unable to get owned sets: %w", err)
-	}
-
-	newestSet, err := controllers.MaxRevisionOf(ownedSets)
-	if err != nil {
-		return err
-	}
-
-	if newestSet == nil {
-		log.Info("no firewall set is present, creating a new one")
-
-		set, err := c.createFirewallSet(ctx, log, deploy, 0)
-		if err != nil {
-			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s", err))
-			deploy.Status.Conditions.Set(cond)
-
-			return fmt.Errorf("unable to create firewall set: %w", err)
-		}
-
-		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", set.Name))
-		deploy.Status.Conditions.Set(cond)
-
-		c.Recorder.Eventf(set, "Normal", "Create", "created firewallset %s", set.Name)
-
-		return nil
-	}
-
-	newSetRequired, err := c.isNewSetRequired(ctx, log, deploy, newestSet)
+// rollingUpdateStrategy first creates a new set and deletes the old one's when the new one becomes ready
+func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet, current *v2.FirewallSet) error {
+	newSetRequired, err := c.isNewSetRequired(r, current)
 	if err != nil {
 		return err
 	}
 
 	if newSetRequired {
-		log.Info("significant changes detected in the spec, creating new firewall set")
+		r.Log.Info("significant changes detected in the spec, creating new firewall set")
 
-		revision, err := controllers.NextRevision(newestSet)
+		newSet, err := c.createNextFirewallSet(r, current)
 		if err != nil {
 			return err
 		}
-
-		newSet, err := c.createFirewallSet(ctx, log, deploy, revision)
-		if err != nil {
-			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s", err))
-			deploy.Status.Conditions.Set(cond)
-
-			return err
-		}
-
-		log.Info("created new firewall set", "name", newSet.Name)
-
-		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetCreated", fmt.Sprintf("Created new firewall set %q", newSet.Name))
-		deploy.Status.Conditions.Set(cond)
 
 		c.Recorder.Eventf(newSet, "Normal", "Create", "created firewallset %s", newSet.Name)
 
-		ownedSets = append(ownedSets, newestSet)
+		ownedSets = append(ownedSets, newSet)
 
-		return c.cleanupIntermediateSets(ctx, log, ownedSets)
+		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	log.Info("existing firewall set does not need to be rolled, only updating the resource")
-
-	newestSet.Spec.Replicas = deploy.Spec.Replicas
-	newestSet.Spec.Template = deploy.Spec.Template
-
-	err = c.Seed.Update(ctx, newestSet, &client.UpdateOptions{})
+	err = c.syncFirewallSet(r, current)
 	if err != nil {
 		return fmt.Errorf("unable to update firewall set: %w", err)
 	}
 
-	log.Info("updated firewall set", "name", newestSet.Name)
-
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q", newestSet.Name))
-	deploy.Status.Conditions.Set(cond)
-
-	c.Recorder.Eventf(newestSet, "Normal", "Update", "updated firewallset %s", newestSet.Name)
-
-	if newestSet.Status.ReadyReplicas != newestSet.Spec.Replicas {
-		log.Info("set replicas are not yet ready, delaying old set cleanup")
+	if current.Status.ReadyReplicas != current.Spec.Replicas {
+		r.Log.Info("set replicas are not yet ready, delaying old set cleanup")
 
 		// TODO: detect when it's not finishing and set to ProgressDeadlineExceeded
 		// when the set does not show any progress within the given deadline (progressDeadlineSeconds)
 
-		return c.cleanupIntermediateSets(ctx, log, ownedSets)
+		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	cond = v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", newestSet.Name))
-	deploy.Status.Conditions.Set(cond)
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", current.Name))
+	r.Target.Status.Conditions.Set(cond)
 
-	log.Info("ensuring old sets are cleaned up")
+	r.Log.Info("ensuring old sets are cleaned up")
 
-	oldSets := controllers.Except(ownedSets, newestSet)
+	oldSets := controllers.Except(ownedSets, current)
 
-	return c.deleteFirewallSets(ctx, log, oldSets)
+	return c.deleteFirewallSets(r, oldSets)
 }
 
-func (c *controller) cleanupIntermediateSets(ctx context.Context, log logr.Logger, sets []*v2.FirewallSet) error {
+func (c *controller) cleanupIntermediateSets(r *controllers.Ctx[*v2.FirewallDeployment], sets []*v2.FirewallSet) error {
+	// the idea is to keep the oldest and the latest set such that unfinished updates "in the middle" are cleaned up
+	// prevents e.g. more than one firewall getting provisioned when triggering multiple spec changes quickly
+
 	oldestSet, err := controllers.MinRevisionOf(sets)
 	if err != nil {
 		return err
 	}
 
-	newestSet, err := controllers.MaxRevisionOf(sets)
+	latestSet, err := controllers.MaxRevisionOf(sets)
 	if err != nil {
 		return err
 	}
 
-	intermediateSets := controllers.Except(sets, oldestSet, newestSet)
+	intermediateSets := controllers.Except(sets, oldestSet, latestSet)
 
 	if len(intermediateSets) > 0 {
-		log.Info("cleaning up intermediate sets")
-		err = c.deleteFirewallSets(ctx, log, intermediateSets)
+		r.Log.Info("cleaning up intermediate sets")
+
+		err = c.deleteFirewallSets(r, intermediateSets)
 		if err != nil {
 			return err
 		}

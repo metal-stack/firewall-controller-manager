@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"fmt"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -12,14 +11,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (c *controller) ensureFirewallControllerRBAC(ctx context.Context) error {
+func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.FirewallDeployment]) error {
+	r.Log.Info("ensuring firewall controller rbac")
+
+	var err error
+	defer func() {
+		if err != nil {
+			r.Log.Error(err, "unable to ensure firewall controller rbac")
+
+			cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionFalse, "Error", fmt.Sprintf("RBAC resources could not be provisioned %s", err))
+			r.Target.Status.Conditions.Set(cond)
+
+			return
+		}
+
+		cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, "Provisioned", "RBAC provisioned successfully.")
+		r.Target.Status.Conditions.Set(cond)
+	}()
+
 	serviceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-controller-seed-access",
 			Namespace: c.Namespace,
 		},
 	}
-	_, err := controllerutil.CreateOrUpdate(ctx, c.Seed, serviceAccount, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Seed, serviceAccount, func() error {
 		serviceAccount.Labels = map[string]string{
 			"token-invalidator.resources.gardener.cloud/skip": "true",
 		}
@@ -37,7 +53,7 @@ func (c *controller) ensureFirewallControllerRBAC(ctx context.Context) error {
 			},
 		}
 
-		_, err := controllerutil.CreateOrUpdate(ctx, c.Seed, serviceAccountSecret, func() error {
+		_, err := controllerutil.CreateOrUpdate(r.Ctx, c.Seed, serviceAccountSecret, func() error {
 			serviceAccountSecret.Annotations = map[string]string{
 				"kubernetes.io/service-account.name": serviceAccount.Name,
 			}
@@ -56,7 +72,7 @@ func (c *controller) ensureFirewallControllerRBAC(ctx context.Context) error {
 			Namespace: c.Namespace,
 		},
 	}
-	_, err = controllerutil.CreateOrUpdate(ctx, c.Seed, role, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Seed, role, func() error {
 		role.Rules = []rbac.PolicyRule{
 			{
 				APIGroups: []string{v2.GroupVersion.String()},
@@ -81,7 +97,7 @@ func (c *controller) ensureFirewallControllerRBAC(ctx context.Context) error {
 			Namespace: c.Namespace,
 		},
 	}
-	_, err = controllerutil.CreateOrUpdate(ctx, c.Seed, roleBinding, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Seed, roleBinding, func() error {
 		roleBinding.RoleRef = rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "Role",

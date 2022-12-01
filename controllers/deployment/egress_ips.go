@@ -1,10 +1,10 @@
 package deployment
 
 import (
-	"context"
 	"fmt"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/ip"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -13,12 +13,36 @@ import (
 
 // TODO: probably it makes more sense to keep the egress ip logic in the GEPM
 
-func (c *controller) reconcileEgressIPs(ctx context.Context, fw *v2.FirewallSpec) error {
+func (c *controller) reconcileEgressIPs(r *controllers.Ctx[*v2.FirewallDeployment]) error {
+	r.Log.Info("reonciling egress ips")
+
+	var err error
+
+	defer func() {
+		if err != nil {
+			r.Log.Error(err, "unable to reconcile egress ips")
+
+			cond := v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionFalse, "Error", fmt.Sprintf("Egress IPs could not be reconciled: %s", err))
+			r.Target.Status.Conditions.Set(cond)
+
+			return
+		}
+
+		var ips []string
+		for _, ip := range r.Target.Spec.Template.EgressRules {
+			ips = append(ips, ip.IPs...)
+		}
+		cond := v2.NewCondition(v2.FirewallDeplomentEgressIPs, v2.ConditionTrue, "Reconciled", fmt.Sprintf("Egress IPs reconciled successfully. %v", ips))
+		r.Target.Status.Conditions.Set(cond)
+	}()
+
+	fw := r.Target.Spec.Template
+
 	resp, err := c.Metal.IP().FindIPs(ip.NewFindIPsParams().WithBody(&models.V1IPFindRequest{
 		Projectid: fw.ProjectID,
 		Tags:      []string{egressTag(c.ClusterID)},
 		Type:      models.V1IPBaseTypeStatic,
-	}).WithContext(ctx), nil)
+	}).WithContext(r.Ctx), nil)
 	if err != nil {
 		return fmt.Errorf("failed to list egress ips of cluster %w", err)
 	}
@@ -48,7 +72,7 @@ func (c *controller) reconcileEgressIPs(ctx context.Context, fw *v2.FirewallSpec
 				Ipaddress: ipAddress,
 				Projectid: fw.ProjectID,
 				Networkid: egressRule.NetworkID,
-			}).WithContext(ctx), nil)
+			}).WithContext(r.Ctx), nil)
 			if err != nil {
 				return fmt.Errorf("error when retrieving ip %s for egress rule %w", ipAddress, err)
 			}
@@ -74,7 +98,7 @@ func (c *controller) reconcileEgressIPs(ctx context.Context, fw *v2.FirewallSpec
 			_, err = c.Metal.IP().UpdateIP(ip.NewUpdateIPParams().WithBody(&models.V1IPUpdateRequest{
 				Ipaddress: dbIP.Ipaddress,
 				Tags:      []string{egressTag(c.ClusterID)},
-			}).WithContext(ctx), nil)
+			}).WithContext(r.Ctx), nil)
 			if err != nil {
 				return fmt.Errorf("could not tag ip %s for egress usage %w", ipAddress, err)
 			}
@@ -89,7 +113,7 @@ func (c *controller) reconcileEgressIPs(ctx context.Context, fw *v2.FirewallSpec
 			_, err := c.Metal.IP().UpdateIP(ip.NewUpdateIPParams().WithBody(&models.V1IPUpdateRequest{
 				Ipaddress: &ipAddress,
 				Tags:      []string{},
-			}).WithContext(ctx), nil)
+			}).WithContext(r.Ctx), nil)
 			if err != nil {
 				return fmt.Errorf("could not remove egress tag from ip %s %w", ipAddress, err)
 			}
