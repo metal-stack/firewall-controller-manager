@@ -25,6 +25,7 @@ func (c *controller) createUserdata(ctx context.Context) (string, error) {
 		ca    []byte
 		token string
 	)
+
 	if controllers.VersionGreaterOrEqual125(c.K8sVersion) {
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

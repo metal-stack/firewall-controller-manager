@@ -24,7 +24,8 @@ clean:
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out -timeout 30s
+	@if ! which $(SETUP_ENVTEST) > /dev/null; then echo "setup-envtest needs to be installed. you can use setup-envtest target to achieve this."; exit 1; fi
+	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use -i --bin-dir $(PWD)/bin -p path)" go test ./... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -84,4 +85,19 @@ ifeq (, $(shell which controller-gen))
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+setup-envtest:
+ifeq (, $(shell which setup-envtest))
+	@{ \
+	set -e ;\
+	TMP_DIR=$$(mktemp -d) ;\
+	cd $$TMP_DIR ;\
+	go mod init tmp ;\
+	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
+	rm -rf $$TMP_DIR ;\
+	}
+SETUP_ENVTEST=$(GOBIN)/setup-envtest
+else
+SETUP_ENVTEST=$(shell which setup-envtest)
 endif

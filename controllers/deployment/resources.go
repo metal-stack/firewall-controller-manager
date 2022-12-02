@@ -63,7 +63,6 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 		if err != nil {
 			return fmt.Errorf("error ensuring service account token secret: %w", err)
 		}
-
 	}
 
 	role := &rbac.Role{

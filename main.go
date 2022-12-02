@@ -201,7 +201,6 @@ func main() {
 			Namespace:             namespace,
 			ClusterID:             clusterID,
 			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			ClusterAPIURL:         clusterApiURL,
 			FirewallHealthTimeout: firewallHealthTimeout,
 			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
 		},

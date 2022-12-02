@@ -3,6 +3,7 @@ package set
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -118,7 +119,8 @@ func (c *controller) checkOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
 		Tags:              []string{c.ClusterTag, controllers.FirewallSetTag(r.Target.Name)},
 	}).WithContext(r.Ctx), nil)
 	if err != nil {
-		return err
+		r.Log.Error(err, "unable to retrieve firewalls for orphan checking, backing off...")
+		return controllers.RequeueAfter(10*time.Second, "backing off")
 	}
 
 	if len(resp.Payload) == 0 {

@@ -31,9 +31,9 @@ type FirewallUpdateStrategy string
 
 const (
 	// StrategyRollingUpdate first creates a new firewall set, wait's until it is ready and then removes the old one
-	StrategyRollingUpdate = "RollingUpdate"
+	StrategyRollingUpdate FirewallUpdateStrategy = "RollingUpdate"
 	// StrategyRecreate removes the old firewall set and then creates a new one
-	StrategyRecreate = "Recreate"
+	StrategyRecreate FirewallUpdateStrategy = "Recreate"
 )
 
 // FirewallDeploymentSpec specifies the firewall deployment.

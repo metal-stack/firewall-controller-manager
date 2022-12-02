@@ -27,7 +27,6 @@ type (
 		Namespace             string
 		ClusterID             string
 		ClusterTag            string
-		ClusterAPIURL         string
 		FirewallHealthTimeout time.Duration
 		Recorder              record.EventRecorder
 	}
@@ -53,9 +52,6 @@ func (c *Config) validate() error {
 	}
 	if c.ClusterTag == "" {
 		return fmt.Errorf("cluster tag must be specified")
-	}
-	if c.ClusterAPIURL == "" {
-		return fmt.Errorf("cluster api url must be specified")
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")
