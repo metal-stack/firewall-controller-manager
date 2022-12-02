@@ -1,4 +1,4 @@
-package controllers
+package controllers_test
 
 import (
 	"context"
@@ -22,10 +22,9 @@ import (
 var _ = Describe("firewall deployment controller", Ordered, func() {
 	Context("the good case", Ordered, func() {
 		var (
-			ctx           = context.Background()
-			timeout       = 5 * time.Second
-			interval      = 250 * time.Millisecond
-			namespaceName = "test"
+			ctx      = context.Background()
+			timeout  = 5 * time.Second
+			interval = 250 * time.Millisecond
 
 			namespace = &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
