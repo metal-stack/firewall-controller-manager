@@ -25,6 +25,9 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 		r.Target.Status.Conditions.Set(cond)
 	}()
 
+	cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionUnknown, "MonitorNotProvisioned", "Monitor was not yet deployed into the shoot.")
+	r.Target.Status.Conditions.Set(cond)
+
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.ShootNamespace,

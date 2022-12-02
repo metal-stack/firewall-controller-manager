@@ -48,11 +48,9 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 			continue
 		}
 
-		// FIXME: enable back in real environment:
-		// connected := pointer.SafeDeref(r.Target.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-		ready := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
+		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
 
-		if !ready && time.Since(fw.CreationTimestamp.Time) > c.createTimeout {
+		if !connected && time.Since(fw.CreationTimestamp.Time) > c.createTimeout {
 			r.Log.Info("firewall not getting ready, deleting from set", "firewall-name", fw.Name)
 
 			err := c.deleteFirewalls(r, fw)

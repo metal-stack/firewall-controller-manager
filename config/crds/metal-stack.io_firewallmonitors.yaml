@@ -165,8 +165,6 @@ spec:
                 - idsStats
                 - rules
                 type: object
-            required:
-            - stats
             type: object
           egressRules:
             description: EgressRules contains egress rules configured for this firewall.

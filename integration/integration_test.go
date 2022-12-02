@@ -21,35 +21,36 @@ import (
 )
 
 var (
-	timeout  = 15 * time.Second
 	interval = 250 * time.Millisecond
 )
 
 var _ = Describe("firewall deployment controller", Ordered, func() {
+	var (
+		deployment = &v2.FirewallDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: namespaceName,
+			},
+			Spec: v2.FirewallDeploymentSpec{
+				Template: v2.FirewallSpec{
+					Size:              "n1-medium-x86",
+					Project:           "project-a",
+					Partition:         "partition-a",
+					Image:             "firewall-ubuntu-2.0",
+					Networks:          []string{"internet"},
+					ControllerURL:     "http://controller.tar.gz",
+					ControllerVersion: "v0.0.1",
+				},
+			},
+		}
+	)
+
 	Context("the good case", Ordered, func() {
 		var (
 			namespace = &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: namespaceName,
-				},
-			}
-
-			deployment = &v2.FirewallDeployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: namespaceName,
-				},
-				Spec: v2.FirewallDeploymentSpec{
-					Template: v2.FirewallSpec{
-						Size:              "n1-medium-x86",
-						Project:           "project-a",
-						Partition:         "partition-a",
-						Image:             "firewall-ubuntu-2.0",
-						Networks:          []string{"internet"},
-						ControllerURL:     "http://controller.tar.gz",
-						ControllerVersion: "v0.0.1",
-					},
 				},
 			}
 
@@ -69,6 +70,7 @@ var _ = Describe("firewall deployment controller", Ordered, func() {
 			}
 		)
 
+		// we are sharing a client for the tests, so we need to make sure we do not run contradicting tests in parallel
 		_, metalClient = metalclient.NewMetalMockClient(&metalclient.MetalMockFns{
 			Firewall: func(m *mock.Mock) {
 				m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
@@ -102,63 +104,110 @@ var _ = Describe("firewall deployment controller", Ordered, func() {
 			Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
 		})
 
-		Context("everything comes up healthy", func() {
+		Context("everything comes up healthy", Ordered, func() {
 			var (
 				fw  *v2.Firewall
 				set *v2.FirewallSet
+				mon *v2.FirewallMonitor
 			)
 
 			BeforeAll(func() {
-				By("creating a firewall deployment")
+				set = waitForSingleResource(namespaceName, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+					return l.GetItems()
+				}, 3*time.Second)
+				fw = waitForSingleResource(namespaceName, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+					return l.GetItems()
+				}, 3*time.Second)
+				mon = waitForSingleResource(v2.FirewallShootNamespace, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+					return l.GetItems()
+				}, 5*time.Second)
 
-				set = waitForSingleResource(&v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
-					return l.GetItems()
-				})
-				fw = waitForSingleResource(&v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
-					return l.GetItems()
-				})
+				// simulating a firewall-controller updating the resource
+				mon.ControllerStatus = &v2.ControllerStatus{
+					Updated: metav1.NewTime(testTime),
+				}
+				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
 			})
 
-			Context("the firewall deployment resource", func() {
-				It("should default the update strategy to rolling update (so the mutating webhook is working)", func() {
-					Expect(deployment.Spec.Strategy).To(Equal(v2.StrategyRollingUpdate))
+			Context("the firewall resource", func() {
+				It("should be named after the namespace (it's the shoot name in the end)", func() {
+					Expect(fw.Name).To(HavePrefix(namespaceName + "-firewall-"))
 				})
 
-				It("should have the rbac condition succeeded", func() {
-					cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				It("should be in the same namespace as the set", func() {
+					Expect(fw.Namespace).To(Equal(set.Namespace))
+				})
+
+				It("should inherit the spec from the set", func() {
+					wantSpec := set.Spec.Template.DeepCopy()
+					wantSpec.Interval = "10s"
+					Expect(&fw.Spec).To(BeComparableTo(wantSpec))
+				})
+
+				It("should have the deployment as an owner", func() {
+					Expect(fw.ObjectMeta.OwnerReferences).To(HaveLen(1))
+					Expect(fw.ObjectMeta.OwnerReferences[0].Name).To(Equal(set.Name))
+				})
+
+				It("should have the created condition true", func() {
+					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentRBACProvisioned)
+					}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
-					Expect(cond.Status).To(Equal(v2.ConditionTrue))
-					Expect(cond.Reason).To(Equal("Provisioned"))
-					Expect(cond.Message).To(Equal("RBAC provisioned successfully."))
+					Expect(cond.Reason).To(Equal("Created"))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *firewall1.Allocation.Name)))
 				})
 
-				It("should have the rbac condition true", func() {
-					cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				It("should populate the machine status", func() {
+					var status *v2.MachineStatus
+					var fw = fw.DeepCopy()
+					Eventually(func() *v2.MachineStatus {
+						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+						status = fw.Status.MachineStatus
+						return status
+					}, 5*time.Second, interval).Should(Not(BeNil()))
+
+					Expect(status.MachineID).To(Equal(*firewall1.ID))
+					Expect(status.CrashLoop).To(Equal(false))
+					Expect(status.Liveliness).To(Equal("Alive"))
+					Expect(status.LastEvent).NotTo(BeNil())
+					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
+					Expect(status.LastEvent.Message).To(Equal("phoning home"))
+				})
+
+				It("should have the ready condition true", func() {
+					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentRBACProvisioned)
+					}, v2.FirewallReady, v2.ConditionTrue, 15*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
-					Expect(cond.Status).To(Equal(v2.ConditionTrue))
-					Expect(cond.Reason).To(Equal("Provisioned"))
-					Expect(cond.Message).To(Equal("RBAC provisioned successfully."))
+					Expect(cond.Reason).To(Equal("Ready"))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
 				})
 
-				It("should populate the status", func() {
-					var deploy = deployment.DeepCopy()
-					Eventually(func() int {
-						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deploy), deploy)).To(Succeed())
-						return set.Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(1), "reach ready replicas")
+				It("should have the monitor condition true", func() {
+					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+						return fd.Status.Conditions
+					}, v2.FirewallMonitorDeployed, v2.ConditionTrue, 5*time.Second)
 
-					Expect(deploy.Status.TargetReplicas).To(Equal(1))
-					Expect(deploy.Status.ProgressingReplicas).To(Equal(0))
-					Expect(deploy.Status.UnhealthyReplicas).To(Equal(0))
-					Expect(deploy.Status.ObservedRevision).To(Equal(0)) // this is the first revision
+					Expect(cond.LastTransitionTime).NotTo(BeZero())
+					Expect(cond.LastUpdateTime).NotTo(BeZero())
+					Expect(cond.Reason).To(Equal("Deployed"))
+					Expect(cond.Message).To(Equal("Successfully deployed firewall-monitor."))
+				})
+
+				It("should have the firewall-controller connected condition true", func() {
+					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+						return fd.Status.Conditions
+					}, v2.FirewallControllerConnected, v2.ConditionTrue, 15*time.Second)
+
+					Expect(cond.LastTransitionTime).NotTo(BeZero())
+					Expect(cond.LastUpdateTime).NotTo(BeZero())
+					Expect(cond.Reason).To(Equal("Connected"))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.Updated.Time.String())))
 				})
 			})
 
@@ -191,7 +240,7 @@ var _ = Describe("firewall deployment controller", Ordered, func() {
 					Eventually(func() int {
 						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
 						return set.Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(1), "reach ready replicas")
+					}, 15*time.Second, interval).Should(Equal(1), "reach ready replicas")
 
 					Expect(set.Status.TargetReplicas).To(Equal(1))
 					Expect(set.Status.ProgressingReplicas).To(Equal(0))
@@ -200,105 +249,75 @@ var _ = Describe("firewall deployment controller", Ordered, func() {
 				})
 			})
 
-			Context("the firewall resource", func() {
-				It("should be named after the namespace (it's the shoot name in the end)", func() {
-					Expect(fw.Name).To(HavePrefix(namespaceName + "-firewall-"))
+			Context("the firewall deployment resource", func() {
+				It("should default the update strategy to rolling update (so the mutating webhook is working)", func() {
+					Expect(deployment.Spec.Strategy).To(Equal(v2.StrategyRollingUpdate))
 				})
 
-				It("should be in the same namespace as the set", func() {
-					Expect(fw.Namespace).To(Equal(set.Namespace))
-				})
-
-				It("should inherit the spec from the set", func() {
-					wantSpec := set.Spec.Template.DeepCopy()
-					wantSpec.Interval = "10s"
-					Expect(&fw.Spec).To(BeComparableTo(wantSpec))
-				})
-
-				It("should have the deployment as an owner", func() {
-					Expect(fw.ObjectMeta.OwnerReferences).To(HaveLen(1))
-					Expect(fw.ObjectMeta.OwnerReferences[0].Name).To(Equal(set.Name))
-				})
-
-				It("should have the created condition true", func() {
-					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				It("should have the rbac condition true", func() {
+					cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallCreated)
+					}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
-					Expect(cond.Status).To(Equal(v2.ConditionTrue))
-					Expect(cond.Reason).To(Equal("Created"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *firewall1.Allocation.Name)))
+					Expect(cond.Reason).To(Equal("Provisioned"))
+					Expect(cond.Message).To(Equal("RBAC provisioned successfully."))
 				})
 
-				It("should populate the machine status", func() {
-					var status *v2.MachineStatus
-					var fw = fw.DeepCopy()
-					Eventually(func() *v2.MachineStatus {
-						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
-						status = fw.Status.MachineStatus
-						return status
-					}, timeout, interval).Should(Not(BeNil()))
-
-					Expect(status.MachineID).To(Equal(*firewall1.ID))
-					Expect(status.CrashLoop).To(Equal(false))
-					Expect(status.Liveliness).To(Equal("Alive"))
-					Expect(status.LastEvent).NotTo(BeNil())
-					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
-					Expect(status.LastEvent.Message).To(Equal("phoning home"))
-				})
-
-				It("should have the ready condition true", func() {
-					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				It("should have the available condition true", func() {
+					cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallReady)
+					}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
-					Expect(cond.Status).To(Equal(v2.ConditionTrue))
-					Expect(cond.Reason).To(Equal("Ready"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
+					Expect(cond.Reason).To(Equal("MinimumReplicasAvailable"))
+					Expect(cond.Message).To(Equal("Deployment has minimum availability."))
 				})
 
-				It("should have the monitor condition true", func() {
-					cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				It("should have the progress condition true", func() {
+					cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallMonitorDeployed)
+					}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
-					Expect(cond.Status).To(Equal(v2.ConditionTrue))
-					Expect(cond.Reason).To(Equal("Deployed"))
-					Expect(cond.Message).To(Equal("Successfully deployed firewall-monitor."))
+					Expect(cond.Reason).To(Equal("NewFirewallSetAvailable"))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)))
+				})
+
+				It("should populate the status", func() {
+					var deploy = deployment.DeepCopy()
+					Eventually(func() int {
+						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deploy), deploy)).To(Succeed())
+						return deploy.Status.ReadyReplicas
+					}, 15*time.Second, interval).Should(Equal(1), "reach ready replicas")
+
+					Expect(deploy.Status.TargetReplicas).To(Equal(1))
+					Expect(deploy.Status.ProgressingReplicas).To(Equal(0))
+					Expect(deploy.Status.UnhealthyReplicas).To(Equal(0))
+					Expect(deploy.Status.ObservedRevision).To(Equal(0)) // this is the first revision
 				})
 			})
-		})
-
-		AfterAll(func() {
-			By("cleaning up everything")
-
-			Expect(k8sClient.Delete(ctx, deployment)).To(Succeed())
-
-			// TODO: check that all objects disappear
 		})
 	})
 })
 
-func waitForCondition[O client.Object](of O, getter func(O) v2.Conditions, t v2.ConditionType) *v2.Condition {
+func waitForCondition[O client.Object](of O, getter func(O) v2.Conditions, t v2.ConditionType, s v2.ConditionStatus, timeout time.Duration) *v2.Condition {
 	var cond *v2.Condition
-	Eventually(func() *v2.Condition {
+	Eventually(func() v2.ConditionStatus {
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(of), of)).To(Succeed())
 		cond = getter(of).Get(t)
-		return cond
-	}, timeout, interval).Should(Not(BeNil()))
+		return cond.Status
+	}, timeout, interval).Should(Equal(s), "waiting for condition %q to reach status %q", t, s)
 	return cond
 }
 
-func waitForSingleResource[O client.Object, L client.ObjectList](list L, getter func(L) []O) O {
+func waitForSingleResource[O client.Object, L client.ObjectList](namespace string, list L, getter func(L) []O, timeout time.Duration) O {
 	var items []O
 	Eventually(func() []O {
-		err := k8sClient.List(ctx, list, client.InNamespace(namespaceName))
+		err := k8sClient.List(ctx, list, client.InNamespace(namespace))
 		Expect(err).To(Not(HaveOccurred()))
 		items = getter(list)
 		return items

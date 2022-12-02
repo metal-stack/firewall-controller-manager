@@ -19,13 +19,12 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 		var (
 			fw = fw
 
-			created = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
-			ready   = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
-			// FIXME: enable back in real environment:
-			// connected = fw.Status.Conditions.Get(v2.FirewallControllerConnected).Status == v2.ConditionTrue
+			created   = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
+			ready     = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
+			connected = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
 		)
 
-		if created && ready {
+		if created && ready && connected {
 			r.Target.Status.ReadyReplicas++
 			continue
 		}
