@@ -23,7 +23,7 @@ clean:
 	rm -f bin/*
 
 # Run tests
-test: generate fmt vet manifests
+test:
 	@if ! which $(SETUP_ENVTEST) > /dev/null; then echo "setup-envtest needs to be installed. you can use setup-envtest target to achieve this."; exit 1; fi
 	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use -i --bin-dir $(PWD)/bin -p path)" go test ./... -coverprofile cover.out
 
