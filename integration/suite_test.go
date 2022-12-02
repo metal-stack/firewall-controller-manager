@@ -17,7 +17,6 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
-	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,12 +33,10 @@ const (
 )
 
 var (
-	ctx         context.Context
-	cancel      context.CancelFunc
-	k8sClient   client.Client
-	testEnv     *envtest.Environment
-	metalClient metalgo.Client
-
+	ctx        context.Context
+	cancel     context.CancelFunc
+	k8sClient  client.Client
+	testEnv    *envtest.Environment
 	configPath = filepath.Join("..", "config")
 )
 
