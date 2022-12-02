@@ -8,5 +8,5 @@
   - [ ] other Idea
 - [ ] Adopt Gardener Extension Provider
 - [ ] Adopt Firewall Controller to consume v2.Firewall from Seed and write v2.ControllerStatus to Shoot.
-- [ ] Adopt Integration Test Suite
+- [x] Adopt Integration Test Suite
 - [ ] Remove IngressRules from CWNP, only rely on Service.Spec.LoadBalancerSourceRanges
