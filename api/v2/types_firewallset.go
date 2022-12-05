@@ -7,6 +7,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// FirewallManagedBySetTag is a tag added to the firewall entity in the metal-stack api (backend) indicating by which set a firewall is being managed.
+	FirewallManagedBySetTag = "metal.stack.io/firewall-controller-manager/set"
+)
+
 // FirewallSet contains the spec template of a firewall resource similar to a Kubernetes ReplicaSet and takes care that the desired amount of firewall replicas is running.
 //
 // +kubebuilder:object:root=true
@@ -22,9 +27,6 @@ type FirewallSet struct {
 
 	// Spec contains the firewall set specification.
 	Spec FirewallSetSpec `json:"spec,omitempty"`
-	// Userdata contains the userdata used for the creation of the firewall.
-	// It is not part of the template as it is generated dynamically by a controller that governs the firewall.
-	Userdata string `json:"userdata"`
 	// Status contains current status information on the firewall set.
 	Status FirewallSetStatus `json:"status,omitempty"`
 }
@@ -33,8 +35,16 @@ type FirewallSet struct {
 type FirewallSetSpec struct {
 	// Replicas is the amount of firewall replicas targeted to be running.
 	Replicas int `json:"replicas"`
+	// Selector is a label query over firewalls that should match the replicas count.
+	// If Selector is empty, it is defaulted to the labels present on the firewall template.
+	// Label keys and values that must match in order to be controlled by this replication
+	// controller, if empty defaulted to labels on firewall template.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 	// Template is the firewall spec used for creating the firewalls.
-	Template FirewallSpec `json:"template"`
+	Template FirewallTemplateSpec `json:"template"`
+	// Userdata contains the userdata used for the creation of the firewall.
+	// It is not part of the template as it is generated dynamically by a controller that governs the firewall.
+	Userdata string `json:"userdata"`
 }
 
 type FirewallSetStatus struct {

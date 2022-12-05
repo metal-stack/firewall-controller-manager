@@ -73,6 +73,15 @@ type FirewallSpec struct {
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
 }
 
+// FirewallTemplateSpec describes the data a firewall should have when created from a template
+type FirewallTemplateSpec struct {
+	// Metadata of the firewalls created from this template.
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec contains the firewall specification.
+	Spec FirewallSpec `json:"spec,omitempty"`
+}
+
 // EgressRuleSNAT holds a Source-NAT rule
 type EgressRuleSNAT struct {
 	// NetworkID is the network for which the egress rule will be configured.

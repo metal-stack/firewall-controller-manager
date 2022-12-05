@@ -35,14 +35,21 @@ var _ = Context("integration test", Ordered, func() {
 				Namespace: namespaceName,
 			},
 			Spec: v2.FirewallDeploymentSpec{
-				Template: v2.FirewallSpec{
-					Size:              "n1-medium-x86",
-					Project:           "project-a",
-					Partition:         "partition-a",
-					Image:             "firewall-ubuntu-2.0",
-					Networks:          []string{"internet"},
-					ControllerURL:     "http://controller.tar.gz",
-					ControllerVersion: "v0.0.1",
+				Template: v2.FirewallTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
+					Spec: v2.FirewallSpec{
+						Size:              "n1-medium-x86",
+						Project:           "project-a",
+						Partition:         "partition-a",
+						Image:             "firewall-ubuntu-2.0",
+						Networks:          []string{"internet"},
+						ControllerURL:     "http://controller.tar.gz",
+						ControllerVersion: "v0.0.1",
+					},
 				},
 			},
 		}
@@ -93,6 +100,9 @@ var _ = Context("integration test", Ordered, func() {
 			},
 			Network: func(m *mock.Mock) {
 				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+			},
+			Machine: func(m *mock.Mock) {
+				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
 			},
 		})
 
@@ -150,7 +160,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should inherit the spec from the set", func() {
-				wantSpec := set.Spec.Template.DeepCopy()
+				wantSpec := set.Spec.Template.Spec.DeepCopy()
 				wantSpec.Interval = "10s"
 				Expect(&fw.Spec).To(BeComparableTo(wantSpec))
 			})
@@ -236,9 +246,9 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should inherit the spec from the deployement", func() {
-				wantSpec := deployment.Spec.Template.DeepCopy()
+				wantSpec := deployment.Spec.Template.Spec.DeepCopy()
 				wantSpec.Interval = "10s"
-				Expect(&set.Spec.Template).To(BeComparableTo(wantSpec))
+				Expect(&set.Spec.Template.Spec).To(BeComparableTo(wantSpec))
 			})
 
 			It("should have the deployment as an owner", func() {
@@ -348,9 +358,13 @@ var _ = Context("integration test", Ordered, func() {
 					Network: func(m *mock.Mock) {
 						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
 					},
+
+					Machine: func(m *mock.Mock) {
+						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+					},
 				})
 
-				deploy.Spec.Template.Size = "n2-medium-x86"
+				deploy.Spec.Template.Spec.Size = "n2-medium-x86"
 
 				Expect(k8sClient.Update(ctx, deploy)).To(Succeed())
 			})
@@ -386,7 +400,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should inherit the spec from the set", func() {
-				wantSpec := set.Spec.Template.DeepCopy()
+				wantSpec := set.Spec.Template.Spec.DeepCopy()
 				wantSpec.Interval = "10s"
 				Expect(&fw.Spec).To(BeComparableTo(wantSpec))
 			})
@@ -472,10 +486,10 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should inherit the spec from the deployement", func() {
-				wantSpec := deployment.Spec.Template.DeepCopy()
+				wantSpec := deployment.Spec.Template.Spec.DeepCopy()
 				wantSpec.Size = "n2-medium-x86"
 				wantSpec.Interval = "10s"
-				Expect(&set.Spec.Template).To(BeComparableTo(wantSpec))
+				Expect(&set.Spec.Template.Spec).To(BeComparableTo(wantSpec))
 			})
 
 			It("should have the deployment as an owner", func() {
@@ -554,6 +568,7 @@ var _ = Context("integration test", Ordered, func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Machine: func(m *mock.Mock) {
 						m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
+						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
 					},
 					Firewall: func(m *mock.Mock) {
 						// we need to filter the orphan controller as it would delete the firewall

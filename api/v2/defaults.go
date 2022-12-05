@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -53,8 +55,12 @@ func (r *firewallSetDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	if f.Spec.Replicas == 0 {
 		f.Spec.Replicas = 1
 	}
+	if f.Spec.Selector == nil {
+		labels := labels.Set(f.Spec.Template.Labels)
+		f.Spec.Selector = metav1.SetAsLabelSelector(labels)
+	}
 
-	f.Spec.Template.Default()
+	f.Spec.Template.Spec.Default()
 
 	return nil
 }
@@ -77,8 +83,12 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	if f.Spec.Strategy == "" {
 		f.Spec.Strategy = StrategyRollingUpdate
 	}
+	if f.Spec.Selector == nil {
+		labels := labels.Set(f.Spec.Template.Labels)
+		f.Spec.Selector = metav1.SetAsLabelSelector(labels)
+	}
 
-	f.Spec.Template.Default()
+	f.Spec.Template.Spec.Default()
 
 	return nil
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -104,28 +103,14 @@ func (c *controller) New() *v2.Firewall {
 }
 
 func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
-	tags, err := c.firewallTags(fw)
-	if err != nil {
-		return nil, err
-	}
-
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationName:    fw.Name,
 		AllocationProject: fw.Spec.Project,
-		Tags:              tags,
+		Tags:              []string{c.ClusterTag},
 	}).WithContext(ctx), nil)
 	if err != nil {
 		return nil, fmt.Errorf("firewall find error: %w", err)
 	}
 
 	return resp.Payload, nil
-}
-
-func (c *controller) firewallTags(fw *v2.Firewall) ([]string, error) {
-	ref := metav1.GetControllerOf(fw)
-	if ref == nil {
-		return nil, fmt.Errorf("firewall object has no owner reference")
-	}
-
-	return []string{c.ClusterTag, controllers.FirewallSetTag(ref.Name)}, nil
 }

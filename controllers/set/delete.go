@@ -6,12 +6,15 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/machine"
+	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
-	ownedFirewalls, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
@@ -63,4 +66,66 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 	}
 
 	return result, nil
+}
+
+// deletePhysicalOrphans checks in the backend if there are firewall entities that belong to the controller
+// event though there is no corresponding firewall resource managed by this controller.
+//
+// such firewalls will be deleted in the backend.
+func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
+	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+		AllocationProject: r.Target.Spec.Template.Spec.Project,
+		Tags:              []string{c.ClusterTag, controllers.FirewallSetTag(r.Target.Name)},
+	}).WithContext(r.Ctx), nil)
+	if err != nil {
+		r.Log.Error(err, "unable to retrieve firewalls for orphan checking, backing off...")
+		return controllers.RequeueAfter(10*time.Second, "backing off")
+	}
+
+	if len(resp.Payload) == 0 {
+		return nil
+	}
+
+	fws := &v2.FirewallList{}
+	err = c.Seed.List(r.Ctx, fws, client.InNamespace(c.Namespace))
+	if err != nil {
+		return err
+	}
+
+	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+		return fl.GetItems()
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get owned firewalls: %w", err)
+	}
+
+	existingNames := map[string]bool{}
+	for _, fw := range ownedFirewalls {
+		existingNames[fw.Name] = true
+	}
+
+	for _, fw := range resp.Payload {
+		if fw.Allocation == nil || fw.Allocation.Name == nil {
+			continue
+		}
+		if _, ok := existingNames[*fw.Allocation.Name]; ok {
+			continue
+		}
+
+		r.Log.Info("found physical orphan firewall, deleting", "firewall-name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
+
+		_, err = c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
+		if err != nil {
+			return fmt.Errorf("error deleting orphaned firewall: %w", err)
+		}
+
+		c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID)
+	}
+
+	return nil
+}
+
+func pop[E any](slice []E) (E, []E) {
+	// stolen from golang slice tricks
+	return slice[len(slice)-1], slice[:len(slice)-1]
 }

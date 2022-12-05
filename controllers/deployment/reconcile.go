@@ -22,7 +22,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return err
 	}
 
-	ownedSets, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
 	if err != nil {
@@ -108,8 +108,8 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		Spec: v2.FirewallSetSpec{
 			Replicas: r.Target.Spec.Replicas,
 			Template: r.Target.Spec.Template,
+			Userdata: userdata,
 		},
-		Userdata: userdata,
 	}
 
 	err = c.Seed.Create(r.Ctx, set, &client.CreateOptions{})
@@ -160,8 +160,8 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 	}
 
 	var (
-		newS = &r.Target.Spec.Template
-		oldS = &lastSet.Spec.Template
+		newS = &r.Target.Spec.Template.Spec
+		oldS = &lastSet.Spec.Template.Spec
 	)
 
 	ok = sizeHasChanged(newS, oldS)

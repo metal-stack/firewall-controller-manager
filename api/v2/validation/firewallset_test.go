@@ -19,30 +19,42 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: v2.FirewallSetSpec{
-			Template: v2.FirewallSpec{
-				Interval:          "10s",
-				ControllerURL:     "https://metal-stack.io/controller.img",
-				ControllerVersion: "v",
-				Image:             "image-a",
-				Partition:         "partition-a",
-				Project:           "project-a",
-				Size:              "size-a",
-				Networks:          []string{"internet"},
-				EgressRules: []v2.EgressRuleSNAT{
-					{
-						NetworkID: "network-a",
-						IPs:       []string{"1.2.3.4"},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"purpose": "shoot-firewall",
+				},
+			},
+			Template: v2.FirewallTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"purpose": "shoot-firewall",
 					},
 				},
-				InternalPrefixes: []string{"1.2.3.0/24"},
-				RateLimits: []v2.RateLimit{
-					{
-						NetworkID: "network-a",
+				Spec: v2.FirewallSpec{
+					Interval:          "10s",
+					ControllerURL:     "https://metal-stack.io/controller.img",
+					ControllerVersion: "v",
+					Image:             "image-a",
+					Partition:         "partition-a",
+					Project:           "project-a",
+					Size:              "size-a",
+					Networks:          []string{"internet"},
+					EgressRules: []v2.EgressRuleSNAT{
+						{
+							NetworkID: "network-a",
+							IPs:       []string{"1.2.3.4"},
+						},
+					},
+					InternalPrefixes: []string{"1.2.3.0/24"},
+					RateLimits: []v2.RateLimit{
+						{
+							NetworkID: "network-a",
+						},
 					},
 				},
 			},
+			Userdata: "some-userdata",
 		},
-		Userdata: "some-userdata",
 	}
 
 	tests := []struct {
@@ -60,12 +72,40 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 		{
 			name: "networks are empty",
 			mutateFn: func(f *v2.FirewallSet) *v2.FirewallSet {
-				f.Spec.Template.Networks = nil
+				f.Spec.Template.Spec.Networks = nil
 				return f
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.template.networks: Required value: field is required`,
+					Message: ` "firewall" is invalid: spec.template.spec.networks: Required value: field is required`,
+				},
+			},
+		},
+		{
+			name: "labels must match, selector is nil",
+			mutateFn: func(f *v2.FirewallSet) *v2.FirewallSet {
+				f.Spec.Selector = nil
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall" is invalid: spec.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
+				},
+			},
+		},
+		{
+			name: "labels must match",
+			mutateFn: func(f *v2.FirewallSet) *v2.FirewallSet {
+				f.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"does": "not-match",
+					},
+				}
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall" is invalid: spec.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
 				},
 			},
 		},
@@ -99,30 +139,32 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Spec: v2.FirewallSetSpec{
-					Template: v2.FirewallSpec{
-						Interval:          "10s",
-						ControllerURL:     "https://metal-stack.io/controller.img",
-						ControllerVersion: "v",
-						Image:             "image-a",
-						Partition:         "partition-a",
-						Project:           "project-a",
-						Size:              "size-a",
-						Networks:          []string{"internet"},
-						EgressRules: []v2.EgressRuleSNAT{
-							{
-								NetworkID: "network-a",
-								IPs:       []string{"1.2.3.4"},
+					Template: v2.FirewallTemplateSpec{
+						Spec: v2.FirewallSpec{
+							Interval:          "10s",
+							ControllerURL:     "https://metal-stack.io/controller.img",
+							ControllerVersion: "v",
+							Image:             "image-a",
+							Partition:         "partition-a",
+							Project:           "project-a",
+							Size:              "size-a",
+							Networks:          []string{"internet"},
+							EgressRules: []v2.EgressRuleSNAT{
+								{
+									NetworkID: "network-a",
+									IPs:       []string{"1.2.3.4"},
+								},
 							},
-						},
-						InternalPrefixes: []string{"1.2.3.0/24"},
-						RateLimits: []v2.RateLimit{
-							{
-								NetworkID: "network-a",
+							InternalPrefixes: []string{"1.2.3.0/24"},
+							RateLimits: []v2.RateLimit{
+								{
+									NetworkID: "network-a",
+								},
 							},
 						},
 					},
+					Userdata: "some-userdata",
 				},
-				Userdata: "some-userdata",
 			},
 			oldF: &v2.FirewallSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -130,30 +172,32 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: v2.FirewallSetSpec{
-					Template: v2.FirewallSpec{
-						Interval:          "10s",
-						ControllerURL:     "https://metal-stack.io/controller.img",
-						ControllerVersion: "v",
-						Image:             "image-a",
-						Partition:         "partition-a",
-						Project:           "project-a",
-						Size:              "size-a",
-						Networks:          []string{"internet"},
-						EgressRules: []v2.EgressRuleSNAT{
-							{
-								NetworkID: "network-a",
-								IPs:       []string{"1.2.3.4"},
+					Template: v2.FirewallTemplateSpec{
+						Spec: v2.FirewallSpec{
+							Interval:          "10s",
+							ControllerURL:     "https://metal-stack.io/controller.img",
+							ControllerVersion: "v",
+							Image:             "image-a",
+							Partition:         "partition-a",
+							Project:           "project-a",
+							Size:              "size-a",
+							Networks:          []string{"internet"},
+							EgressRules: []v2.EgressRuleSNAT{
+								{
+									NetworkID: "network-a",
+									IPs:       []string{"1.2.3.4"},
+								},
 							},
-						},
-						InternalPrefixes: []string{"1.2.3.0/24"},
-						RateLimits: []v2.RateLimit{
-							{
-								NetworkID: "network-a",
+							InternalPrefixes: []string{"1.2.3.0/24"},
+							RateLimits: []v2.RateLimit{
+								{
+									NetworkID: "network-a",
+								},
 							},
 						},
 					},
+					Userdata: "some-userdata",
 				},
-				Userdata: "some-userdata",
 			},
 			wantErr: nil,
 		},

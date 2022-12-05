@@ -8,7 +8,7 @@ import (
 )
 
 func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallDeployment]) error {
-	ownedSets, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
 	if err != nil {
