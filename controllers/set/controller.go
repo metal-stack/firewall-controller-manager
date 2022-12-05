@@ -70,13 +70,16 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		createTimeout:    10 * time.Minute,
 	})
 
-	err := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallSet{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("FirewallSet").
 		Owns(&v2.Firewall{}).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
-	if err != nil {
+}
+
+func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := c.validate(); err != nil {
 		return err
 	}
 

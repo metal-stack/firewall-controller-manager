@@ -84,13 +84,16 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		lastSetCreation:  map[string]time.Time{},
 	})
 
-	err := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallDeployment{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("FirewallDeployment").
 		Owns(&v2.FirewallSet{}).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
-	if err != nil {
+}
+
+func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := c.validate(); err != nil {
 		return err
 	}
 

@@ -21,7 +21,6 @@ webhooks:
     - v2
     operations:
     - CREATE
-    - UPDATE
     resources:
     - firewalls
   sideEffects: None
@@ -41,7 +40,6 @@ webhooks:
     - v2
     operations:
     - CREATE
-    - UPDATE
     resources:
     - firewallsets
   sideEffects: None
@@ -61,7 +59,6 @@ webhooks:
     - v2
     operations:
     - CREATE
-    - UPDATE
     resources:
     - firewalldeployments
   sideEffects: None

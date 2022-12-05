@@ -35,6 +35,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	currentAmount := len(ownedFirewalls)
 
 	if currentAmount < r.Target.Spec.Replicas {
+		r.Log.Info("scale up", "current", currentAmount, "want", r.Target.Spec.Replicas)
+
 		for i := currentAmount; i < r.Target.Spec.Replicas; i++ {
 			fw, err := c.createFirewall(r)
 			if err != nil {
@@ -50,7 +52,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	}
 
 	if currentAmount > r.Target.Spec.Replicas {
-		// TODO: this section needs testing
+		r.Log.Info("scale down", "current", currentAmount, "want", r.Target.Spec.Replicas)
+
 		sort.Slice(ownedFirewalls, func(i, j int) bool {
 			// put the oldest at the end of the slice, we will then pop them off
 			return !ownedFirewalls[i].CreationTimestamp.Before(&ownedFirewalls[j].CreationTimestamp)

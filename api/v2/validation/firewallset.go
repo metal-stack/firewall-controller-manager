@@ -46,9 +46,6 @@ func (*firewallSetValidator) validateSpec(f *v2.FirewallSetSpec, fldPath *field.
 	if f.Replicas < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
 	}
-	if f.Replicas > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "for now, no more than a single firewall replica is allowed"))
-	}
 
 	return allErrs
 }

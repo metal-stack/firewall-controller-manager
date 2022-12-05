@@ -80,12 +80,15 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		ControllerConfig: &c.ControllerConfig,
 	})
 
-	err := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.Firewall{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		Named("Firewall").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
-	if err != nil {
+}
+
+func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := c.validate(); err != nil {
 		return err
 	}
 

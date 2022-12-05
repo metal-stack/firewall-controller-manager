@@ -174,10 +174,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: deploy crds for firewallmonitor automatically into the shoot
-	// seed resources must be deployed by GEPM as it defines the initial fwdeployment
-
-	if err = (&deployment.Config{
+	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:          mgr.GetClient(),
 			Metal:         mclient,
@@ -189,12 +186,17 @@ func main() {
 			Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
-	}).SetupWithManager(mgr); err != nil {
+	}
+	if err = deploymentConfig.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "deployment")
 		os.Exit(1)
 	}
+	if err = deploymentConfig.SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup webhook", "controller", "deployment")
+		os.Exit(1)
+	}
 
-	if err = (&set.Config{
+	setConfig := &set.Config{
 		ControllerConfig: set.ControllerConfig{
 			Seed:                  mgr.GetClient(),
 			Metal:                 mclient,
@@ -205,12 +207,17 @@ func main() {
 			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("set"),
-	}).SetupWithManager(mgr); err != nil {
+	}
+	if err = setConfig.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "set")
 		os.Exit(1)
 	}
+	if err = setConfig.SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup webhook", "controller", "set")
+		os.Exit(1)
+	}
 
-	if err = (&firewall.Config{
+	firewallConfig := &firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
 			Seed:           mgr.GetClient(),
 			Shoot:          shootClient,
@@ -222,8 +229,13 @@ func main() {
 			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
-	}).SetupWithManager(mgr); err != nil {
+	}
+	if err = firewallConfig.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "firewall")
+		os.Exit(1)
+	}
+	if err = firewallConfig.SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup webhook", "controller", "firewall")
 		os.Exit(1)
 	}
 

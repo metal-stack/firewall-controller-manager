@@ -2,7 +2,6 @@ package controllers_test
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -13,6 +12,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	testcommon "github.com/metal-stack/firewall-controller-manager/integration/common"
 
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	metalfirewall "github.com/metal-stack/metal-go/api/client/firewall"
@@ -113,19 +114,19 @@ var _ = Context("integration test", Ordered, func() {
 
 		Describe("new resources will be spawned by the controller", func() {
 			It("should create a firewall set", func() {
-				set = waitForResourceAmount(namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
 				}, 3*time.Second)
 			})
 
 			It("should create a firewall", func() {
-				fw = waitForResourceAmount(namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
 				}, 3*time.Second)
 			})
 
 			It("should create a firewall monitor", func() {
-				mon = waitForResourceAmount(v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 			})
@@ -160,7 +161,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the created condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
 
@@ -188,7 +189,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the ready condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallReady, v2.ConditionTrue, 15*time.Second)
 
@@ -199,7 +200,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the monitor condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallMonitorDeployed, v2.ConditionTrue, 5*time.Second)
 
@@ -210,7 +211,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the firewall-controller connected condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallControllerConnected, v2.ConditionTrue, 15*time.Second)
 
@@ -265,7 +266,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the rbac condition true", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
@@ -276,7 +277,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the available condition true", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
 
@@ -287,7 +288,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the progress condition true", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
 
@@ -357,19 +358,19 @@ var _ = Context("integration test", Ordered, func() {
 
 		Context("new resources will be spawned by the controller", func() {
 			It("should create another firewall set", func() {
-				set = waitForResourceAmount(namespaceName, 2, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
 				}, 15*time.Second) // here it takes longer because the firewall set controller has a safety backoff
 			})
 
 			It("should create another firewall", func() {
-				fw = waitForResourceAmount(namespaceName, 2, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
 				}, 3*time.Second)
 			})
 
 			It("should create another firewall monitor", func() {
-				mon = waitForResourceAmount(v2.FirewallShootNamespace, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 			})
@@ -396,7 +397,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the created condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
 
@@ -424,7 +425,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the ready condition false", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallReady, v2.ConditionFalse, 15*time.Second)
 
@@ -435,7 +436,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the monitor condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallMonitorDeployed, v2.ConditionTrue, 5*time.Second)
 
@@ -446,7 +447,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the firewall-controller connected condition true", func() {
-				cond := waitForCondition(fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallControllerConnected, v2.ConditionUnknown, 15*time.Second)
 
@@ -498,7 +499,7 @@ var _ = Context("integration test", Ordered, func() {
 
 		Context("the firewall deployment resource", func() {
 			It("should have the rbac condition true", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
@@ -509,7 +510,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the available condition false", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentAvailable, v2.ConditionFalse, 5*time.Second)
 
@@ -520,7 +521,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should have the progress condition true", func() {
-				cond := waitForCondition(deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
 				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
 
@@ -584,21 +585,21 @@ var _ = Context("integration test", Ordered, func() {
 
 		Context("the old generation disappears", func() {
 			It("should delete the firewall set", func() {
-				set = waitForResourceAmount(namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
 				}, 15*time.Second)
 				Expect(set.Status.ObservedRevision).To(Equal(1))
 			})
 
 			It("should delete the firewall", func() {
-				fw = waitForResourceAmount(namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
 				}, 3*time.Second)
 				Expect(fw.Status.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
 			})
 
 			It("should delete firewall monitor", func() {
-				mon = waitForResourceAmount(v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 				Expect(mon.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
@@ -615,19 +616,19 @@ var _ = Context("integration test", Ordered, func() {
 
 		Context("all resources are cleaned up", func() {
 			It("should delete the firewall set", func() {
-				_ = waitForResourceAmount(namespaceName, 0, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
 				}, 10*time.Second)
 			})
 
 			It("should delete the firewall", func() {
-				_ = waitForResourceAmount(namespaceName, 0, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
 				}, 10*time.Second)
 			})
 
 			It("should delete firewall monitor", func() {
-				_ = waitForResourceAmount(v2.FirewallShootNamespace, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 10*time.Second)
 			})
@@ -635,35 +636,3 @@ var _ = Context("integration test", Ordered, func() {
 	})
 
 })
-
-func waitForCondition[O client.Object](of O, getter func(O) v2.Conditions, t v2.ConditionType, s v2.ConditionStatus, timeout time.Duration) *v2.Condition {
-	var cond *v2.Condition
-	Eventually(func() v2.ConditionStatus {
-		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(of), of)).To(Succeed())
-		cond = getter(of).Get(t)
-		return cond.Status
-	}, timeout, interval).Should(Equal(s), "waiting for condition %q to reach status %q", t, s)
-	return cond
-}
-
-// waitForResourceAmount waits for the given amount of resources and returns the newest one
-func waitForResourceAmount[O client.Object, L client.ObjectList](namespace string, amount int, list L, getter func(L) []O, timeout time.Duration) O {
-	var items []O
-	Eventually(func() []O {
-		err := k8sClient.List(ctx, list, client.InNamespace(namespace))
-		Expect(err).To(Not(HaveOccurred()))
-		items = getter(list)
-		return items
-	}, timeout, interval).Should(HaveLen(amount))
-
-	if amount == 0 {
-		var o O
-		return o
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].GetCreationTimestamp().After(items[j].GetCreationTimestamp().Time)
-	})
-
-	return items[0]
-}

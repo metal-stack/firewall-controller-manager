@@ -1,4 +1,4 @@
-package controllers_test
+package set_test
 
 import (
 	"context"
@@ -7,19 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
-	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	metalfirewall "github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/models"
+	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	namespaceName = "test"
+	namespaceName = "default"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 	cancel     context.CancelFunc
 	k8sClient  client.Client
 	testEnv    *envtest.Environment
-	configPath = filepath.Join("..", "config")
+	configPath = filepath.Join("..", "..", "config")
 )
 
 func TestAPIs(t *testing.T) {
@@ -92,23 +93,12 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	deploymentconfig := &deployment.Config{
-		ControllerConfig: deployment.ControllerConfig{
-			Seed:          k8sClient,
-			Metal:         metalClient,
-			Namespace:     namespaceName,
-			ClusterID:     "cluster-a",
-			ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			ClusterAPIURL: "http://shoot-api",
-			K8sVersion:    semver.MustParse("v1.25.0"),
-			Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
+	_, metalClient := metalclient.NewMetalMockClient(&metalclient.MetalMockFns{
+		Firewall: func(m *mock.Mock) {
+			// muting the orphan controller
+			m.On("FindFirewalls", mock.Anything, mock.Anything).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}, nil)
 		},
-		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
-	}
-	err = deploymentconfig.SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
-	err = deploymentconfig.SetupWebhookWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
+	})
 
 	setConfig := &set.Config{
 		ControllerConfig: set.ControllerConfig{
@@ -140,20 +130,7 @@ var _ = BeforeSuite(func() {
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}
-	err = firewallConfig.SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
 	err = firewallConfig.SetupWebhookWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&monitor.Config{
-		ControllerConfig: monitor.ControllerConfig{
-			Seed:          k8sClient,
-			Shoot:         k8sClient,
-			Namespace:     v2.FirewallShootNamespace,
-			SeedNamespace: namespaceName,
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
-	}).SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
