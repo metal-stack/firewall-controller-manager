@@ -25,7 +25,7 @@ clean:
 # Run tests
 test:
 	@if ! which $(SETUP_ENVTEST) > /dev/null; then echo "setup-envtest needs to be installed. you can use setup-envtest target to achieve this."; exit 1; fi
-	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use -i --bin-dir $(PWD)/bin -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use --arch=amd64 --bin-dir $(PWD)/bin -p path)" go test ./... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -64,7 +64,7 @@ fmt:
 
 # Run go vet against code
 vet:
-	go vet ./...
+	go vet -copylocks=false ./...
 
 # Generate code
 generate: controller-gen
@@ -87,6 +87,7 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
+.PHONY: setup-envtest
 setup-envtest:
 ifeq (, $(shell which setup-envtest))
 	@{ \

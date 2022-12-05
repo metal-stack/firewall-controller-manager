@@ -325,7 +325,7 @@ func swapMetalClient(mockFns *metalclient.MetalMockFns) {
 	}
 
 	metalMockClient := metalClient.(*metalclient.MetalMockClient)
-	*metalMockClient = *newClient // nolint for testing this is just fine
+	*metalMockClient = *newClient // nolint
 
 	return
 }
