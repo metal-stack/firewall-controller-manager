@@ -32,7 +32,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 		f, err := c.createFirewall(r)
 		if err != nil {
-			return controllers.RequeueAfter(30*time.Second, "error creating firewall, backing off")
+			return err
 		}
 
 		if err := c.setStatus(r, f); err != nil {
@@ -138,10 +138,10 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	if err != nil {
 		r.Log.Error(err, "error creating firewall")
 
-		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "Error", fmt.Sprintf("Error creating firewall: %s", err))
+		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "NotCreated", fmt.Sprintf("Firewall could not be created: %s.", err))
 		r.Target.Status.Conditions.Set(cond)
 
-		return nil, fmt.Errorf("firewall create error: %w", err)
+		return nil, controllers.RequeueAfter(30*time.Second, "error creating firewall, backing off")
 	}
 
 	r.Log.Info("firewall created", "id", pointer.SafeDeref(resp.Payload.ID))

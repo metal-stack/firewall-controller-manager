@@ -605,6 +605,35 @@ var _ = Context("integration test", Ordered, func() {
 			})
 		})
 	})
+
+	Describe("the deletion flow", Ordered, func() {
+		When("deleting the firewall deployment", func() {
+			It("the deletion finishes", func() {
+				Expect(k8sClient.Delete(ctx, deployment)).To(Succeed())
+			})
+		})
+
+		Context("all resources are cleaned up", func() {
+			It("should delete the firewall set", func() {
+				_ = waitForResourceAmount(namespaceName, 0, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+					return l.GetItems()
+				}, 10*time.Second)
+			})
+
+			It("should delete the firewall", func() {
+				_ = waitForResourceAmount(namespaceName, 0, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+					return l.GetItems()
+				}, 10*time.Second)
+			})
+
+			It("should delete firewall monitor", func() {
+				_ = waitForResourceAmount(v2.FirewallShootNamespace, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+					return l.GetItems()
+				}, 10*time.Second)
+			})
+		})
+	})
+
 })
 
 func waitForCondition[O client.Object](of O, getter func(O) v2.Conditions, t v2.ConditionType, s v2.ConditionStatus, timeout time.Duration) *v2.Condition {
