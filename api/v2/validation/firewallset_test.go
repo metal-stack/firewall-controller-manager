@@ -89,7 +89,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
+					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
 				},
 			},
 		},
@@ -105,7 +105,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
+					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
 				},
 			},
 		},
@@ -139,7 +139,17 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Spec: v2.FirewallSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
 					Template: v2.FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"purpose": "shoot-firewall",
+							},
+						},
 						Spec: v2.FirewallSpec{
 							Interval:          "10s",
 							ControllerURL:     "https://metal-stack.io/controller.img",
@@ -172,7 +182,17 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: v2.FirewallSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
 					Template: v2.FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"purpose": "shoot-firewall",
+							},
+						},
 						Spec: v2.FirewallSpec{
 							Interval:          "10s",
 							ControllerURL:     "https://metal-stack.io/controller.img",

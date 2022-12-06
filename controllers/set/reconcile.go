@@ -19,10 +19,12 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		return fmt.Errorf("unable to get owned firewalls: %w", err)
 	}
 
-	err = c.adoptFirewalls(r, orphaned)
+	adoptions, err := c.adoptFirewalls(r, orphaned)
 	if err != nil {
 		return fmt.Errorf("error when trying to adopt firewalls: %w", err)
 	}
+
+	ownedFirewalls = append(ownedFirewalls, adoptions...)
 
 	for _, fw := range ownedFirewalls {
 		fw.Spec = r.Target.Spec.Template.Spec
@@ -118,27 +120,24 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	return fw, nil
 }
 
-func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*v2.Firewall) error {
+func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*v2.Firewall) ([]*v2.Firewall, error) {
+	var adoptions []*v2.Firewall
+
 	for _, fw := range fws {
 		fw := fw
 
-		if fw.DeletionTimestamp != nil {
-			continue
-		}
-
-		if len(fw.OwnerReferences) != 0 {
-			continue
-		}
-
-		fw.OwnerReferences = append(fw.OwnerReferences, *metav1.GetControllerOf(r.Target))
-
-		err := c.Seed.Update(r.Ctx, fw)
+		ok, err := c.adoptFirewall(r, fw)
 		if err != nil {
+			return nil, err
+		}
 
+		if ok {
+			r.Log.Info("adopted firewall", "firewall-name", fw.Name)
+			adoptions = append(adoptions, fw)
 		}
 	}
 
-	return nil
+	return adoptions, nil
 }
 
 func (c *controller) adoptFirewall(r *controllers.Ctx[*v2.FirewallSet], fw *v2.Firewall) (adopted bool, err error) {
@@ -153,14 +152,12 @@ func (c *controller) adoptFirewall(r *controllers.Ctx[*v2.FirewallSet], fw *v2.F
 		return false, nil
 	}
 
-	fw.OwnerReferences = append(fw.OwnerReferences, *metav1.GetControllerOf(r.Target))
+	fw.OwnerReferences = append(fw.OwnerReferences, *metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")))
 
 	err = c.Seed.Update(r.Ctx, fw)
 	if err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-
-	r.Log.Info("adopted firewall", "firewall-name", fw.Name)
 
 	return true, nil
 }

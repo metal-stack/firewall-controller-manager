@@ -112,7 +112,17 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 				},
 				Spec: v2.FirewallDeploymentSpec{
 					Strategy: v2.StrategyRollingUpdate,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
 					Template: v2.FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"purpose": "shoot-firewall",
+							},
+						},
 						Spec: v2.FirewallSpec{
 							Interval:          "10s",
 							ControllerURL:     "https://metal-stack.io/controller.img",
@@ -145,7 +155,17 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 				},
 				Spec: v2.FirewallDeploymentSpec{
 					Strategy: v2.StrategyRollingUpdate,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
 					Template: v2.FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"purpose": "shoot-firewall",
+							},
+						},
 						Spec: v2.FirewallSpec{
 							Interval:          "10s",
 							ControllerURL:     "https://metal-stack.io/controller.img",

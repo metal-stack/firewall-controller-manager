@@ -103,12 +103,11 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 				}
 
-				if !apierrors.IsNotFound(err) {
-					log.Error(err, "error during deletion flow")
-					return ctrl.Result{}, err
-				}
+				log.Error(err, "error during deletion flow")
+				return ctrl.Result{}, err
 			}
 
+			log.Info("deletion finished, removing finalizer")
 			controllerutil.RemoveFinalizer(o, FinalizerName)
 			if err := g.c.Update(ctx, o); err != nil {
 				return ctrl.Result{}, err
@@ -119,6 +118,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !controllerutil.ContainsFinalizer(o, FinalizerName) {
+		log.Info("adding finalizer")
 		controllerutil.AddFinalizer(o, FinalizerName)
 		if err := g.c.Update(ctx, o); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to add finalizer: %w", err)

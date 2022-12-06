@@ -86,3 +86,11 @@ type FirewallDeploymentList struct {
 	// Items contains the list items.
 	Items []FirewallDeployment `json:"items"`
 }
+
+func (f *FirewallDeploymentList) GetItems() []*FirewallDeployment {
+	var result []*FirewallDeployment
+	for i := range f.Items {
+		result = append(result, &f.Items[i])
+	}
+	return result
+}

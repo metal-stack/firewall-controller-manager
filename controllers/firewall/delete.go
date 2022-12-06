@@ -60,9 +60,9 @@ func (c *controller) deleteFirewallMonitor(ctx context.Context, fw *v2.Firewall)
 		},
 	}
 
-	err := c.Shoot.Delete(ctx, mon, &client.DeleteOptions{})
+	err := c.Shoot.Delete(ctx, mon)
 	if err != nil {
-		return err
+		return client.IgnoreNotFound(err)
 	}
 
 	return nil

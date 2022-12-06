@@ -28,14 +28,18 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 	for _, fw := range fws {
 		fw := fw
 
-		err := c.Seed.Delete(r.Ctx, fw, &client.DeleteOptions{})
+		err := c.Seed.Delete(r.Ctx, fw)
 		if err != nil {
 			return err
 		}
 
-		r.Log.Info("deleted firewall", "firewall-name", fw.Name)
+		r.Log.Info("set deletion timestamp on firewall", "firewall-name", fw.Name)
 
 		c.Recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s", fw.Name)
+	}
+
+	if len(fws) > 0 {
+		return controllers.RequeueAfter(2*time.Second, "firewalls are getting deleted, waiting")
 	}
 
 	return nil

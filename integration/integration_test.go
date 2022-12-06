@@ -25,6 +25,29 @@ import (
 
 var (
 	interval = 250 * time.Millisecond
+
+	namespace = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}
+
+	// we need to fake the secret as there is no kube-controller-manager in the
+	// envtest setup which can issue a long-lived token for the secret
+	fakeTokenSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: namespaceName,
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "firewall-controller-seed-access",
+			},
+		},
+		StringData: map[string]string{
+			"token":  "a-token",
+			"ca.crt": "ca-crt",
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+	}
 )
 
 var _ = Context("integration test", Ordered, func() {
@@ -55,31 +78,44 @@ var _ = Context("integration test", Ordered, func() {
 		}
 	)
 
+	BeforeAll(func() {
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		DeferCleanup(func() {
+			swapMetalClient(&metalclient.MetalMockFns{
+				Firewall: func(m *mock.Mock) {
+					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
+
+					// we need to filter the orphan controller as it would delete the firewall
+					call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+					call.Run(func(args mock.Arguments) {
+						resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
+						params, ok := args.Get(0).(*firewall.FindFirewallsParams)
+						if !ok {
+							panic(fmt.Sprintf("unexpected type: %T", args.Get(0)))
+						}
+						if params.Body.AllocationName != "" {
+							resp.Payload = append(resp.Payload, firewall1)
+						}
+						call.ReturnArguments = mock.Arguments{resp, nil}
+					})
+				},
+				Network: func(m *mock.Mock) {
+					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+				},
+				Machine: func(m *mock.Mock) {
+					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
+					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+				},
+			})
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, deployment.DeepCopy()))).To(Succeed())
+			_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+				return l.GetItems()
+			}, 10*time.Second)
+		})
+	})
+
 	Describe("the good case", Ordered, func() {
-		var (
-			namespace = &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: namespaceName,
-				},
-			}
-
-			fakeTokenSecret = &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "firewall-controller-seed-access",
-					Namespace: namespaceName,
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "firewall-controller-seed-access",
-					},
-				},
-				StringData: map[string]string{
-					"token":  "a-token",
-					"ca.crt": "ca-crt",
-				},
-				Type: corev1.SecretTypeServiceAccountToken,
-			}
-		)
-
 		swapMetalClient(&metalclient.MetalMockFns{
 			Firewall: func(m *mock.Mock) {
 				m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
@@ -106,39 +142,35 @@ var _ = Context("integration test", Ordered, func() {
 			},
 		})
 
-		When("creating a firewall deployment", func() {
-			It("the creation works", func() {
-				Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
-				// we need to fake the secret as there is no kube-controller-manager in the
-				// envtest setup which can issue a long-lived token for the secret
-				Expect(k8sClient.Create(ctx, fakeTokenSecret)).To(Succeed())
-				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
-			})
-		})
-
 		var (
 			fw  *v2.Firewall
 			set *v2.FirewallSet
 			mon *v2.FirewallMonitor
 		)
 
+		When("creating a firewall deployment", func() {
+			It("the creation works", func() {
+				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
+			})
+		})
+
 		Describe("new resources will be spawned by the controller", func() {
 			It("should create a firewall set", func() {
 				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
-				}, 3*time.Second)
+				}, 15*time.Second)
 			})
 
 			It("should create a firewall", func() {
 				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
-				}, 3*time.Second)
+				}, 15*time.Second)
 			})
 
 			It("should create a firewall monitor", func() {
 				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
-				}, 5*time.Second)
+				}, 15*time.Second)
 			})
 
 			It("should allow an update of the firewall monitor", func() {
@@ -374,19 +406,19 @@ var _ = Context("integration test", Ordered, func() {
 			It("should create another firewall set", func() {
 				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
-				}, 15*time.Second) // here it takes longer because the firewall set controller has a safety backoff
+				}, 15*time.Second)
 			})
 
 			It("should create another firewall", func() {
 				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
-				}, 3*time.Second)
+				}, 15*time.Second)
 			})
 
 			It("should create another firewall monitor", func() {
 				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
-				}, 5*time.Second)
+				}, 15*time.Second)
 			})
 		})
 
@@ -649,5 +681,168 @@ var _ = Context("integration test", Ordered, func() {
 			})
 		})
 	})
+})
 
+var _ = Context("migration path", Ordered, func() {
+	var (
+		fw = &v2.Firewall{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: namespaceName,
+				Labels: map[string]string{
+					"purpose": "shoot-firewall",
+				},
+			},
+			Spec: v2.FirewallSpec{
+				Size:              "n1-medium-x86",
+				Project:           "project-a",
+				Partition:         "partition-a",
+				Image:             "firewall-ubuntu-2.0",
+				Networks:          []string{"internet"},
+				ControllerURL:     "http://controller.tar.gz",
+				ControllerVersion: "v0.0.1",
+			},
+		}
+
+		deployment = &v2.FirewallDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: namespaceName,
+			},
+			Spec: v2.FirewallDeploymentSpec{
+				Template: v2.FirewallTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
+					Spec: v2.FirewallSpec{
+						Size:              "n1-medium-x86",
+						Project:           "project-a",
+						Partition:         "partition-a",
+						Image:             "firewall-ubuntu-2.0",
+						Networks:          []string{"internet"},
+						ControllerURL:     "http://controller.tar.gz",
+						ControllerVersion: "v0.0.1",
+					},
+				},
+			},
+		}
+	)
+
+	BeforeAll(func() {
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		DeferCleanup(func() {
+			swapMetalClient(&metalclient.MetalMockFns{
+				Firewall: func(m *mock.Mock) {
+					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
+
+					// we need to filter the orphan controller as it would delete the firewall
+					call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+					call.Run(func(args mock.Arguments) {
+						resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
+						params, ok := args.Get(0).(*firewall.FindFirewallsParams)
+						if !ok {
+							panic(fmt.Sprintf("unexpected type: %T", args.Get(0)))
+						}
+						if params.Body.AllocationName != "" {
+							resp.Payload = append(resp.Payload, firewall1)
+						}
+						call.ReturnArguments = mock.Arguments{resp, nil}
+					})
+				},
+				Network: func(m *mock.Mock) {
+					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+				},
+				Machine: func(m *mock.Mock) {
+					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
+					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+				},
+			})
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, deployment.DeepCopy()))).To(Succeed())
+			_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+				return l.GetItems()
+			}, 10*time.Second)
+		})
+	})
+
+	Describe("the migration starts", Ordered, func() {
+		swapMetalClient(&metalclient.MetalMockFns{
+			Firewall: func(m *mock.Mock) {
+				// we need to filter the orphan controller as it would delete the firewall
+				call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+				call.Run(func(args mock.Arguments) {
+					resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
+					params, ok := args.Get(0).(*firewall.FindFirewallsParams)
+					if !ok {
+						panic(fmt.Sprintf("unexpected type: %T", args.Get(0)))
+					}
+					if params.Body.AllocationName != "" {
+						resp.Payload = append(resp.Payload, firewall1)
+					}
+					call.ReturnArguments = mock.Arguments{resp, nil}
+				})
+			},
+			Network: func(m *mock.Mock) {
+				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+			},
+			Machine: func(m *mock.Mock) {
+				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+			},
+		})
+
+		When("creating a firewall resource (for an existing firewall)", Ordered, func() {
+			It("the creation works", func() {
+				Expect(k8sClient.Create(ctx, fw)).To(Succeed())
+			})
+
+			Specify("no other resources pop up", func() {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+					return l.GetItems()
+				}, 10*time.Second)
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+					return l.GetItems()
+				}, 10*time.Second)
+
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+				Expect(fw.OwnerReferences).To(HaveLen(0))
+			})
+		})
+
+		When("creating a firewall deployment", Ordered, func() {
+			var (
+				set *v2.FirewallSet
+			)
+
+			It("the creation works", func() {
+				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
+			})
+
+			It("should create a firewall set", func() {
+				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
+					return l.GetItems()
+				}, 3*time.Second)
+			})
+
+			It("should adopt the existing firewall", func() {
+				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+					return l.GetItems()
+				}, 3*time.Second)
+
+				Expect(fw.Name).To(Equal("test"))
+				Expect(fw.OwnerReferences).To(HaveLen(1))
+
+				Expect(fw.OwnerReferences[0].UID).To(Equal(set.UID))
+			})
+
+			It("should create a firewall monitor", func() {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+					return l.GetItems()
+				}, 5*time.Second)
+			})
+
+			// TODO: check all the statuses
+		})
+	})
 })

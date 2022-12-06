@@ -2,10 +2,10 @@ package deployment
 
 import (
 	"fmt"
+	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
@@ -23,14 +23,18 @@ func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeploymen
 	for _, set := range sets {
 		set := set
 
-		err := c.Seed.Delete(r.Ctx, set, &client.DeleteOptions{})
+		err := c.Seed.Delete(r.Ctx, set)
 		if err != nil {
 			return err
 		}
 
-		r.Log.Info("deleted firewall set", "set-name", set.Name)
+		r.Log.Info("set deletion timestamp on firewall set", "set-name", set.Name)
 
 		c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
+	}
+
+	if len(sets) > 0 {
+		return controllers.RequeueAfter(2*time.Second, "firewall sets are getting deleted, waiting")
 	}
 
 	return nil
