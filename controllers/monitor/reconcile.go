@@ -32,25 +32,30 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		return fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
-	if r.Target.ControllerStatus != nil {
-		connection := &v2.ControllerConnection{
-			ActualVersion: r.Target.ControllerStatus.ControllerVersion,
-			Updated:       r.Target.ControllerStatus.Updated,
-		}
-
-		if connection.Updated.Time.IsZero() {
-			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet reconciled.")
-			fw.Status.Conditions.Set(cond)
-		} else if time.Since(connection.Updated.Time) > 5*time.Minute {
-			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
+	if enabled, err := strconv.ParseBool(fw.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
+		fw.Status.Conditions.Set(cond)
+	} else {
+		if r.Target.ControllerStatus == nil {
+			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionUnknown, "NotConnected", "Controller has not yet reconciled.")
 			fw.Status.Conditions.Set(cond)
 		} else {
-			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.Updated.Time.String()))
-			fw.Status.Conditions.Set(cond)
+			connection := &v2.ControllerConnection{
+				ActualVersion: r.Target.ControllerStatus.ControllerVersion,
+				Updated:       r.Target.ControllerStatus.Updated,
+			}
+
+			if connection.Updated.Time.IsZero() {
+				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet reconciled.")
+				fw.Status.Conditions.Set(cond)
+			} else if time.Since(connection.Updated.Time) > 5*time.Minute {
+				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
+				fw.Status.Conditions.Set(cond)
+			} else {
+				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.Updated.Time.String()))
+				fw.Status.Conditions.Set(cond)
+			}
 		}
-	} else {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionUnknown, "NotConnected", "Controller has not yet reconciled.")
-		fw.Status.Conditions.Set(cond)
 	}
 
 	err = c.Seed.Status().Update(r.Ctx, fw)

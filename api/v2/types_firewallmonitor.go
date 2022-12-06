@@ -7,6 +7,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// FirewallShootNamespace is the name of the namespace to which the firewall monitor gets deployed and in which the firewall-controller operates
+	FirewallShootNamespace = "firewall"
+)
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fwmon
 // +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".machineStatus.machineID"

@@ -5,7 +5,12 @@ import (
 )
 
 const (
-	FirewallShootNamespace = "firewall"
+	// FirewallNoControllerConnectionAnnotation can be used as an annotation to the firewall resource in order
+	// to indicate that the firewall-controller does not connect to the firewall monitor. this way, the replica
+	// set will become healthy without a controller connection.
+	//
+	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
+	FirewallNoControllerConnectionAnnotation = "metal.stack.io/no-controller-connection"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

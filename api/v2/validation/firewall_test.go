@@ -94,6 +94,9 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 					Name:            "firewall-123",
 					Namespace:       "default",
 					ResourceVersion: "1",
+					Annotations: map[string]string{
+						v2.FirewallNoControllerConnectionAnnotation: "true",
+					},
 				},
 				Spec: v2.FirewallSpec{
 					Interval:          "10s",
