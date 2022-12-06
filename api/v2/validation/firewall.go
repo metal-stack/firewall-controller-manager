@@ -26,26 +26,6 @@ func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) fiel
 	return allErrs
 }
 
-func (v *firewallValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.Firewall) field.ErrorList {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldF.Userdata, newF.Userdata, field.NewPath("userdata"))...)
-
-	return allErrs
-}
-
-func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, v.validateSpec(fNew, fldPath)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.SSHPublicKeys, fOld.SSHPublicKeys, fldPath.Child("sshPublicKeys"))...)
-
-	return allErrs
-}
-
 func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -104,6 +84,26 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		}
 		allErrs = append(allErrs, r.check()...)
 	}
+
+	return allErrs
+}
+
+func (v *firewallValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.Firewall) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldF.Userdata, newF.Userdata, field.NewPath("userdata"))...)
+
+	return allErrs
+}
+
+func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, v.validateSpec(fNew, fldPath)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.SSHPublicKeys, fOld.SSHPublicKeys, fldPath.Child("sshPublicKeys"))...)
 
 	return allErrs
 }

@@ -25,6 +25,45 @@ func (v *firewallDeploymentValidator) ValidateCreate(log logr.Logger, f *v2.Fire
 	return allErrs
 }
 
+func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	switch f.Strategy {
+	case v2.StrategyRecreate, v2.StrategyRollingUpdate:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("strategy"), f.Strategy, fmt.Sprintf("unknown strategy: %s", f.Strategy)))
+	}
+
+	if f.Replicas < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
+	}
+	if f.Replicas > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "for now, no more than a single firewall replica is allowed"))
+	}
+
+	if f.Selector == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), f.Selector, "selector should not be nil"))
+	} else {
+		selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+			MatchLabels: f.Selector,
+		})
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), f.Selector, ""))
+		}
+
+		if !selector.Empty() {
+			labels := labels.Set(f.Template.Labels)
+			if !selector.Matches(labels) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), f.Template.Labels, "`selector` does not match template `labels`"))
+			}
+		}
+	}
+
+	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpec(&f.Template.Spec, fldPath.Child("template").Child("spec"))...)
+
+	return allErrs
+}
+
 func (v *firewallDeploymentValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.FirewallDeployment) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -40,37 +79,9 @@ func (v *firewallDeploymentValidator) validateSpecUpdate(log logr.Logger, oldF, 
 
 	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Selector, oldF.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Strategy, oldF.Strategy, fldPath.Child("strategy"))...)
-
-	return allErrs
-}
-
-func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	if f.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
-	}
-	if f.Replicas > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "for now, no more than a single firewall replica is allowed"))
-	}
-	if f.Strategy != v2.StrategyRecreate && f.Strategy != v2.StrategyRollingUpdate {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("strategy"), f.Strategy, fmt.Sprintf("unknown strategy: %s", f.Strategy)))
-	}
-
-	selector, err := metav1.LabelSelectorAsSelector(f.Selector)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), f.Selector, ""))
-	}
-
-	if !selector.Empty() {
-		labels := labels.Set(f.Template.Labels)
-		if !selector.Matches(labels) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), f.Template.Labels, "`selector` does not match template `labels`"))
-		}
-	}
-
-	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpec(&f.Template.Spec, fldPath.Child("template").Child("spec"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Template.ObjectMeta, oldF.Template.ObjectMeta, fldPath.Child("template").Child("metadata"))...)
 
 	return allErrs
 }

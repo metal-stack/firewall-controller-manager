@@ -6,7 +6,6 @@
 package v2
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -247,8 +246,10 @@ func (in *FirewallDeploymentSpec) DeepCopyInto(out *FirewallDeploymentSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 }
@@ -527,8 +528,10 @@ func (in *FirewallSetSpec) DeepCopyInto(out *FirewallSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 }

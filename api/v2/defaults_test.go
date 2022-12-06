@@ -41,10 +41,8 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 				},
 				Spec: FirewallDeploymentSpec{
 					Replicas: 1,
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"a": "b",
-						},
+					Selector: map[string]string{
+						"a": "b",
 					},
 					Strategy: StrategyRollingUpdate,
 					Template: FirewallTemplateSpec{

@@ -155,10 +155,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 
 type ItemGetter[O client.ObjectList, E metav1.Object] func(O) []E
 
-func GetOwnedResources[O client.ObjectList, E metav1.Object](ctx context.Context, c client.Client, selector *metav1.LabelSelector, owner metav1.Object, list O, getter ItemGetter[O, E]) (owned []E, orphaned []E, err error) {
+func GetOwnedResources[O client.ObjectList, E metav1.Object](ctx context.Context, c client.Client, selector map[string]string, owner metav1.Object, list O, getter ItemGetter[O, E]) (owned []E, orphaned []E, err error) {
 	opts := []client.ListOption{client.InNamespace(owner.GetNamespace())}
 	if selector != nil {
-		opts = append(opts, client.MatchingLabels(selector.MatchLabels))
+		opts = append(opts, client.MatchingLabels(selector))
 	}
 
 	err = c.List(ctx, list, opts...)
