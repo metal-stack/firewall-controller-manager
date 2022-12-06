@@ -25,21 +25,19 @@ type (
 		ControllerConfig
 	}
 	ControllerConfig struct {
-		Seed          client.Client
-		Metal         metalgo.Client
-		K8sVersion    *semver.Version
-		Namespace     string
-		ClusterID     string
-		ClusterTag    string
-		ClusterAPIURL string
-		Recorder      record.EventRecorder
+		Seed             client.Client
+		Metal            metalgo.Client
+		K8sVersion       *semver.Version
+		Namespace        string
+		ClusterAPIURL    string
+		Recorder         record.EventRecorder
+		SafetyBackoff    time.Duration
+		ProgressDeadline time.Duration
 	}
 
 	controller struct {
 		*ControllerConfig
-		safetyBackoff    time.Duration
-		progressDeadline time.Duration // time after which a deployment is considered not progressing anymore (informational)
-		lastSetCreation  map[string]time.Time
+		lastSetCreation map[string]time.Time
 	}
 )
 
@@ -56,17 +54,17 @@ func (c *Config) validate() error {
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
 	}
-	if c.ClusterID == "" {
-		return fmt.Errorf("cluster id must be specified")
-	}
-	if c.ClusterTag == "" {
-		return fmt.Errorf("cluster tag must be specified")
-	}
 	if c.ClusterAPIURL == "" {
 		return fmt.Errorf("cluster api url must be specified")
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")
+	}
+	if c.SafetyBackoff <= 0 {
+		return fmt.Errorf("safety backoff must be specified")
+	}
+	if c.ProgressDeadline <= 0 {
+		return fmt.Errorf("progress deadline must be specified")
 	}
 
 	return nil
@@ -79,8 +77,6 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.FirewallDeployment](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
-		safetyBackoff:    10 * time.Second,
-		progressDeadline: 15 * time.Minute,
 		lastSetCreation:  map[string]time.Time{},
 	})
 

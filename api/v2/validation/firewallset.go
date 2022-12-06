@@ -69,6 +69,7 @@ func (v *firewallSetValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v
 	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Userdata, oldF.Userdata, fldPath.Child("userdata"))...)
+	// TODO: theoretically, the selector or metadata should be changeable, but we need to think it through... let's simplify for now and just not support it.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Selector, oldF.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Template.ObjectMeta, oldF.Template.ObjectMeta, fldPath.Child("template").Child("metadata"))...)
 

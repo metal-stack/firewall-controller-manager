@@ -31,7 +31,6 @@ type (
 		Metal          metalgo.Client
 		Namespace      string
 		ShootNamespace string
-		ClusterID      string
 		ClusterTag     string
 		Recorder       record.EventRecorder
 	}
@@ -56,9 +55,6 @@ func (c *Config) validate() error {
 	}
 	if c.ShootNamespace == "" {
 		return fmt.Errorf("shoot namespace must be specified")
-	}
-	if c.ClusterID == "" {
-		return fmt.Errorf("cluster id must be specified")
 	}
 	if c.ClusterTag == "" {
 		return fmt.Errorf("cluster tag must be specified")

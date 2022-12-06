@@ -25,15 +25,14 @@ type (
 		Seed                  client.Client
 		Metal                 metalgo.Client
 		Namespace             string
-		ClusterID             string
 		ClusterTag            string
 		FirewallHealthTimeout time.Duration
+		CreateTimeout         time.Duration
 		Recorder              record.EventRecorder
 	}
 
 	controller struct {
 		*ControllerConfig
-		createTimeout time.Duration // duration after which a firewall in phase creating will be thrown away
 	}
 )
 
@@ -47,14 +46,17 @@ func (c *Config) validate() error {
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
 	}
-	if c.ClusterID == "" {
-		return fmt.Errorf("cluster id must be specified")
-	}
 	if c.ClusterTag == "" {
 		return fmt.Errorf("cluster tag must be specified")
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")
+	}
+	if c.CreateTimeout <= 0 {
+		return fmt.Errorf("create timeout must be specified")
+	}
+	if c.FirewallHealthTimeout <= 0 {
+		return fmt.Errorf("firewall health timeout must be specified")
 	}
 
 	return nil
@@ -67,7 +69,6 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.FirewallSet](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
-		createTimeout:    10 * time.Minute,
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).

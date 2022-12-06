@@ -76,7 +76,7 @@ func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeploy
 }
 
 func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], revision int) (*v2.FirewallSet, error) {
-	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.safetyBackoff {
+	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.SafetyBackoff {
 		// this is just for safety reasons to prevent mass-allocations
 		r.Log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
 		return nil, controllers.RequeueAfter(10*time.Second, "delaying firewall set creation")
