@@ -6,9 +6,8 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/cache"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -23,7 +22,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 		errors = append(errors, err)
 	}
 
-	firewallNetworks, err := getFirewallNetworks(r.Ctx, c.Metal, m)
+	firewallNetworks, err := getFirewallNetworks(r.Ctx, c.networkCache, m)
 	if err == nil {
 		r.Target.Status.FirewallNetworks = firewallNetworks
 	} else {
@@ -60,7 +59,7 @@ func getMachineStatus(m *models.V1FirewallResponse) (*v2.MachineStatus, error) {
 	return result, nil
 }
 
-func getFirewallNetworks(ctx context.Context, client metalgo.Client, m *models.V1FirewallResponse) ([]v2.FirewallNetwork, error) {
+func getFirewallNetworks(ctx context.Context, cache *cache.Cache[*models.V1NetworkResponse], m *models.V1FirewallResponse) ([]v2.FirewallNetwork, error) {
 	// check whether network prefixes were updated in metal-api
 	// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
 	// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
@@ -79,10 +78,9 @@ func getFirewallNetworks(ctx context.Context, client metalgo.Client, m *models.V
 			continue
 		}
 
-		// TODO: network calls could be expensive, maybe add a cache for it
-		nwResp, err := client.Network().FindNetwork(network.NewFindNetworkParams().WithID(*n.Networkid).WithContext(ctx), nil)
+		nw, err := cache.Get(ctx, *n.Networkid)
 		if err != nil {
-			return nil, fmt.Errorf("network find error: %w", err)
+			return nil, err
 		}
 
 		result = append(result, v2.FirewallNetwork{
@@ -92,7 +90,7 @@ func getFirewallNetworks(ctx context.Context, client metalgo.Client, m *models.V
 			Nat:                 n.Nat,
 			NetworkID:           n.Networkid,
 			NetworkType:         n.Networktype,
-			Prefixes:            nwResp.Payload.Prefixes,
+			Prefixes:            nw.Prefixes,
 			Vrf:                 n.Vrf,
 		})
 	}

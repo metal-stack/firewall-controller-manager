@@ -3,6 +3,7 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
@@ -13,8 +14,10 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
+	"github.com/metal-stack/firewall-controller-manager/cache"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
 
 	metalgo "github.com/metal-stack/metal-go"
@@ -37,6 +40,7 @@ type (
 
 	controller struct {
 		*ControllerConfig
+		networkCache *cache.Cache[*models.V1NetworkResponse]
 	}
 )
 
@@ -73,6 +77,13 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.Firewall](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
+		networkCache: cache.New(5*time.Minute, func(ctx context.Context, key any) (*models.V1NetworkResponse, error) {
+			resp, err := c.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(key.(string)).WithContext(ctx), nil)
+			if err != nil {
+				return nil, fmt.Errorf("network find error: %w", err)
+			}
+			return resp.Payload, nil
+		}),
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
