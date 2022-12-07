@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
@@ -47,14 +46,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	zcfg := zap.NewProductionConfig()
-	zcfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-	zcfg.EncoderConfig.TimeKey = "timestamp"
-	zcfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-	l, err := zcfg.Build()
+	l, err := controllers.NewZapLogger("debug")
 	Expect(err).NotTo(HaveOccurred())
 
-	ctrl.SetLogger(zapr.NewLogger(l))
+	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
 
 	ctx, cancel = context.WithCancel(context.Background())
 

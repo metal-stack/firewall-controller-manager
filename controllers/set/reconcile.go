@@ -70,8 +70,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 			if err != nil {
 				return err
 			}
-
-			ownedFirewalls = controllers.Except(ownedFirewalls, fw)
 		}
 	}
 
@@ -88,6 +86,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	}
 
 	return c.deletePhysicalOrphans(r)
+}
+
+func pop[E any](slice []E) (E, []E) {
+	// stolen from golang slice tricks
+	return slice[len(slice)-1], slice[:len(slice)-1]
 }
 
 func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Firewall, error) {

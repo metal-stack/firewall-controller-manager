@@ -128,8 +128,3 @@ func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) 
 
 	return nil
 }
-
-func pop[E any](slice []E) (E, []E) {
-	// stolen from golang slice tricks
-	return slice[len(slice)-1], slice[:len(slice)-1]
-}
