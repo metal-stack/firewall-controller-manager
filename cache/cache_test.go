@@ -55,7 +55,7 @@ func Test_Cache(t *testing.T) {
 			})
 
 			for i := 0; i < tt.times; i++ {
-				got, err := cache.Get(nil, *tt.want.ID)
+				got, err := cache.Get(context.Background(), *tt.want.ID)
 				if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 					t.Errorf("error diff (+got -want):\n %s", diff)
 				}
