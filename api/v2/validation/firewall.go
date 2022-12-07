@@ -104,6 +104,7 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.SSHPublicKeys, fOld.SSHPublicKeys, fldPath.Child("sshPublicKeys"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.DNSPort, fOld.DNSPort, fldPath.Child("dnsPort"))...)
 
 	return allErrs
 }

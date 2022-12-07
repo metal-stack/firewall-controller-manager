@@ -62,7 +62,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager")
 	flag.StringVar(&namespace, "namespace", "default", "the namespace this controller is running")
 	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "the path to the kubeconfig to talk to the shoot")
-	flag.DurationVar(&reconcileInterval, "reconcile-interval", 1*time.Minute, "duration after which a resource is getting reconciled at minimum")
+	flag.DurationVar(&reconcileInterval, "reconcile-interval", 10*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
 	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
 	flag.DurationVar(&safetyBackoff, "safety-backoff", 10*time.Second, "duration after which a resource is getting reconciled at minimum")

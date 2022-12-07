@@ -76,6 +76,10 @@ type FirewallSpec struct {
 	ControllerURL string `json:"controllerURL,omitempty"`
 	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
+	// DNSServerAddress specifies DNS server address used by DNS proxy
+	DNSServerAddress string `json:"dnsServerAddress,omitempty"`
+	// DNSPort specifies port to which DNS proxy should be bound
+	DNSPort *uint `json:"dnsPort,omitempty"`
 }
 
 // FirewallTemplateSpec describes the data a firewall should have when created from a template
