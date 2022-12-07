@@ -118,6 +118,7 @@ var _ = BeforeSuite(func() {
 			Metal:          metalClient,
 			Namespace:      namespaceName,
 			ShootNamespace: v2.FirewallShootNamespace,
+			APIServerURL:   "http://shoot-api",
 			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
 		},

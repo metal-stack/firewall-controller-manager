@@ -82,7 +82,7 @@ func (c *controller) createUserdata(ctx context.Context) (string, error) {
 				Name: c.Namespace,
 				Cluster: configv1.Cluster{
 					CertificateAuthorityData: ca,
-					Server:                   c.ClusterAPIURL,
+					Server:                   c.APIServerURL,
 				},
 			},
 		},

@@ -498,9 +498,46 @@ var _ = Context("integration test", Ordered, func() {
 				}, v2.FirewallControllerConnected, v2.ConditionUnknown, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
-				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("NotConnected"))
-				Expect(cond.Message).To(Equal("Controller has not yet reconciled."))
+			})
+
+			It("should have firewall networks populated", func() {
+				var nws []v2.FirewallNetwork
+				var fw = fw.DeepCopy()
+				Eventually(func() []v2.FirewallNetwork {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+					nws = fw.Status.FirewallNetworks
+					return nws
+				}, 5*time.Second, interval).Should(HaveLen(1))
+
+				Expect(nws).To(BeComparableTo([]v2.FirewallNetwork{
+					{
+						ASN:                 installingFirewall.Allocation.Networks[0].Asn,
+						DestinationPrefixes: installingFirewall.Allocation.Networks[0].Destinationprefixes,
+						IPs:                 installingFirewall.Allocation.Networks[0].Ips,
+						Nat:                 installingFirewall.Allocation.Networks[0].Nat,
+						NetworkID:           installingFirewall.Allocation.Networks[0].Networkid,
+						NetworkType:         installingFirewall.Allocation.Networks[0].Networktype,
+						Prefixes:            network1.Prefixes,
+						Vrf:                 installingFirewall.Allocation.Networks[0].Vrf,
+					},
+				}))
+			})
+
+			It("should have shoot access populated", func() {
+				var access *v2.ShootAccess
+				var fw = fw.DeepCopy()
+				Eventually(func() *v2.ShootAccess {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+					access = fw.Status.ShootAccess
+					return access
+				}, 5*time.Second, interval).Should(Not(BeNil()))
+
+				Expect(access).To(BeComparableTo(&v2.ShootAccess{
+					GenericKubeconfigSecretName: "kubeconfig-secret-name",
+					TokenSecretName:             "token",
+					Namespace:                   namespaceName,
+					APIServerURL:                "http://shoot-api",
+				}))
 			})
 		})
 

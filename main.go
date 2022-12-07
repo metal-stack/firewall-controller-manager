@@ -1,13 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/zapr"
@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
@@ -42,7 +43,8 @@ func main() {
 		logLevel                string
 		metricsAddr             string
 		enableLeaderElection    bool
-		shootKubeconfig         string
+		shootKubeconfigSecret   string
+		shootToken              string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
@@ -61,7 +63,6 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager")
 	flag.StringVar(&namespace, "namespace", "default", "the namespace this controller is running")
-	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "the path to the kubeconfig to talk to the shoot")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 10*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
 	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
@@ -72,6 +73,8 @@ func main() {
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
+	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "generic-token-kubeconfig", "the secret name of the generic kubeconfig for shoot access")
+	flag.StringVar(&shootToken, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 
 	flag.Parse()
 
@@ -90,20 +93,6 @@ func main() {
 		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
 		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
 	)
-
-	if shootKubeconfig == "" {
-		l.Infow("no shoot kubeconfig configured, running in single-cluster mode")
-	} else {
-		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
-
-		shootConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: shootKubeconfig},
-			&clientcmd.ConfigOverrides{},
-		).ClientConfig()
-		if err != nil {
-			l.Fatalw("unable to create shoot restconfig", "error", err)
-		}
-	}
 
 	mclient, err := getMetalClient(metalURL)
 	if err != nil {
@@ -137,12 +126,28 @@ func main() {
 		l.Fatalw("unable to start firewall-controller-manager", "error", err)
 	}
 
+	if shootKubeconfigSecret == "" && shootToken == "" {
+		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
+	} else {
+		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
+
+		shootConfig, err = helper.NewShootClient(context.Background(), seedMgr.GetClient(), &v2.ShootAccess{
+			GenericKubeconfigSecretName: shootKubeconfigSecret,
+			TokenSecretName:             shootToken,
+			Namespace:                   namespace,
+			APIServerURL:                clusterApiURL,
+		})
+		if err != nil {
+			l.Fatalw("unable to create shoot client", "error", err)
+		}
+	}
+
 	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:             seedMgr.GetClient(),
 			Metal:            mclient,
 			Namespace:        namespace,
-			ClusterAPIURL:    clusterApiURL,
+			APIServerURL:     clusterApiURL,
 			K8sVersion:       k8sVersion,
 			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:    safetyBackoff,

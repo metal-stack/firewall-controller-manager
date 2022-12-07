@@ -120,6 +120,8 @@ type FirewallStatus struct {
 	Conditions Conditions `json:"conditions"`
 	// Phase describes the firewall phase at the current time.
 	Phase FirewallPhase `json:"phase"`
+	// ShootAccess contains references to construct shoot clients.
+	ShootAccess *ShootAccess `json:"shootAccess,omitempty"`
 }
 
 // FirewallPhase describes the firewall phase at the current time.
@@ -144,6 +146,22 @@ const (
 	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 )
+
+// ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.
+//
+// The controller has to be aware that Gardener will rotate these secrets on regular basis so it has to exchange
+// the client when the access expires.
+type ShootAccess struct {
+	// GenericKubeconfigSecretName is the secret name of the generic kubeconfig secret deployed by Gardener
+	// to be used as a template for constructing a shoot client.
+	GenericKubeconfigSecretName string `json:"genericKubeconfigSecretName"`
+	// TokenSecretName is the secret name for the access token for shoot access.
+	TokenSecretName string `json:"tokenSecretName"`
+	// Namespace is the namespace in the seed where the secrets reside.
+	Namespace string `json:"namespace"`
+	// APIServerURL is the URL of the shoot's API server.
+	APIServerURL string `json:"apiServerURL"`
+}
 
 // MachineStatus holds the status of the firewall machine containing information from the metal-stack api.
 type MachineStatus struct {

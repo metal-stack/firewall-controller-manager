@@ -25,14 +25,16 @@ type (
 		ControllerConfig
 	}
 	ControllerConfig struct {
-		Seed             client.Client
-		Metal            metalgo.Client
-		K8sVersion       *semver.Version
-		Namespace        string
-		ClusterAPIURL    string
-		Recorder         record.EventRecorder
-		SafetyBackoff    time.Duration
-		ProgressDeadline time.Duration
+		Seed                      client.Client
+		Metal                     metalgo.Client
+		K8sVersion                *semver.Version
+		Namespace                 string
+		APIServerURL              string
+		ShootKubeconfigSecretName string
+		ShootTokenSecretName      string
+		Recorder                  record.EventRecorder
+		SafetyBackoff             time.Duration
+		ProgressDeadline          time.Duration
 	}
 
 	controller struct {
@@ -54,8 +56,8 @@ func (c *Config) validate() error {
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
 	}
-	if c.ClusterAPIURL == "" {
-		return fmt.Errorf("cluster api url must be specified")
+	if c.APIServerURL == "" {
+		return fmt.Errorf("api server url must be specified")
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")

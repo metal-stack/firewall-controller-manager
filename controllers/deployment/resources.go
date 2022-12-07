@@ -65,6 +65,14 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 		}
 	}
 
+	var shootAccessSecretNames []string
+	if c.ShootKubeconfigSecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, c.ShootKubeconfigSecretName)
+	}
+	if c.ShootTokenSecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, c.ShootTokenSecretName)
+	}
+
 	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-controller-seed-access",
@@ -81,7 +89,13 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 			{
 				APIGroups: []string{v2.GroupVersion.String()},
 				Resources: []string{"firewall/status"},
-				Verbs:     []string{"get", "list", "watch", "update"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups:     []string{"core/v1"},
+				Resources:     []string{"secrets"},
+				Verbs:         []string{"get", "list", "watch"},
+				ResourceNames: shootAccessSecretNames,
 			},
 		}
 		return nil

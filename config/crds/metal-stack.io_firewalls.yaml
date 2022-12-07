@@ -327,6 +327,31 @@ spec:
               phase:
                 description: Phase describes the firewall phase at the current time.
                 type: string
+              shootAccess:
+                description: ShootAccess contains references to construct shoot clients.
+                properties:
+                  apiServerURL:
+                    description: APIServerURL is the URL of the shoot's API server.
+                    type: string
+                  genericKubeconfigSecretName:
+                    description: GenericKubeconfigSecretName is the secret name of
+                      the generic kubeconfig secret deployed by Gardener to be used
+                      as a template for constructing a shoot client.
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace in the seed where the
+                      secrets reside.
+                    type: string
+                  tokenSecretName:
+                    description: TokenSecretName is the secret name for the access
+                      token for shoot access.
+                    type: string
+                required:
+                - apiServerURL
+                - genericKubeconfigSecretName
+                - namespace
+                - tokenSecretName
+                type: object
             required:
             - conditions
             - phase

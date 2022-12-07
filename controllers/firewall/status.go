@@ -29,6 +29,13 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 		errors = append(errors, err)
 	}
 
+	r.Target.Status.ShootAccess = &v2.ShootAccess{
+		GenericKubeconfigSecretName: c.ShootKubeconfigSecretName,
+		TokenSecretName:             c.ShootTokenSecretName,
+		APIServerURL:                c.APIServerURL,
+		Namespace:                   c.Namespace,
+	}
+
 	return controllers.CombineErrors(errors...)
 }
 

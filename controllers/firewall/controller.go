@@ -29,13 +29,16 @@ type (
 		ControllerConfig
 	}
 	ControllerConfig struct {
-		Seed           client.Client
-		Shoot          client.Client
-		Metal          metalgo.Client
-		Namespace      string
-		ShootNamespace string
-		ClusterTag     string
-		Recorder       record.EventRecorder
+		Seed                      client.Client
+		Shoot                     client.Client
+		Metal                     metalgo.Client
+		Namespace                 string
+		ShootNamespace            string
+		ClusterTag                string
+		APIServerURL              string
+		ShootKubeconfigSecretName string
+		ShootTokenSecretName      string
+		Recorder                  record.EventRecorder
 	}
 
 	controller struct {
@@ -56,6 +59,9 @@ func (c *Config) validate() error {
 	}
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
+	}
+	if c.APIServerURL == "" {
+		return fmt.Errorf("api server url must be specified")
 	}
 	if c.ShootNamespace == "" {
 		return fmt.Errorf("shoot namespace must be specified")

@@ -89,14 +89,16 @@ var _ = BeforeSuite(func() {
 
 	deploymentconfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
-			Seed:             k8sClient,
-			Metal:            metalClient,
-			Namespace:        namespaceName,
-			ClusterAPIURL:    "http://shoot-api",
-			K8sVersion:       semver.MustParse("v1.25.0"),
-			Recorder:         mgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:    3 * time.Second,
-			ProgressDeadline: 10 * time.Minute,
+			Seed:                      k8sClient,
+			Metal:                     metalClient,
+			Namespace:                 namespaceName,
+			APIServerURL:              "http://shoot-api",
+			ShootKubeconfigSecretName: "kubeconfig-secret-name",
+			ShootTokenSecretName:      "token",
+			K8sVersion:                semver.MustParse("v1.25.0"),
+			Recorder:                  mgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:             3 * time.Second,
+			ProgressDeadline:          10 * time.Minute,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}
@@ -124,13 +126,16 @@ var _ = BeforeSuite(func() {
 
 	firewallConfig := &firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
-			Seed:           k8sClient,
-			Shoot:          k8sClient,
-			Metal:          metalClient,
-			Namespace:      namespaceName,
-			ShootNamespace: v2.FirewallShootNamespace,
-			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
+			Seed:                      k8sClient,
+			Shoot:                     k8sClient,
+			Metal:                     metalClient,
+			Namespace:                 namespaceName,
+			ShootNamespace:            v2.FirewallShootNamespace,
+			ShootKubeconfigSecretName: "kubeconfig-secret-name",
+			ShootTokenSecretName:      "token",
+			APIServerURL:              "http://shoot-api",
+			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
+			Recorder:                  mgr.GetEventRecorderFor("firewall-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}
