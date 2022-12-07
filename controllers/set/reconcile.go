@@ -3,28 +3,31 @@ package set
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/client/machine"
-	"github.com/metal-stack/metal-go/api/models"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
-	ownedFirewalls, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+	ownedFirewalls, orphaned, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
 		return fmt.Errorf("unable to get owned firewalls: %w", err)
 	}
 
+	adoptions, err := c.adoptFirewalls(r, orphaned)
+	if err != nil {
+		return fmt.Errorf("error when trying to adopt firewalls: %w", err)
+	}
+
+	ownedFirewalls = append(ownedFirewalls, adoptions...)
+
 	for _, fw := range ownedFirewalls {
-		fw.Spec = r.Target.Spec.Template
+		fw.Spec = r.Target.Spec.Template.Spec
 
 		err := c.Seed.Update(r.Ctx, fw, &client.UpdateOptions{})
 		if err != nil {
@@ -67,8 +70,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 			if err != nil {
 				return err
 			}
-
-			ownedFirewalls = controllers.Except(ownedFirewalls, fw)
 		}
 	}
 
@@ -84,7 +85,12 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		return err
 	}
 
-	return c.checkOrphans(r)
+	return c.deletePhysicalOrphans(r)
+}
+
+func pop[E any](slice []E) (E, []E) {
+	// stolen from golang slice tricks
+	return slice[len(slice)-1], slice[:len(slice)-1]
 }
 
 func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Firewall, error) {
@@ -96,16 +102,17 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	clusterName := r.Target.Namespace
 	name := fmt.Sprintf("%s-firewall-%s", clusterName, uuid.String()[:5])
 
+	meta := r.Target.Spec.Template.ObjectMeta.DeepCopy()
+	meta.Name = name
+	meta.Namespace = r.Target.Namespace
+	meta.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")),
+	}
+
 	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: r.Target.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")),
-			},
-		},
-		Spec:     r.Target.Spec.Template,
-		Userdata: r.Target.Userdata,
+		ObjectMeta: *meta,
+		Spec:       r.Target.Spec.Template.Spec,
+		Userdata:   r.Target.Spec.Userdata,
 	}
 
 	err = c.Seed.Create(r.Ctx, fw, &client.CreateOptions{})
@@ -116,60 +123,44 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	return fw, nil
 }
 
-func (c *controller) checkOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
-	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationProject: r.Target.Spec.Template.Project,
-		Tags:              []string{c.ClusterTag, controllers.FirewallSetTag(r.Target.Name)},
-	}).WithContext(r.Ctx), nil)
-	if err != nil {
-		r.Log.Error(err, "unable to retrieve firewalls for orphan checking, backing off...")
-		return controllers.RequeueAfter(10*time.Second, "backing off")
-	}
+func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*v2.Firewall) ([]*v2.Firewall, error) {
+	var adoptions []*v2.Firewall
 
-	if len(resp.Payload) == 0 {
-		return nil
-	}
+	for _, fw := range fws {
+		fw := fw
 
-	fws := &v2.FirewallList{}
-	err = c.Seed.List(r.Ctx, fws, client.InNamespace(c.Namespace))
-	if err != nil {
-		return err
-	}
-
-	ownedFirewalls, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
-		return fl.GetItems()
-	})
-	if err != nil {
-		return fmt.Errorf("unable to get owned firewalls: %w", err)
-	}
-
-	existingNames := map[string]bool{}
-	for _, fw := range ownedFirewalls {
-		existingNames[fw.Name] = true
-	}
-
-	for _, fw := range resp.Payload {
-		if fw.Allocation == nil || fw.Allocation.Name == nil {
-			continue
-		}
-		if _, ok := existingNames[*fw.Allocation.Name]; ok {
-			continue
-		}
-
-		r.Log.Info("found orphan firewall, deleting orphan", "firewall-name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
-
-		_, err = c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
+		ok, err := c.adoptFirewall(r, fw)
 		if err != nil {
-			return fmt.Errorf("error deleting orphaned firewall: %w", err)
+			return nil, err
 		}
 
-		c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID)
+		if ok {
+			r.Log.Info("adopted firewall", "firewall-name", fw.Name)
+			adoptions = append(adoptions, fw)
+		}
 	}
 
-	return nil
+	return adoptions, nil
 }
 
-func pop[E any](slice []E) (E, []E) {
-	// stolen from golang slice tricks
-	return slice[len(slice)-1], slice[:len(slice)-1]
+func (c *controller) adoptFirewall(r *controllers.Ctx[*v2.FirewallSet], fw *v2.Firewall) (adopted bool, err error) {
+	if fw.DeletionTimestamp != nil {
+		// don't adopt in deletion firewalls
+		return false, nil
+	}
+
+	ref := metav1.GetControllerOf(fw)
+	if ref != nil && ref.UID != r.Target.UID {
+		// the firewall belongs to some other controller
+		return false, nil
+	}
+
+	fw.OwnerReferences = append(fw.OwnerReferences, *metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")))
+
+	err = c.Seed.Update(r.Ctx, fw)
+	if err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	return true, nil
 }

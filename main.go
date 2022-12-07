@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -16,7 +14,6 @@ import (
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/tag"
-	"github.com/metal-stack/metal-lib/rest"
 	"github.com/metal-stack/v"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -24,27 +21,24 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+const (
+	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
 )
-
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v2.AddToScheme(scheme))
-}
 
 func main() {
 	var (
+		scheme   = runtime.NewScheme()
+		metalURL string
+
 		logLevel                string
 		metricsAddr             string
 		enableLeaderElection    bool
@@ -53,11 +47,15 @@ func main() {
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
 		firewallHealthTimeout   time.Duration
+		createTimeout           time.Duration
+		safetyBackoff           time.Duration
+		progressDeadline        time.Duration
 		clusterID               string
 		clusterApiURL           string
 		certDir                 string
 	)
-	flag.StringVar(&logLevel, "log-level", "", "the log level of the controller")
+
+	flag.StringVar(&logLevel, "log-level", "info", "the log level of the controller")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "the address the metric endpoint binds to")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -66,46 +64,65 @@ func main() {
 	flag.StringVar(&shootKubeconfig, "shoot-kubeconfig", "", "the path to the kubeconfig to talk to the shoot")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 1*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
+	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
+	flag.DurationVar(&safetyBackoff, "safety-backoff", 10*time.Second, "duration after which a resource is getting reconciled at minimum")
+	flag.DurationVar(&progressDeadline, "progress-deadline", 15*time.Minute, "time after which a deployment is considered unhealthy instead of progressing (informational)")
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
+	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 
 	flag.Parse()
 
-	level := zap.InfoLevel
-	if len(logLevel) > 0 {
-		err := level.UnmarshalText([]byte(logLevel))
+	l, err := controllers.NewZapLogger(logLevel)
+	if err != nil {
+		ctrl.Log.WithName("setup").Error(err, "unable to parse log level")
+		os.Exit(1)
+	}
+	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
+
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(v2.AddToScheme(scheme))
+
+	var (
+		seedConfig      = ctrl.GetConfigOrDie()
+		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
+		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
+	)
+
+	if shootKubeconfig == "" {
+		l.Infow("no shoot kubeconfig configured, running in single-cluster mode")
+	} else {
+		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
+
+		shootConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: shootKubeconfig},
+			&clientcmd.ConfigOverrides{},
+		).ClientConfig()
 		if err != nil {
-			setupLog.Error(err, "can't initialize zap logger")
-			os.Exit(1)
+			l.Fatalw("unable to create shoot restconfig", "error", err)
 		}
 	}
 
-	cfg := zap.NewProductionConfig()
-	cfg.Level = zap.NewAtomicLevelAt(level)
-	cfg.EncoderConfig.TimeKey = "timestamp"
-	cfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-
-	l, err := cfg.Build()
+	mclient, err := getMetalClient(metalURL)
 	if err != nil {
-		setupLog.Error(err, "can't initialize zap logger")
-		os.Exit(1)
+		l.Fatalw("unable to create metal client", "error", err)
 	}
 
-	ctrl.SetLogger(zapr.NewLogger(l))
-	if clusterID == "" {
-		setupLog.Error(fmt.Errorf("cluster-id is not set"), "")
-		os.Exit(1)
-	}
-	if clusterApiURL == "" {
-		setupLog.Error(fmt.Errorf("cluster-api-url is not set"), "")
-		os.Exit(1)
+	version, err := discoveryClient.ServerVersion()
+	if err != nil {
+		l.Fatalw("unable to discover server version", "error", err)
 	}
 
-	restConfig := ctrl.GetConfigOrDie()
+	l.Infow("seed kubernetes version", "version", version.String())
 
-	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
+	k8sVersion, err := semver.NewVersion(version.GitVersion)
+	if err != nil {
+		l.Fatalw("unable to parse kubernetes version version", "error", err)
+	}
+
+	seedMgr, err := ctrl.NewManager(seedConfig, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
 		Port:                    9443,
@@ -117,33 +134,49 @@ func main() {
 		CertDir:                 certDir,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start firewall-controller-manager")
-		os.Exit(1)
+		l.Fatalw("unable to start firewall-controller-manager", "error", err)
 	}
 
-	var (
-		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(mgr.GetConfig())
-
-		shootClient, _  = client.New(restConfig, client.Options{Scheme: scheme}) // defaults to seed, e.g. for devel purposes
-		shootRestConfig = restConfig                                             // defaults to seed, e.g. for devel purposes
-	)
-	if len(shootKubeconfig) > 0 {
-		shootRestConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: shootKubeconfig},
-			&clientcmd.ConfigOverrides{},
-		).ClientConfig()
-		if err != nil {
-			setupLog.Error(err, "unable to create shoot restconfig")
-			os.Exit(1)
-		}
-		shootClient, err = client.New(shootRestConfig, client.Options{Scheme: scheme})
-		if err != nil {
-			setupLog.Error(err, "unable to create shoot client")
-			os.Exit(1)
-		}
+	deploymentConfig := &deployment.Config{
+		ControllerConfig: deployment.ControllerConfig{
+			Seed:             seedMgr.GetClient(),
+			Metal:            mclient,
+			Namespace:        namespace,
+			ClusterAPIURL:    clusterApiURL,
+			K8sVersion:       k8sVersion,
+			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:    safetyBackoff,
+			ProgressDeadline: progressDeadline,
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
+	}
+	if err := deploymentConfig.SetupWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "deployment")
+	}
+	if err := deploymentConfig.SetupWebhookWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup webhook", "error", err, "controller", "deployment")
 	}
 
-	shootMgr, err := ctrl.NewManager(shootRestConfig, ctrl.Options{
+	setConfig := &set.Config{
+		ControllerConfig: set.ControllerConfig{
+			Seed:                  seedMgr.GetClient(),
+			Metal:                 mclient,
+			Namespace:             namespace,
+			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			FirewallHealthTimeout: firewallHealthTimeout,
+			CreateTimeout:         createTimeout,
+			Recorder:              seedMgr.GetEventRecorderFor("firewall-set-controller"),
+		},
+		Log: ctrl.Log.WithName("controllers").WithName("set"),
+	}
+	if err := setConfig.SetupWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "set")
+	}
+	if err := setConfig.SetupWebhookWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup webhook", "error", err, "controller", "set")
+	}
+
+	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      "0",
 		LeaderElection:          false,
@@ -151,156 +184,70 @@ func main() {
 		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start firewall-controller-manager-monitor")
-		os.Exit(1)
-	}
-
-	mclient, err := getMetalClient()
-	if err != nil {
-		setupLog.Error(err, "unable to create metal client")
-		os.Exit(1)
-	}
-
-	version, err := discoveryClient.ServerVersion()
-	if err != nil {
-		setupLog.Error(err, "unable to discover server version")
-		os.Exit(1)
-	}
-
-	setupLog.Info("seed kubernetes version", "version", version.String())
-	k8sVersion, err := semver.NewVersion(version.GitVersion)
-	if err != nil {
-		setupLog.Error(err, "unable to parse kubernetes version version")
-		os.Exit(1)
-	}
-
-	deploymentConfig := &deployment.Config{
-		ControllerConfig: deployment.ControllerConfig{
-			Seed:          mgr.GetClient(),
-			Metal:         mclient,
-			Namespace:     namespace,
-			ClusterID:     clusterID,
-			ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			ClusterAPIURL: clusterApiURL,
-			K8sVersion:    k8sVersion,
-			Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
-	}
-	if err = deploymentConfig.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "deployment")
-		os.Exit(1)
-	}
-	if err = deploymentConfig.SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup webhook", "controller", "deployment")
-		os.Exit(1)
-	}
-
-	setConfig := &set.Config{
-		ControllerConfig: set.ControllerConfig{
-			Seed:                  mgr.GetClient(),
-			Metal:                 mclient,
-			Namespace:             namespace,
-			ClusterID:             clusterID,
-			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			FirewallHealthTimeout: firewallHealthTimeout,
-			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("set"),
-	}
-	if err = setConfig.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "set")
-		os.Exit(1)
-	}
-	if err = setConfig.SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup webhook", "controller", "set")
-		os.Exit(1)
+		l.Fatalw("unable to start firewall-controller-manager-monitor", "error", err)
 	}
 
 	firewallConfig := &firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
-			Seed:           mgr.GetClient(),
-			Shoot:          shootClient,
+			Seed:           seedMgr.GetClient(),
+			Shoot:          shootMgr.GetClient(),
 			Metal:          mclient,
 			Namespace:      namespace,
 			ShootNamespace: v2.FirewallShootNamespace,
-			ClusterID:      clusterID,
 			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
+			Recorder:       seedMgr.GetEventRecorderFor("firewall-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}
-	if err = firewallConfig.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "firewall")
-		os.Exit(1)
+	if err := firewallConfig.SetupWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "firewall")
 	}
-	if err = firewallConfig.SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup webhook", "controller", "firewall")
-		os.Exit(1)
+	if err := firewallConfig.SetupWebhookWithManager(seedMgr); err != nil {
+		l.Fatalw("unable to setup webhook", "error", err, "controller", "firewall")
 	}
 
-	if err = (&monitor.Config{
+	monitorConfig := &monitor.Config{
 		ControllerConfig: monitor.ControllerConfig{
-			Seed:          mgr.GetClient(),
-			Shoot:         shootClient,
+			Seed:          seedMgr.GetClient(),
+			Shoot:         shootMgr.GetClient(),
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespace,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
-	}).SetupWithManager(shootMgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "monitor")
-		os.Exit(1)
+	}
+	if err := monitorConfig.SetupWithManager(shootMgr); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
 	}
 
 	stop := ctrl.SetupSignalHandler()
 
 	go func() {
-		setupLog.Info("starting firewall-controller-manager-monitor", "version", v.V)
+		l.Infow("starting shoot controller", "version", v.V)
 		if err := shootMgr.Start(stop); err != nil {
-			setupLog.Error(err, "problem running firewall-controller-manager-monitor")
-			os.Exit(1)
+			l.Fatalw("problem running shoot controller", "error", err)
 		}
 	}()
 
-	setupLog.Info("starting firewall-controller-manager", "version", v.V)
-	if err := mgr.Start(stop); err != nil {
-		setupLog.Error(err, "problem running firewall-controller-manager")
-		os.Exit(1)
+	l.Infow("starting seed controller", "version", v.V)
+	if err := seedMgr.Start(stop); err != nil {
+		l.Fatalw("problem running seed controller", "error", err)
 	}
 }
 
-const (
-	metalAPIUrlEnvVar = "METAL_API_URL"
-	// nolint
-	metalAuthTokenEnvVar = "METAL_AUTH_TOKEN"
-	metalAuthHMACEnvVar  = "METAL_AUTH_HMAC"
-)
-
-func getMetalClient() (metalgo.Client, error) {
-	url := os.Getenv(metalAPIUrlEnvVar)
-	token := os.Getenv(metalAuthTokenEnvVar)
+func getMetalClient(url string) (metalgo.Client, error) {
 	hmac := os.Getenv(metalAuthHMACEnvVar)
 
 	if url == "" {
-		return nil, fmt.Errorf("environment variable %q is required", metalAPIUrlEnvVar)
+		return nil, fmt.Errorf("metal api url is required")
+	}
+	if hmac == "" {
+		return nil, fmt.Errorf("environment variable %q is required", metalAuthHMACEnvVar)
 	}
 
-	if (token == "") == (hmac == "") {
-		return nil, fmt.Errorf("environment variable %q or %q is required", metalAuthTokenEnvVar, metalAuthHMACEnvVar)
-	}
-
-	var err error
-	client, err := metalgo.NewDriver(url, token, hmac)
+	client, err := metalgo.NewDriver(url, "", hmac)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize metal ccm:%w", err)
 	}
 
-	resp, err := client.Health().Health(nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("metal-api health endpoint not reachable:%w", err)
-	}
-	if resp.Payload != nil && resp.Payload.Status != nil && *resp.Payload.Status != string(rest.HealthStatusHealthy) {
-		return nil, fmt.Errorf("metal-api not healthy, restarting")
-	}
 	return client, nil
 }

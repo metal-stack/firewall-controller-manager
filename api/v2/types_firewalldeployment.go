@@ -42,8 +42,13 @@ type FirewallDeploymentSpec struct {
 	Strategy FirewallUpdateStrategy `json:"strategy"`
 	// Replicas is the amount of firewall replicas targeted to be running.
 	Replicas int `json:"replicas"`
+	// Selector is a label query over firewalls that should match the replicas count.
+	// If selector is empty, it is defaulted to the labels present on the firewall template.
+	// Label keys and values that must match in order to be controlled by this replication
+	// controller, if empty defaulted to labels on firewall template.
+	Selector map[string]string `json:"selector,omitempty"`
 	// Template is the firewall spec used for creating the firewalls.
-	Template FirewallSpec `json:"template"`
+	Template FirewallTemplateSpec `json:"template"`
 }
 
 // FirewallDeploymentStatus contains current status information on the firewall deployment.
@@ -80,4 +85,12 @@ type FirewallDeploymentList struct {
 
 	// Items contains the list items.
 	Items []FirewallDeployment `json:"items"`
+}
+
+func (f *FirewallDeploymentList) GetItems() []*FirewallDeployment {
+	var result []*FirewallDeployment
+	for i := range f.Items {
+		result = append(result, &f.Items[i])
+	}
+	return result
 }

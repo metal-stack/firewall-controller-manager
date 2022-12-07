@@ -21,14 +21,21 @@ var _ = Context("firewall set controller", Ordered, func() {
 				Namespace: namespaceName,
 			},
 			Spec: v2.FirewallSetSpec{
-				Template: v2.FirewallSpec{
-					Size:              "n1-medium-x86",
-					Project:           "project-a",
-					Partition:         "partition-a",
-					Image:             "firewall-ubuntu-2.0",
-					Networks:          []string{"internet"},
-					ControllerURL:     "http://controller.tar.gz",
-					ControllerVersion: "v0.0.1",
+				Template: v2.FirewallTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"purpose": "shoot-firewall",
+						},
+					},
+					Spec: v2.FirewallSpec{
+						Size:              "n1-medium-x86",
+						Project:           "project-a",
+						Partition:         "partition-a",
+						Image:             "firewall-ubuntu-2.0",
+						Networks:          []string{"internet"},
+						ControllerURL:     "http://controller.tar.gz",
+						ControllerVersion: "v0.0.1",
+					},
 				},
 			},
 		}

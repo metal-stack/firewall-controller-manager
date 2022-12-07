@@ -103,12 +103,11 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 				}
 
-				if !apierrors.IsNotFound(err) {
-					log.Error(err, "error during deletion flow")
-					return ctrl.Result{}, err
-				}
+				log.Error(err, "error during deletion flow")
+				return ctrl.Result{}, err
 			}
 
+			log.Info("deletion finished, removing finalizer")
 			controllerutil.RemoveFinalizer(o, FinalizerName)
 			if err := g.c.Update(ctx, o); err != nil {
 				return ctrl.Result{}, err
@@ -119,6 +118,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !controllerutil.ContainsFinalizer(o, FinalizerName) {
+		log.Info("adding finalizer")
 		controllerutil.AddFinalizer(o, FinalizerName)
 		if err := g.c.Update(ctx, o); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to add finalizer: %w", err)
@@ -155,22 +155,30 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 
 type ItemGetter[O client.ObjectList, E metav1.Object] func(O) []E
 
-func GetOwnedResources[O client.ObjectList, E metav1.Object](ctx context.Context, c client.Client, owner metav1.Object, list O, getter ItemGetter[O, E]) ([]E, error) {
-	err := c.List(ctx, list, client.InNamespace(owner.GetNamespace()))
-	if err != nil {
-		return nil, err
+func GetOwnedResources[O client.ObjectList, E metav1.Object](ctx context.Context, c client.Client, selector map[string]string, owner metav1.Object, list O, getter ItemGetter[O, E]) (owned []E, orphaned []E, err error) {
+	opts := []client.ListOption{client.InNamespace(owner.GetNamespace())}
+	if selector != nil {
+		opts = append(opts, client.MatchingLabels(selector))
 	}
 
-	var owned []E
+	err = c.List(ctx, list, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	for _, o := range getter(list) {
 		o := o
 
 		if !metav1.IsControlledBy(o, owner) {
+			if metav1.GetControllerOf(o) == nil {
+				orphaned = append(orphaned, o)
+			}
+
 			continue
 		}
 
 		owned = append(owned, o)
 	}
 
-	return owned, nil
+	return owned, orphaned, nil
 }

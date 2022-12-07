@@ -8,6 +8,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,8 +62,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 			r.Target.Status.Phase = v2.FirewallPhaseRunning
 
+			if _, err := c.syncTags(r, f); err != nil {
+				r.Log.Error(err, "error syncing firewall tags")
+				return controllers.RequeueAfter(10*time.Second, "error syncing firewall tags, backing off")
+			}
+
 			// to make the controller always sync the status with the metal-api, we requeue
-			return controllers.RequeueAfter(1*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
+			return controllers.RequeueAfter(2*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
 
 		} else if isFirewallProgressing(r.Target.Status.MachineStatus) {
 
@@ -184,4 +190,32 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 		return true
 	}
 	return false
+}
+
+func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) (*models.V1MachineResponse, error) {
+	var (
+		newTags          []string
+		controllerRefTag = controllers.FirewallSetTag(r.Target.Name)
+	)
+
+	for _, tag := range m.Tags {
+		key, value, found := strings.Cut(tag, "=")
+
+		if found && key == v2.FirewallManagedBySetTag && value != controllerRefTag {
+			newTags = append(newTags, controllerRefTag)
+			continue
+		}
+
+		newTags = append(newTags, tag)
+	}
+
+	resp, err := c.Metal.Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
+		ID:   m.ID,
+		Tags: newTags,
+	}).WithContext(r.Ctx), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Payload, nil
 }

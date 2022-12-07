@@ -24,6 +24,15 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 					Name:      "a",
 					Namespace: "b",
 				},
+				Spec: FirewallDeploymentSpec{
+					Template: FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"a": "b",
+							},
+						},
+					},
+				},
 			},
 			want: &FirewallDeployment{
 				ObjectMeta: metav1.ObjectMeta{
@@ -32,9 +41,19 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 				},
 				Spec: FirewallDeploymentSpec{
 					Replicas: 1,
+					Selector: map[string]string{
+						"a": "b",
+					},
 					Strategy: StrategyRollingUpdate,
-					Template: FirewallSpec{
-						Interval: "10s",
+					Template: FirewallTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"a": "b",
+							},
+						},
+						Spec: FirewallSpec{
+							Interval: "10s",
+						},
 					},
 				},
 			},

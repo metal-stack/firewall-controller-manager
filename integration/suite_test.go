@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
@@ -47,14 +46,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	zcfg := zap.NewProductionConfig()
-	zcfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-	zcfg.EncoderConfig.TimeKey = "timestamp"
-	zcfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-	l, err := zcfg.Build()
+	l, err := controllers.NewZapLogger("debug")
 	Expect(err).NotTo(HaveOccurred())
 
-	ctrl.SetLogger(zapr.NewLogger(l))
+	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
 
 	ctx, cancel = context.WithCancel(context.Background())
 
@@ -94,14 +89,14 @@ var _ = BeforeSuite(func() {
 
 	deploymentconfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
-			Seed:          k8sClient,
-			Metal:         metalClient,
-			Namespace:     namespaceName,
-			ClusterID:     "cluster-a",
-			ClusterTag:    fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			ClusterAPIURL: "http://shoot-api",
-			K8sVersion:    semver.MustParse("v1.25.0"),
-			Recorder:      mgr.GetEventRecorderFor("firewall-deployment-controller"),
+			Seed:             k8sClient,
+			Metal:            metalClient,
+			Namespace:        namespaceName,
+			ClusterAPIURL:    "http://shoot-api",
+			K8sVersion:       semver.MustParse("v1.25.0"),
+			Recorder:         mgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:    3 * time.Second,
+			ProgressDeadline: 10 * time.Minute,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}
@@ -115,9 +110,9 @@ var _ = BeforeSuite(func() {
 			Seed:                  k8sClient,
 			Metal:                 metalClient,
 			Namespace:             namespaceName,
-			ClusterID:             "cluster-a",
 			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 			FirewallHealthTimeout: 20 * time.Minute,
+			CreateTimeout:         10 * time.Minute,
 			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("set"),
@@ -134,7 +129,6 @@ var _ = BeforeSuite(func() {
 			Metal:          metalClient,
 			Namespace:      namespaceName,
 			ShootNamespace: v2.FirewallShootNamespace,
-			ClusterID:      "cluster-a",
 			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
 		},

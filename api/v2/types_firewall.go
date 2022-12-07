@@ -5,7 +5,12 @@ import (
 )
 
 const (
-	FirewallShootNamespace = "firewall"
+	// FirewallNoControllerConnectionAnnotation can be used as an annotation to the firewall resource in order
+	// to indicate that the firewall-controller does not connect to the firewall monitor. this way, the replica
+	// set will become healthy without a controller connection.
+	//
+	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
+	FirewallNoControllerConnectionAnnotation = "metal.stack.io/no-controller-connection"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -71,6 +76,15 @@ type FirewallSpec struct {
 	ControllerURL string `json:"controllerURL,omitempty"`
 	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
+}
+
+// FirewallTemplateSpec describes the data a firewall should have when created from a template
+type FirewallTemplateSpec struct {
+	// Metadata of the firewalls created from this template.
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec contains the firewall specification.
+	Spec FirewallSpec `json:"spec,omitempty"`
 }
 
 // EgressRuleSNAT holds a Source-NAT rule

@@ -3,9 +3,9 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -14,8 +14,10 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
+	"github.com/metal-stack/firewall-controller-manager/cache"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
 
 	metalgo "github.com/metal-stack/metal-go"
@@ -32,13 +34,13 @@ type (
 		Metal          metalgo.Client
 		Namespace      string
 		ShootNamespace string
-		ClusterID      string
 		ClusterTag     string
 		Recorder       record.EventRecorder
 	}
 
 	controller struct {
 		*ControllerConfig
+		networkCache *cache.Cache[*models.V1NetworkResponse]
 	}
 )
 
@@ -58,9 +60,6 @@ func (c *Config) validate() error {
 	if c.ShootNamespace == "" {
 		return fmt.Errorf("shoot namespace must be specified")
 	}
-	if c.ClusterID == "" {
-		return fmt.Errorf("cluster id must be specified")
-	}
 	if c.ClusterTag == "" {
 		return fmt.Errorf("cluster tag must be specified")
 	}
@@ -78,6 +77,13 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	g := controllers.NewGenericController[*v2.Firewall](c.Log, c.Seed, c.Namespace, &controller{
 		ControllerConfig: &c.ControllerConfig,
+		networkCache: cache.New(5*time.Minute, func(ctx context.Context, key any) (*models.V1NetworkResponse, error) {
+			resp, err := c.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(key.(string)).WithContext(ctx), nil)
+			if err != nil {
+				return nil, fmt.Errorf("network find error: %w", err)
+			}
+			return resp.Payload, nil
+		}),
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -104,28 +110,14 @@ func (c *controller) New() *v2.Firewall {
 }
 
 func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
-	tags, err := c.firewallTags(fw)
-	if err != nil {
-		return nil, err
-	}
-
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationName:    fw.Name,
 		AllocationProject: fw.Spec.Project,
-		Tags:              tags,
+		Tags:              []string{c.ClusterTag},
 	}).WithContext(ctx), nil)
 	if err != nil {
 		return nil, fmt.Errorf("firewall find error: %w", err)
 	}
 
 	return resp.Payload, nil
-}
-
-func (c *controller) firewallTags(fw *v2.Firewall) ([]string, error) {
-	ref := metav1.GetControllerOf(fw)
-	if ref == nil {
-		return nil, fmt.Errorf("firewall object has no owner reference")
-	}
-
-	return []string{c.ClusterTag, controllers.FirewallSetTag(ref.Name)}, nil
 }

@@ -36,9 +36,9 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	}
 
 	if current.Status.ReadyReplicas != current.Spec.Replicas {
-		r.Log.Info("set replicas are not yet ready, delaying old set cleanup")
+		r.Log.Info("set replicas are not yet ready")
 
-		if time.Since(current.CreationTimestamp.Time) > c.progressDeadline {
+		if time.Since(current.CreationTimestamp.Time) > c.ProgressDeadline {
 			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", current.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}

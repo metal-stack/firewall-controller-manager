@@ -15,6 +15,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+include .env
+
 all: manager
 
 # clean generated code
@@ -26,8 +28,6 @@ clean:
 test:
 	@if ! which $(SETUP_ENVTEST) > /dev/null; then echo "setup-envtest needs to be installed. you can use setup-envtest target to achieve this."; exit 1; fi
 	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use --arch=amd64 --bin-dir $(PWD)/bin -p path)" go test ./... -coverprofile cover.out
-	@# when testing something more specific:
-	@# KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use --arch=amd64 --bin-dir $(PWD)/bin -p path)" go test -v ./controllers/set/... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -40,7 +40,7 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443 --cert-dir config/examples/certs
+	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443 --cert-dir config/examples/certs --metal-api-url http://api.172.17.0.1.nip.io:8080/metal
 
 # Install CRDs into a cluster
 install: manifests
@@ -57,7 +57,7 @@ deploy: manifests
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) +crd paths="./..." +output:dir=config/crds
+	$(CONTROLLER_GEN) +crd:generateEmbeddedObjectMeta=true paths="./..." +output:dir=config/crds
 	$(CONTROLLER_GEN) +webhook paths="./..." +output:dir=config/webhooks
 
 # Run go fmt against code

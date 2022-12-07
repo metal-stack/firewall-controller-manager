@@ -53,8 +53,11 @@ func (r *firewallSetDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	if f.Spec.Replicas == 0 {
 		f.Spec.Replicas = 1
 	}
+	if f.Spec.Selector == nil {
+		f.Spec.Selector = f.Spec.Template.Labels
+	}
 
-	f.Spec.Template.Default()
+	f.Spec.Template.Spec.Default()
 
 	return nil
 }
@@ -77,8 +80,11 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	if f.Spec.Strategy == "" {
 		f.Spec.Strategy = StrategyRollingUpdate
 	}
+	if f.Spec.Selector == nil {
+		f.Spec.Selector = f.Spec.Template.Labels
+	}
 
-	f.Spec.Template.Default()
+	f.Spec.Template.Spec.Default()
 
 	return nil
 }
