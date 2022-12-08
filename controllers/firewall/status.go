@@ -34,6 +34,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 		TokenSecretName:             c.ShootTokenSecretName,
 		APIServerURL:                c.APIServerURL,
 		Namespace:                   c.Namespace,
+		SSHKeySecretName:            c.SSHKeySecretName,
 	}
 
 	return controllers.CombineErrors(errors...)

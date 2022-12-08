@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestNewShootClient(t *testing.T) {
+func TestNewShootConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		seed    client.Client
@@ -69,7 +69,7 @@ users:
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewShootClient(context.Background(), tt.seed, tt.access)
+			got, err := NewShootConfig(context.Background(), tt.seed, tt.access)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}

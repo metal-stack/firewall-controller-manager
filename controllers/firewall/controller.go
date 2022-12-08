@@ -38,6 +38,7 @@ type (
 		APIServerURL              string
 		ShootKubeconfigSecretName string
 		ShootTokenSecretName      string
+		SSHKeySecretName          string
 		Recorder                  record.EventRecorder
 	}
 
@@ -71,6 +72,15 @@ func (c *Config) validate() error {
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")
+	}
+	if c.ShootKubeconfigSecretName == "" {
+		return fmt.Errorf("shoot kubeconfig secret must be specified")
+	}
+	if c.ShootTokenSecretName == "" {
+		return fmt.Errorf("shoot token secret name must be specified")
+	}
+	if c.SSHKeySecretName == "" {
+		return fmt.Errorf("shoot ssh key secret name must be specified")
 	}
 
 	return nil

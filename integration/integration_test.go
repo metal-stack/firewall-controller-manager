@@ -537,6 +537,7 @@ var _ = Context("integration test", Ordered, func() {
 					TokenSecretName:             "token",
 					Namespace:                   namespaceName,
 					APIServerURL:                "http://shoot-api",
+					SSHKeySecretName:            "ssh-secret-name",
 				}))
 			})
 		})

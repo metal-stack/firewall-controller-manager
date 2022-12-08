@@ -113,14 +113,17 @@ var _ = BeforeSuite(func() {
 
 	firewallConfig := &firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
-			Seed:           k8sClient,
-			Shoot:          k8sClient,
-			Metal:          metalClient,
-			Namespace:      namespaceName,
-			ShootNamespace: v2.FirewallShootNamespace,
-			APIServerURL:   "http://shoot-api",
-			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			Recorder:       mgr.GetEventRecorderFor("firewall-controller"),
+			Seed:                      k8sClient,
+			Shoot:                     k8sClient,
+			Metal:                     metalClient,
+			Namespace:                 namespaceName,
+			ShootNamespace:            v2.FirewallShootNamespace,
+			APIServerURL:              "http://shoot-api",
+			ShootKubeconfigSecretName: "kubeconfig-secret-name",
+			ShootTokenSecretName:      "token",
+			SSHKeySecretName:          "ssh-secret-name",
+			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
+			Recorder:                  mgr.GetEventRecorderFor("firewall-controller"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}

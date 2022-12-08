@@ -16,7 +16,7 @@ import (
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-func NewShootClient(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*rest.Config, error) {
+func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*rest.Config, error) {
 	kubeconfigTemplate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      access.GenericKubeconfigSecretName,

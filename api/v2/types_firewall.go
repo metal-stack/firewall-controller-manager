@@ -161,6 +161,8 @@ type ShootAccess struct {
 	Namespace string `json:"namespace"`
 	// APIServerURL is the URL of the shoot's API server.
 	APIServerURL string `json:"apiServerURL"`
+	// SSHKeySecretName is the secret name containing the ssh keys for the machine access.
+	SSHKeySecretName string `json:"sshKeySecretName"`
 }
 
 // MachineStatus holds the status of the firewall machine containing information from the metal-stack api.

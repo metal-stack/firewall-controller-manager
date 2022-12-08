@@ -44,7 +44,8 @@ func main() {
 		metricsAddr             string
 		enableLeaderElection    bool
 		shootKubeconfigSecret   string
-		shootToken              string
+		shootTokenSecret        string
+		sshKeySecret            string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
@@ -74,7 +75,8 @@ func main() {
 	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "generic-token-kubeconfig", "the secret name of the generic kubeconfig for shoot access")
-	flag.StringVar(&shootToken, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
+	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
+	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
 
 	flag.Parse()
 
@@ -126,14 +128,14 @@ func main() {
 		l.Fatalw("unable to start firewall-controller-manager", "error", err)
 	}
 
-	if shootKubeconfigSecret == "" && shootToken == "" {
+	if shootKubeconfigSecret == "" && shootTokenSecret == "" {
 		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
 	} else {
 		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
 
-		shootConfig, err = helper.NewShootClient(context.Background(), seedMgr.GetClient(), &v2.ShootAccess{
+		shootConfig, err = helper.NewShootConfig(context.Background(), seedMgr.GetClient(), &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
-			TokenSecretName:             shootToken,
+			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
 			APIServerURL:                clusterApiURL,
 		})
@@ -144,14 +146,17 @@ func main() {
 
 	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
-			Seed:             seedMgr.GetClient(),
-			Metal:            mclient,
-			Namespace:        namespace,
-			APIServerURL:     clusterApiURL,
-			K8sVersion:       k8sVersion,
-			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:    safetyBackoff,
-			ProgressDeadline: progressDeadline,
+			Seed:                      seedMgr.GetClient(),
+			Metal:                     mclient,
+			Namespace:                 namespace,
+			APIServerURL:              clusterApiURL,
+			K8sVersion:                k8sVersion,
+			Recorder:                  seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:             safetyBackoff,
+			ProgressDeadline:          progressDeadline,
+			ShootKubeconfigSecretName: shootKubeconfigSecret,
+			ShootTokenSecretName:      shootTokenSecret,
+			SSHKeySecretName:          sshKeySecret,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}
@@ -194,13 +199,16 @@ func main() {
 
 	firewallConfig := &firewall.Config{
 		ControllerConfig: firewall.ControllerConfig{
-			Seed:           seedMgr.GetClient(),
-			Shoot:          shootMgr.GetClient(),
-			Metal:          mclient,
-			Namespace:      namespace,
-			ShootNamespace: v2.FirewallShootNamespace,
-			ClusterTag:     fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			Recorder:       seedMgr.GetEventRecorderFor("firewall-controller"),
+			Seed:                      seedMgr.GetClient(),
+			Shoot:                     shootMgr.GetClient(),
+			Metal:                     mclient,
+			Namespace:                 namespace,
+			ShootNamespace:            v2.FirewallShootNamespace,
+			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+			Recorder:                  seedMgr.GetEventRecorderFor("firewall-controller"),
+			ShootKubeconfigSecretName: shootKubeconfigSecret,
+			ShootTokenSecretName:      shootTokenSecret,
+			SSHKeySecretName:          sshKeySecret,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
 	}

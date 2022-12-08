@@ -72,6 +72,9 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 	if c.ShootTokenSecretName != "" {
 		shootAccessSecretNames = append(shootAccessSecretNames, c.ShootTokenSecretName)
 	}
+	if c.SSHKeySecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, c.SSHKeySecretName)
+	}
 
 	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
