@@ -2,6 +2,11 @@ package v2
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+const (
+	RollSetAnnotation  = "firewall.metal-stack.io/roll-set"
+	RevisionAnnotation = "firewall.metal-stack.io/revision"
+)
+
 // ConditionStatus is the status of a condition.
 type ConditionStatus string
 
@@ -23,11 +28,6 @@ type Condition struct {
 	// A human readable message indicating details about the transition.
 	Message string `json:"message"`
 }
-
-const (
-	RollSetAnnotation  = "firewall-deployment.metal-stack.io/roll-set"
-	RevisionAnnotation = "firewall-deployment.metal-stack.io/revision"
-)
 
 const (
 	// ConditionTrue means a resource is in the condition.

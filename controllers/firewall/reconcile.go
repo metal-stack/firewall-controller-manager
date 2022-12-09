@@ -110,7 +110,10 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V1FirewallResponse, error) {
 	var (
 		networks []*models.V1MachineAllocationNetwork
-		tags     = []string{c.ClusterTag}
+		tags     = []string{
+			c.ClusterTag,
+			fmt.Sprintf("%s=%s", v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager),
+		}
 	)
 	for _, n := range r.Target.Spec.Networks {
 		n := n

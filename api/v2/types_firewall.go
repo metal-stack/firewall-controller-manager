@@ -10,7 +10,12 @@ const (
 	// set will become healthy without a controller connection.
 	//
 	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
-	FirewallNoControllerConnectionAnnotation = "metal.stack.io/no-controller-connection"
+	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
+
+	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
+	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
+	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.
+	FirewallControllerManager = "firewall-controller-manager"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
