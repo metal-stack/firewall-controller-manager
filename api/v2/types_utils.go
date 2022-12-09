@@ -3,6 +3,7 @@ package v2
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 const (
+	FinalizerName      = "firewall.metal-stack.io/firewall-controller-manager"
 	RollSetAnnotation  = "firewall.metal-stack.io/roll-set"
 	RevisionAnnotation = "firewall.metal-stack.io/revision"
 )

@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
+	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,7 +23,10 @@ type (
 		Target O
 	}
 	Reconciler[O client.Object] interface {
+		// New returns a new object of O.
 		New() O
+		// SetStatus sets the status of the reconciled object into the refetched object. this mitigates status updates error due to concurrent modification.
+		SetStatus(reconciled O, refetched O)
 		Reconcile(rctx *Ctx[O]) error
 		Delete(rctx *Ctx[O]) error
 	}
@@ -93,7 +97,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !o.GetDeletionTimestamp().IsZero() {
-		if controllerutil.ContainsFinalizer(o, FinalizerName) {
+		if controllerutil.ContainsFinalizer(o, v2.FinalizerName) {
 			log.Info("reconciling resource deletion flow")
 			err := g.reconciler.Delete(rctx)
 			if err != nil {
@@ -108,7 +112,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 
 			log.Info("deletion finished, removing finalizer")
-			controllerutil.RemoveFinalizer(o, FinalizerName)
+			controllerutil.RemoveFinalizer(o, v2.FinalizerName)
 			if err := g.c.Update(ctx, o); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -117,9 +121,9 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(o, FinalizerName) {
+	if !controllerutil.ContainsFinalizer(o, v2.FinalizerName) {
 		log.Info("adding finalizer")
-		controllerutil.AddFinalizer(o, FinalizerName)
+		controllerutil.AddFinalizer(o, v2.FinalizerName)
 		if err := g.c.Update(ctx, o); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to add finalizer: %w", err)
 		}
@@ -128,8 +132,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if g.hasStatus {
 		defer func() {
 			log.Info("updating status")
+			refetched := g.reconciler.New()
 
-			err := g.c.Status().Update(ctx, o)
+			err := g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
+			if err != nil {
+				log.Error(err, "unable to fetch resource before status update")
+				return
+			}
+
+			g.reconciler.SetStatus(o, refetched)
+
+			err = g.c.Status().Update(ctx, refetched)
 			if err != nil {
 				log.Error(err, "status could not be updated")
 			}

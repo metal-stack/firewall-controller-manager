@@ -15,11 +15,24 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
+	var f *models.V1FirewallResponse
 	defer func() {
 		_, err := c.ensureFirewallMonitor(r)
 		if err != nil {
 			r.Log.Error(err, "unable to deploy firewall monitor")
+			// not returning, we can still try to update the status
 		}
+
+		if f == nil {
+			r.Log.Error(fmt.Errorf("not owning a firewall"), "controller is not owning a firewall")
+			return
+		}
+
+		if err := c.setStatus(r, f); err != nil {
+			r.Log.Error(err, "unable to set firewall status")
+		}
+
+		return
 	}()
 
 	fws, err := c.findAssociatedFirewalls(r.Ctx, r.Target)
@@ -31,29 +44,26 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	case 0:
 		r.Target.Status.Phase = v2.FirewallPhaseCreating
 
-		f, err := c.createFirewall(r)
+		f, err = c.createFirewall(r)
 		if err != nil {
-			return err
-		}
-
-		if err := c.setStatus(r, f); err != nil {
 			return err
 		}
 
 		// requeueing in order to continue checking progression
 		return controllers.RequeueAfter(10*time.Second, "firewall creation is progressing")
 	case 1:
-		f := fws[0]
+		f = fws[0]
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
 		r.Target.Status.Conditions.Set(cond)
 
-		err := c.setStatus(r, f)
+		currentStatus, err := getMachineStatus(f)
 		if err != nil {
-			return err
+			r.Log.Error(err, "error finding out machine status")
+			return controllers.RequeueAfter(10*time.Second, "error finding out machine status")
 		}
 
-		if isFirewallReady(r.Target.Status.MachineStatus) {
+		if isFirewallReady(currentStatus) {
 
 			r.Log.Info("firewall reconciled successfully", "id", pointer.SafeDeref(f.ID))
 
@@ -70,7 +80,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			// to make the controller always sync the status with the metal-api, we requeue
 			return controllers.RequeueAfter(2*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
 
-		} else if isFirewallProgressing(r.Target.Status.MachineStatus) {
+		} else if isFirewallProgressing(currentStatus) {
 
 			r.Log.Info("firewall is progressing", "id", pointer.SafeDeref(f.ID))
 
@@ -83,7 +93,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 			r.Log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", pointer.SafeDeref(f.ID))
 
-			if pointer.SafeDeref(r.Target.Status.MachineStatus).CrashLoop {
+			if pointer.SafeDeref(currentStatus).CrashLoop {
 				r.Target.Status.Phase = v2.FirewallPhaseCrashing
 			}
 
@@ -95,9 +105,9 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		}
 	default:
 		var ids []string
-		for _, f := range fws {
-			f := f
-			ids = append(ids, pointer.SafeDeref(f.ID))
+		for _, fw := range fws {
+			fw := fw
+			ids = append(ids, pointer.SafeDeref(fw.ID))
 		}
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "MultipleFirewalls", fmt.Sprintf("Found multiple firewalls with the same name: %s", strings.Join(ids, ", ")))
@@ -126,7 +136,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 
 	ref := metav1.GetControllerOf(r.Target)
 	if ref != nil {
-		tags = append(tags, controllers.FirewallSetTag(ref.Name))
+		tags = append(tags, v2.FirewallSetTag(ref.Name))
 	}
 
 	createRequest := &models.V1FirewallCreateRequest{
@@ -198,13 +208,13 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) (*models.V1MachineResponse, error) {
 	var (
 		newTags          []string
-		controllerRefTag = controllers.FirewallSetTag(r.Target.Name)
+		controllerRefTag = v2.FirewallSetTag(r.Target.Name)
 	)
 
 	for _, tag := range m.Tags {
 		key, value, found := strings.Cut(tag, "=")
 
-		if found && key == v2.FirewallManagedBySetTag && value != controllerRefTag {
+		if found && key == v2.FirewallControllerSetAnnotation && value != controllerRefTag {
 			newTags = append(newTags, controllerRefTag)
 			continue
 		}

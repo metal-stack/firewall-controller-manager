@@ -94,3 +94,7 @@ func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
 func (c *controller) New() *v2.FirewallSet {
 	return &v2.FirewallSet{}
 }
+
+func (c *controller) SetStatus(reconciled *v2.FirewallSet, refetched *v2.FirewallSet) {
+	refetched.Status = reconciled.Status
+}

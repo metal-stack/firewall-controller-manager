@@ -79,7 +79,7 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationProject: r.Target.Spec.Template.Spec.Project,
-		Tags:              []string{c.ClusterTag, controllers.FirewallSetTag(r.Target.Name)},
+		Tags:              []string{c.ClusterTag, v2.FirewallSetTag(r.Target.Name)},
 	}).WithContext(r.Ctx), nil)
 	if err != nil {
 		r.Log.Error(err, "unable to retrieve firewalls for orphan checking, backing off...")

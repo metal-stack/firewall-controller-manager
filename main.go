@@ -74,7 +74,7 @@ func main() {
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
-	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "generic-token-kubeconfig", "the secret name of the generic kubeconfig for shoot access")
+	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
 
@@ -130,6 +130,10 @@ func main() {
 
 	if shootKubeconfigSecret == "" && shootTokenSecret == "" {
 		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
+
+		shootKubeconfigSecret = "dev-mode"
+		shootTokenSecret = "dev-mode"
+		sshKeySecret = "dev-mode"
 	} else {
 		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
 

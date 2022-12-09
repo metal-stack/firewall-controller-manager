@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -8,9 +10,13 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// FirewallManagedBySetTag is a tag added to the firewall entity in the metal-stack api (backend) indicating by which set a firewall is being managed.
-	FirewallManagedBySetTag = "metal.stack.io/firewall-controller-manager/set"
+	// FirewallControllerSetAnnotation is a tag added to the firewall entity indicating to which set a firewall belongs to.
+	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
 )
+
+func FirewallSetTag(setName string) string {
+	return fmt.Sprintf("%s=%s", FirewallControllerSetAnnotation, setName)
+}
 
 // FirewallSet contains the spec template of a firewall resource similar to a Kubernetes ReplicaSet and takes care that the desired amount of firewall replicas is running.
 //

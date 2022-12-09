@@ -38,11 +38,9 @@ Create and delete the physical firewall machine from the spec at the metal-api.
 A user can initiate rolling the latest firewall set by annotating a monitor in the following way:
 
 ```bash
-$ kubectl annotate fwmon <firewall-name> firewall-deployment.metal-stack.io/roll-set=true
+$ kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
 ```
 
 ## Deployment
 
 Firewall Controller Manager must be deployed into the Shoot Namespace in a Seed Cluster if this is a Gardener Managed environment. So the Gardener Extension Provider Metal have to create a appropriate Deployment.
-
-TODO: Create deployment.

@@ -65,3 +65,5 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 func (c *controller) New() *v2.FirewallMonitor {
 	return &v2.FirewallMonitor{}
 }
+
+func (c *controller) SetStatus(reconciled *v2.FirewallMonitor, refetched *v2.FirewallMonitor) {}

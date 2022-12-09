@@ -15,18 +15,21 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 
 	defer func() {
 		if err != nil {
-			cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionFalse, "Error", fmt.Sprintf("Monitor could not be deployed: %s", err))
+			r.Log.Error(err, "error deploying firewall monitor")
+
+			cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionFalse, "NotDeployed", fmt.Sprintf("Monitor could not be deployed: %s", err))
 			r.Target.Status.Conditions.Set(cond)
+
+			return
 		}
 
 		r.Log.Info("firewall monitor deployed")
 
 		cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionTrue, "Deployed", "Successfully deployed firewall-monitor.")
 		r.Target.Status.Conditions.Set(cond)
-	}()
 
-	cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionUnknown, "MonitorNotProvisioned", "Monitor was not yet deployed into the shoot.")
-	r.Target.Status.Conditions.Set(cond)
+		return
+	}()
 
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{

@@ -125,6 +125,10 @@ func (c *controller) New() *v2.Firewall {
 	return &v2.Firewall{}
 }
 
+func (c *controller) SetStatus(reconciled *v2.Firewall, refetched *v2.Firewall) {
+	refetched.Status = reconciled.Status
+}
+
 func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
 	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationName:    fw.Name,
