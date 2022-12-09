@@ -206,6 +206,7 @@ func main() {
 			ShootNamespace:            v2.FirewallShootNamespace,
 			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 			Recorder:                  seedMgr.GetEventRecorderFor("firewall-controller"),
+			APIServerURL:              clusterApiURL,
 			ShootKubeconfigSecretName: shootKubeconfigSecret,
 			ShootTokenSecretName:      shootTokenSecret,
 			SSHKeySecretName:          sshKeySecret,
