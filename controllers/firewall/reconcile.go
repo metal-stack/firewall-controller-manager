@@ -12,6 +12,7 @@ import (
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
@@ -57,7 +58,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
 		r.Target.Status.Conditions.Set(cond)
 
-		currentStatus, err := getMachineStatus(f)
+		var currentStatus *v2.MachineStatus
+		currentStatus, err = getMachineStatus(f)
 		if err != nil {
 			r.Log.Error(err, "error finding out machine status")
 			return controllers.RequeueAfter(10*time.Second, "error finding out machine status")
@@ -72,7 +74,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 			r.Target.Status.Phase = v2.FirewallPhaseRunning
 
-			if _, err := c.syncTags(r, f); err != nil {
+			if err := c.syncTags(r, f); err != nil {
 				r.Log.Error(err, "error syncing firewall tags")
 				return controllers.RequeueAfter(10*time.Second, "error syncing firewall tags, backing off")
 			}
@@ -205,7 +207,7 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	return false
 }
 
-func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) (*models.V1MachineResponse, error) {
+func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
 	var (
 		newTags          []string
 		controllerRefTag = v2.FirewallSetTag(r.Target.Name)
@@ -222,13 +224,17 @@ func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1Fire
 		newTags = append(newTags, tag)
 	}
 
-	resp, err := c.Metal.Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
+	if sets.NewString(newTags...).Equal(sets.NewString(m.Tags...)) {
+		return nil
+	}
+
+	_, err := c.Metal.Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
 		ID:   m.ID,
 		Tags: newTags,
 	}).WithContext(r.Ctx), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return resp.Payload, nil
+	return nil
 }
