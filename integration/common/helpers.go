@@ -20,6 +20,9 @@ func WaitForCondition[O client.Object](c client.Client, ctx context.Context, of 
 	Eventually(func() v2.ConditionStatus {
 		Expect(c.Get(ctx, client.ObjectKeyFromObject(of), of)).To(Succeed())
 		cond = getter(of).Get(t)
+		if cond == nil {
+			return v2.ConditionStatus("")
+		}
 		return cond.Status
 	}, timeout, interval).Should(Equal(s), "waiting for condition %q to reach status %q", t, s)
 	return cond

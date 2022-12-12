@@ -492,10 +492,10 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.Message).To(Equal("Successfully deployed firewall-monitor."))
 			})
 
-			It("should have the firewall-controller connected condition true", func() {
+			It("should have the firewall-controller connected condition false", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallControllerConnected, v2.ConditionUnknown, 15*time.Second)
+				}, v2.FirewallControllerConnected, v2.ConditionFalse, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 			})
@@ -660,6 +660,7 @@ var _ = Context("integration test", Ordered, func() {
 					},
 				})
 
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				// simulating a firewall-controller updating the resource
 				mon.ControllerStatus = &v2.ControllerStatus{
 					Updated: metav1.NewTime(time.Now()),
