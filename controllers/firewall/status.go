@@ -3,6 +3,7 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -27,6 +28,14 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 		r.Target.Status.FirewallNetworks = firewallNetworks
 	} else {
 		errors = append(errors, err)
+	}
+
+	if enabled, err := strconv.ParseBool(r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
+		r.Target.Status.Conditions.Set(cond)
+	} else if r.Target.Status.ControllerStatus == nil {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
+		r.Target.Status.Conditions.Set(cond)
 	}
 
 	r.Target.Status.ShootAccess = &v2.ShootAccess{
