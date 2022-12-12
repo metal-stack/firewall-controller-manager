@@ -104,6 +104,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v2.Firewall{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
+		// don't think about owning the firewall monitor here, it's in the shoot cluster, we cannot watch two clusters with controller-runtime
 		Named("Firewall").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
 		Complete(g)
