@@ -28,6 +28,11 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 	for _, fw := range fws {
 		fw := fw
 
+		if fw.DeletionTimestamp != nil {
+			r.Log.Info("deletion timestamp on firewall already set", "firewall-name", fw.Name)
+			continue
+		}
+
 		err := c.Seed.Delete(r.Ctx, fw)
 		if err != nil {
 			return err
