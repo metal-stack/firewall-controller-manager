@@ -14,7 +14,7 @@ import (
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	err := c.updateFirewallStatus(r)
 	if err != nil {
-		return err
+		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")
 	}
 
 	return c.setRollAnnotation(r)
@@ -37,7 +37,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		fw.Status.Conditions.Set(cond)
 	} else {
 		if r.Target.ControllerStatus == nil {
-			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionUnknown, "NotConnected", "Controller has not yet reconciled.")
+			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
 			fw.Status.Conditions.Set(cond)
 		} else {
 			connection := &v2.ControllerConnection{
@@ -46,7 +46,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 			}
 
 			if connection.Updated.Time.IsZero() {
-				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet reconciled.")
+				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
 				fw.Status.Conditions.Set(cond)
 			} else if time.Since(connection.Updated.Time) > 5*time.Minute {
 				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
