@@ -51,7 +51,6 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 					},
 				},
 			},
-			Userdata: "some-userdata",
 		},
 	}
 
@@ -162,7 +161,6 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					},
 				},
 			},
-			Userdata: "some-userdata",
 		},
 	}
 
@@ -178,19 +176,6 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 				return f
 			},
 			wantErr: nil,
-		},
-		{
-			name: "prevent userdata update",
-			mutateFn: func(f *v2.FirewallSet) *v2.FirewallSet {
-				f.ResourceVersion = "1"
-				f.Spec.Userdata = "new-userdata"
-				return f
-			},
-			wantErr: &apierrors.StatusError{
-				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.userdata: Invalid value: "new-userdata": field is immutable`,
-				},
-			},
 		},
 		{
 			name: "prevent selector update",

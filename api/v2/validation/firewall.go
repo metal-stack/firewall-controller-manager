@@ -88,11 +88,10 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 	return allErrs
 }
 
-func (v *firewallValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.Firewall) field.ErrorList {
+func (v *firewallValidator) ValidateUpdate(log logr.Logger, fOld, fNew *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpecUpdate(&oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldF.Userdata, newF.Userdata, field.NewPath("userdata"))...)
+	allErrs = append(allErrs, v.validateSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
 
 	return allErrs
 }
@@ -103,7 +102,6 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	allErrs = append(allErrs, v.validateSpec(fNew, fldPath)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.SSHPublicKeys, fOld.SSHPublicKeys, fldPath.Child("sshPublicKeys"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.DNSPort, fOld.DNSPort, fldPath.Child("dnsPort"))...)
 
 	return allErrs

@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
@@ -87,6 +88,15 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	defaulterConfig := &defaults.DefaulterConfig{
+		Log:           ctrl.Log.WithName("defaulting-webhook"),
+		Seed:          k8sClient,
+		Namespace:     namespaceName,
+		SSHSecretName: sshSecret.Name,
+		K8sVersion:    semver.MustParse("v1.25.0"),
+		APIServerURL:  "http://shoot-api",
+	}
+
 	deploymentconfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:                      k8sClient,
@@ -95,7 +105,7 @@ var _ = BeforeSuite(func() {
 			APIServerURL:              "http://shoot-api",
 			ShootKubeconfigSecretName: "kubeconfig-secret-name",
 			ShootTokenSecretName:      "token",
-			SSHKeySecretName:          "ssh-secret-name",
+			SSHKeySecretName:          sshSecret.Name,
 			K8sVersion:                semver.MustParse("v1.25.0"),
 			Recorder:                  mgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:             3 * time.Second,
@@ -105,7 +115,7 @@ var _ = BeforeSuite(func() {
 	}
 	err = deploymentconfig.SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
-	err = deploymentconfig.SetupWebhookWithManager(mgr)
+	err = deploymentconfig.SetupWebhookWithManager(mgr, defaulterConfig)
 	Expect(err).ToNot(HaveOccurred())
 
 	setConfig := &set.Config{
@@ -122,7 +132,7 @@ var _ = BeforeSuite(func() {
 	}
 	err = setConfig.SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
-	err = setConfig.SetupWebhookWithManager(mgr)
+	err = setConfig.SetupWebhookWithManager(mgr, defaulterConfig)
 	Expect(err).ToNot(HaveOccurred())
 
 	firewallConfig := &firewall.Config{
@@ -134,7 +144,7 @@ var _ = BeforeSuite(func() {
 			ShootNamespace:            v2.FirewallShootNamespace,
 			ShootKubeconfigSecretName: "kubeconfig-secret-name",
 			ShootTokenSecretName:      "token",
-			SSHKeySecretName:          "ssh-secret-name",
+			SSHKeySecretName:          sshSecret.Name,
 			APIServerURL:              "http://shoot-api",
 			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 			Recorder:                  mgr.GetEventRecorderFor("firewall-controller"),
@@ -143,7 +153,7 @@ var _ = BeforeSuite(func() {
 	}
 	err = firewallConfig.SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
-	err = firewallConfig.SetupWebhookWithManager(mgr)
+	err = firewallConfig.SetupWebhookWithManager(mgr, defaulterConfig)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&monitor.Config{

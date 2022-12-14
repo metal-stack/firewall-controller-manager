@@ -1,4 +1,4 @@
-package controllers
+package helper
 
 import "github.com/Masterminds/semver/v3"
 

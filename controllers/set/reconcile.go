@@ -112,7 +112,6 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	fw := &v2.Firewall{
 		ObjectMeta: *meta,
 		Spec:       r.Target.Spec.Template.Spec,
-		Userdata:   r.Target.Spec.Userdata,
 	}
 
 	err = c.Seed.Create(r.Ctx, fw, &client.CreateOptions{})

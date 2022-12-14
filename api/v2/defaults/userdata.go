@@ -1,12 +1,13 @@
-package deployment
+package defaults
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/flatcar/container-linux-config-transpiler/config/types"
-	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,24 +17,24 @@ import (
 )
 
 const (
-	firewallControllerName = "firewall-controller"
-	droptailerClientName   = "droptailer"
+	FirewallControllerName = "firewall-controller"
+	DroptailerClientName   = "droptailer"
 )
 
-func (c *controller) createUserdata(ctx context.Context) (string, error) {
+func createUserdata(ctx context.Context, c client.Client, k8sVersion *semver.Version, namespace, apiServerURL string) (string, error) {
 	var (
 		ca    []byte
 		token string
 	)
 
-	if controllers.VersionGreaterOrEqual125(c.K8sVersion) {
+	if helper.VersionGreaterOrEqual125(k8sVersion) {
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "firewall-controller-seed-access",
-				Namespace: c.Namespace,
+				Namespace: namespace,
 			},
 		}
-		err := c.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		err := c.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -44,10 +45,10 @@ func (c *controller) createUserdata(ctx context.Context) (string, error) {
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "firewall-controller-seed-access",
-				Namespace: c.Namespace,
+				Namespace: namespace,
 			},
 		}
-		err := c.Seed.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
+		err := c.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -59,10 +60,10 @@ func (c *controller) createUserdata(ctx context.Context) (string, error) {
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      sa.Secrets[0].Name,
-				Namespace: c.Namespace,
+				Namespace: namespace,
 			},
 		}
-		err = c.Seed.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		err = c.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -76,28 +77,28 @@ func (c *controller) createUserdata(ctx context.Context) (string, error) {
 	}
 
 	config := &configv1.Config{
-		CurrentContext: c.Namespace,
+		CurrentContext: namespace,
 		Clusters: []configv1.NamedCluster{
 			{
-				Name: c.Namespace,
+				Name: namespace,
 				Cluster: configv1.Cluster{
 					CertificateAuthorityData: ca,
-					Server:                   c.APIServerURL,
+					Server:                   apiServerURL,
 				},
 			},
 		},
 		Contexts: []configv1.NamedContext{
 			{
-				Name: c.Namespace,
+				Name: namespace,
 				Context: configv1.Context{
-					Cluster:  c.Namespace,
-					AuthInfo: c.Namespace,
+					Cluster:  namespace,
+					AuthInfo: namespace,
 				},
 			},
 		},
 		AuthInfos: []configv1.NamedAuthInfo{
 			{
-				Name: c.Namespace,
+				Name: namespace,
 				AuthInfo: configv1.AuthInfo{
 					Token: token,
 				},
@@ -119,12 +120,12 @@ func renderUserdata(kubeconfig []byte) (string, error) {
 
 	enabled := true
 	fcUnit := types.SystemdUnit{
-		Name:    fmt.Sprintf("%s.service", firewallControllerName),
+		Name:    fmt.Sprintf("%s.service", FirewallControllerName),
 		Enable:  enabled,
 		Enabled: &enabled,
 	}
 	dcUnit := types.SystemdUnit{
-		Name:    fmt.Sprintf("%s.service", droptailerClientName),
+		Name:    fmt.Sprintf("%s.service", DroptailerClientName),
 		Enable:  enabled,
 		Enabled: &enabled,
 	}
@@ -136,7 +137,7 @@ func renderUserdata(kubeconfig []byte) (string, error) {
 	mode := 0600
 	id := 0
 	ignitionFile := types.File{
-		Path:       "/etc/firewall-controller/.kubeconfig",
+		Path:       fmt.Sprintf("/etc/%s/.kubeconfig", FirewallControllerName),
 		Filesystem: "root",
 		Mode:       &mode,
 		User: &types.FileUser{

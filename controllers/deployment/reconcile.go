@@ -87,11 +87,6 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		return nil, err
 	}
 
-	userdata, err := c.createUserdata(r.Ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	name := fmt.Sprintf("%s-%s", r.Target.Name, uuid.String()[:5])
 
 	set := &v2.FirewallSet{
@@ -108,7 +103,6 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		Spec: v2.FirewallSetSpec{
 			Replicas: r.Target.Spec.Replicas,
 			Template: r.Target.Spec.Template,
-			Userdata: userdata,
 		},
 	}
 

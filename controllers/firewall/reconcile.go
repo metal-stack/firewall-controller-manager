@@ -151,7 +151,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		Imageid:     &r.Target.Spec.Image,
 		SSHPubKeys:  r.Target.Spec.SSHPublicKeys,
 		Networks:    networks,
-		UserData:    r.Target.Userdata,
+		UserData:    r.Target.Spec.Userdata,
 		Tags:        tags,
 	}
 

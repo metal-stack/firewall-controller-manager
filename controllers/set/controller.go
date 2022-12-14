@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	metalgo "github.com/metal-stack/metal-go"
@@ -79,14 +80,19 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(g)
 }
 
-func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager, dc *defaults.DefaulterConfig) error {
 	if err := c.validate(); err != nil {
+		return err
+	}
+
+	defaulter, err := defaults.NewFirewallSetDefaulter(dc)
+	if err != nil {
 		return err
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&v2.FirewallSet{}).
-		WithDefaulter(v2.NewFirewallSetDefaulter(c.Log.WithName("defaulting-webhook"))).
+		WithDefaulter(defaulter).
 		WithValidator(validation.NewFirewallSetValidator(c.Log.WithName("validating-webhook"))).
 		Complete()
 }

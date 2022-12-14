@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 
@@ -100,14 +101,19 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(g)
 }
 
-func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager, dc *defaults.DefaulterConfig) error {
 	if err := c.validate(); err != nil {
+		return err
+	}
+
+	defaulter, err := defaults.NewFirewallDeploymentDefaulter(dc)
+	if err != nil {
 		return err
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&v2.FirewallDeployment{}).
-		WithDefaulter(v2.NewFirewallDeploymentDefaulter(c.Log.WithName("defaulting-webhook"))).
+		WithDefaulter(defaulter).
 		WithValidator(validation.NewFirewallDeploymentValidator(c.Log.WithName("validating-webhook"))).
 		Complete()
 }

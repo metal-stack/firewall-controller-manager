@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
@@ -148,6 +149,15 @@ func main() {
 		}
 	}
 
+	defaulterConfig := &defaults.DefaulterConfig{
+		Log:           ctrl.Log.WithName("defaulting-webhook"),
+		Seed:          seedMgr.GetClient(),
+		Namespace:     namespace,
+		SSHSecretName: sshKeySecret,
+		K8sVersion:    k8sVersion,
+		APIServerURL:  clusterApiURL,
+	}
+
 	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:                      seedMgr.GetClient(),
@@ -167,7 +177,7 @@ func main() {
 	if err := deploymentConfig.SetupWithManager(seedMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "deployment")
 	}
-	if err := deploymentConfig.SetupWebhookWithManager(seedMgr); err != nil {
+	if err := deploymentConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
 		l.Fatalw("unable to setup webhook", "error", err, "controller", "deployment")
 	}
 
@@ -186,7 +196,7 @@ func main() {
 	if err := setConfig.SetupWithManager(seedMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "set")
 	}
-	if err := setConfig.SetupWebhookWithManager(seedMgr); err != nil {
+	if err := setConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
 		l.Fatalw("unable to setup webhook", "error", err, "controller", "set")
 	}
 
@@ -220,7 +230,7 @@ func main() {
 	if err := firewallConfig.SetupWithManager(seedMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "firewall")
 	}
-	if err := firewallConfig.SetupWebhookWithManager(seedMgr); err != nil {
+	if err := firewallConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
 		l.Fatalw("unable to setup webhook", "error", err, "controller", "firewall")
 	}
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -45,7 +46,7 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
-	if controllers.VersionGreaterOrEqual125(c.K8sVersion) {
+	if helper.VersionGreaterOrEqual125(c.K8sVersion) {
 		serviceAccountSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "firewall-controller-seed-access",

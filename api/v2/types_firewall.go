@@ -36,9 +36,6 @@ type Firewall struct {
 
 	// Spec contains the firewall specification.
 	Spec FirewallSpec `json:"spec"`
-	// Userdata contains the userdata used for the creation of the firewall.
-	// It is not part of the template as it is generated dynamically by a controller that governs the firewall.
-	Userdata string `json:"userdata"`
 	// Status contains current status information on the firewall.
 	Status FirewallStatus `json:"status,omitempty"`
 }
@@ -58,7 +55,12 @@ type FirewallSpec struct {
 	// Networks are the networks to which this firewall is connected.
 	// An update on this field requires the recreation of the physical firewall and can therefore lead to traffic interruption for the cluster.
 	Networks []string `json:"networks"`
-	// SSHPublicKeys are the public keys which are added to the firewall's authorized keys file on creation.
+
+	// Userdata contains the userdata used for the creation of the firewall.
+	// It gets defaulted to a userdata matching for the firewall-controller with connection to Gardener shoot and seed.
+	Userdata string `json:"userdata"`
+	// SSHPublicKeys are public keys which are added to the firewall's authorized keys file on creation.
+	// It gets defaulted to the public key of ssh secret as provided by the controller flags.
 	SSHPublicKeys []string `json:"sshPublicKeys,omitempty"`
 
 	// RateLimits allows configuration of rate limit rules for interfaces.

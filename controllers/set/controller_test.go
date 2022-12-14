@@ -10,7 +10,31 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	accessSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: namespaceName,
+		},
+		Data: map[string][]byte{
+			"token":  []byte(`a-token`),
+			"ca.crt": []byte(`a-ca-crt`),
+		},
+	}
+	sshSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ssh-secret",
+			Namespace: namespaceName,
+		},
+		StringData: map[string]string{
+			"id_rsa":     "private",
+			"id_rsa.pub": "public",
+		},
+	}
 )
 
 var _ = Context("firewall set controller", Ordered, func() {
@@ -40,6 +64,11 @@ var _ = Context("firewall set controller", Ordered, func() {
 			},
 		}
 	)
+
+	BeforeAll(func() {
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
+	})
 
 	When("creating a three replica firewall set", Ordered, func() {
 		It("the creation works", func() {

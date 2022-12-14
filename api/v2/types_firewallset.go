@@ -48,9 +48,6 @@ type FirewallSetSpec struct {
 	Selector map[string]string `json:"selector,omitempty"`
 	// Template is the firewall spec used for creating the firewalls.
 	Template FirewallTemplateSpec `json:"template"`
-	// Userdata contains the userdata used for the creation of the firewall.
-	// It is not part of the template as it is generated dynamically by a controller that governs the firewall.
-	Userdata string `json:"userdata"`
 }
 
 type FirewallSetStatus struct {

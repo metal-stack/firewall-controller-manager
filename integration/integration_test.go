@@ -32,6 +32,28 @@ var (
 		},
 	}
 
+	sshSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ssh-secret",
+			Namespace: namespaceName,
+		},
+		StringData: map[string]string{
+			"id_rsa":     "private",
+			"id_rsa.pub": "public",
+		},
+	}
+
+	accessSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-seed-access",
+			Namespace: namespaceName,
+		},
+		Data: map[string][]byte{
+			"token":  []byte(`a-token`),
+			"ca.crt": []byte(`a-ca-crt`),
+		},
+	}
+
 	// we need to fake the secret as there is no kube-controller-manager in the
 	// envtest setup which can issue a long-lived token for the secret
 	fakeTokenSecret = &corev1.Secret{
@@ -81,6 +103,8 @@ var _ = Context("integration test", Ordered, func() {
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
@@ -537,7 +561,7 @@ var _ = Context("integration test", Ordered, func() {
 					TokenSecretName:             "token",
 					Namespace:                   namespaceName,
 					APIServerURL:                "http://shoot-api",
-					SSHKeySecretName:            "ssh-secret-name",
+					SSHKeySecretName:            sshSecret.Name,
 				}))
 			})
 		})
@@ -775,6 +799,8 @@ var _ = Context("migration path", Ordered, func() {
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
