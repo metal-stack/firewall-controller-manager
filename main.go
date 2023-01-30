@@ -21,6 +21,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
@@ -129,8 +130,6 @@ func main() {
 		l.Fatalw("unable to start firewall-controller-manager", "error", err)
 	}
 
-	stop := ctrl.SetupSignalHandler()
-
 	if shootKubeconfigSecret == "" && shootTokenSecret == "" {
 		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
 
@@ -140,16 +139,16 @@ func main() {
 	} else {
 		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
 
-		// client cache needs to be started prematurely in order to use it before the manager build completes
-		if err := seedMgr.GetCache().Start(stop); err != nil {
-			l.Fatalw("unable to start seed cache", "error", err)
+		// cannot use seedMgr.GetClient() because it gets initialized at a later point in time
+		// we have to create an own client
+		client, err := controllerclient.New(seedConfig, controllerclient.Options{
+			Scheme: scheme,
+		})
+		if err != nil {
+			l.Fatalw("unable to create seed client", "error", err)
 		}
 
-		if !seedMgr.GetCache().WaitForCacheSync(stop) {
-			l.Warnw("unable to sync seed client cache")
-		}
-
-		shootConfig, err = helper.NewShootConfig(context.Background(), seedMgr.GetClient(), &v2.ShootAccess{
+		shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
@@ -257,6 +256,8 @@ func main() {
 	if err := monitorConfig.SetupWithManager(shootMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
 	}
+
+	stop := ctrl.SetupSignalHandler()
 
 	go func() {
 		l.Infow("starting shoot controller", "version", v.V)
