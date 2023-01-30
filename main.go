@@ -140,6 +140,11 @@ func main() {
 	} else {
 		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
 
+		// client cache needs to be started prematurely in order to use it before the manager build completes
+		if err := seedMgr.GetCache().Start(stop); err != nil {
+			l.Fatalw("unable to start seed cache", "error", err)
+		}
+
 		if !seedMgr.GetCache().WaitForCacheSync(stop) {
 			l.Warnw("unable to sync seed client cache")
 		}
