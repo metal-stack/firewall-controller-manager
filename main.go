@@ -129,6 +129,8 @@ func main() {
 		l.Fatalw("unable to start firewall-controller-manager", "error", err)
 	}
 
+	stop := ctrl.SetupSignalHandler()
+
 	if shootKubeconfigSecret == "" && shootTokenSecret == "" {
 		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
 
@@ -137,6 +139,10 @@ func main() {
 		sshKeySecret = "dev-mode"
 	} else {
 		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
+
+		if !seedMgr.GetCache().WaitForCacheSync(stop) {
+			l.Warnw("unable to sync seed client cache")
+		}
 
 		shootConfig, err = helper.NewShootConfig(context.Background(), seedMgr.GetClient(), &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
@@ -246,8 +252,6 @@ func main() {
 	if err := monitorConfig.SetupWithManager(shootMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
 	}
-
-	stop := ctrl.SetupSignalHandler()
 
 	go func() {
 		l.Infow("starting shoot controller", "version", v.V)
