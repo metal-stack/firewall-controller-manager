@@ -1,5 +1,5 @@
 ---
-apiVersion: metal-stack.io/v2
+apiVersion: firewall.metal-stack.io/v2
 kind: FirewallDeployment
 metadata:
   name: firewall

@@ -11,12 +11,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-metal-stack-io-v2-firewall
+      path: /mutate-firewall-metal-stack-io-v2-firewall
   failurePolicy: Fail
   name: firewall.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:
@@ -30,12 +30,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-metal-stack-io-v2-firewallset
+      path: /mutate-firewall-metal-stack-io-v2-firewallset
   failurePolicy: Fail
   name: firewallset.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:
@@ -49,12 +49,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-metal-stack-io-v2-firewalldeployment
+      path: /mutate-firewall-metal-stack-io-v2-firewalldeployment
   failurePolicy: Fail
   name: firewalldeployment.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:
@@ -75,12 +75,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metal-stack-io-v2-firewall
+      path: /validate-firewall-metal-stack-io-v2-firewall
   failurePolicy: Fail
   name: firewall.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:
@@ -95,12 +95,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metal-stack-io-v2-firewallset
+      path: /validate-firewall-metal-stack-io-v2-firewallset
   failurePolicy: Fail
   name: firewallset.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:
@@ -115,12 +115,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metal-stack-io-v2-firewalldeployment
+      path: /validate-firewall-metal-stack-io-v2-firewalldeployment
   failurePolicy: Fail
   name: firewalldeployment.metal-stack.io
   rules:
   - apiGroups:
-    - metal-stack.io
+    - firewall.metal-stack.io
     apiVersions:
     - v2
     operations:

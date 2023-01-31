@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: firewalls.metal-stack.io
+  name: firewalls.firewall.metal-stack.io
 spec:
-  group: metal-stack.io
+  group: firewall.metal-stack.io
   names:
     kind: Firewall
     listKind: FirewallList
