@@ -80,7 +80,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			}
 
 			// to make the controller always sync the status with the metal-api, we requeue
-			return controllers.RequeueAfter(2*time.Minute, "firewall creation succeeded, continue probing regularly for status sync")
+			return controllers.RequeueAfter(2*time.Minute, "firewall is running, continue probing regularly for status sync")
 
 		} else if isFirewallProgressing(currentStatus) {
 
