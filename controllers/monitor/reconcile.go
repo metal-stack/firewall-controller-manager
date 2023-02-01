@@ -20,11 +20,13 @@ import (
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	fw, err := c.updateFirewallStatus(r)
 	if err != nil {
-		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")
+		r.Log.Error(err, "unable to update firewall status")
+		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying: %w")
 	}
 
 	err = c.offerFirewallControllerMigrationSecret(r, fw)
 	if err != nil {
+		r.Log.Error(err, "unable to offer firewall-controller migration secret")
 		return controllers.RequeueAfter(10*time.Second, "unable to offer firewall-controller migration secret, retrying")
 	}
 
