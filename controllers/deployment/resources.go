@@ -86,17 +86,17 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Seed, role, func() error {
 		role.Rules = []rbac.PolicyRule{
 			{
-				APIGroups: []string{v2.GroupVersion.String()},
-				Resources: []string{"firewall"},
+				APIGroups: []string{v2.GroupVersion.Group},
+				Resources: []string{"firewalls"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
 				APIGroups: []string{v2.GroupVersion.String()},
-				Resources: []string{"firewall/status"},
+				Resources: []string{"firewalls/status"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
-				APIGroups:     []string{"core/v1"},
+				APIGroups:     []string{""},
 				Resources:     []string{"secrets"},
 				Verbs:         []string{"get", "list", "watch"},
 				ResourceNames: shootAccessSecretNames,
