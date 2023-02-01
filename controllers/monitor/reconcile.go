@@ -101,7 +101,7 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 		return fmt.Errorf("error creating kubeconfig for firewall-controller migration secret: %w", err)
 	}
 
-	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Seed, migrationSecret, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, migrationSecret, func() error {
 		migrationSecret.Data = map[string][]byte{
 			"kubeconfig": kubeconfig,
 		}
