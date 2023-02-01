@@ -90,9 +90,11 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 
 	isOldController := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Reason == "NotChecking" && r.Target.ControllerStatus == nil
 	if !isOldController {
-		// controller is already running with firewall-controller v2.x, we can remove the secret
+		r.Log.Info("firewall-controller is already running with version v2.x or later, not offering migration secret")
 		return client.IgnoreNotFound(c.Shoot.Delete(r.Ctx, migrationSecret))
 	}
+
+	r.Log.Info("firewall-controller seems to be running with v1.x, offering migration secret")
 
 	kubeconfig, err := helper.SeedAccessKubeconfig(r.Ctx, c.Seed, c.K8sVersion, c.SeedNamespace, c.APIServerURL)
 	if err != nil {
