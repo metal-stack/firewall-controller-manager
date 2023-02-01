@@ -102,7 +102,6 @@ var _ = BeforeSuite(func() {
 			Seed:                      k8sClient,
 			Metal:                     metalClient,
 			Namespace:                 namespaceName,
-			APIServerURL:              "http://shoot-api",
 			ShootKubeconfigSecretName: "kubeconfig-secret-name",
 			ShootTokenSecretName:      "token",
 			SSHKeySecretName:          sshSecret.Name,

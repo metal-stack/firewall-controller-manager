@@ -56,7 +56,8 @@ func main() {
 		safetyBackoff           time.Duration
 		progressDeadline        time.Duration
 		clusterID               string
-		clusterApiURL           string
+		shootApiURL             string
+		seedApiURL              string
 		certDir                 string
 	)
 
@@ -74,7 +75,8 @@ func main() {
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
 	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
-	flag.StringVar(&clusterApiURL, "cluster-api-url", "", "url of the cluster to put into the kubeconfig")
+	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server")
+	flag.StringVar(&seedApiURL, "seed-api-url", "", "url of the seed api server")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
@@ -152,7 +154,7 @@ func main() {
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
-			APIServerURL:                clusterApiURL,
+			APIServerURL:                shootApiURL,
 		})
 		if err != nil {
 			l.Fatalw("unable to create shoot client", "error", err)
@@ -165,7 +167,7 @@ func main() {
 		Namespace:     namespace,
 		SSHSecretName: sshKeySecret,
 		K8sVersion:    k8sVersion,
-		APIServerURL:  clusterApiURL,
+		APIServerURL:  seedApiURL,
 	}
 
 	deploymentConfig := &deployment.Config{
@@ -173,7 +175,6 @@ func main() {
 			Seed:                      seedMgr.GetClient(),
 			Metal:                     mclient,
 			Namespace:                 namespace,
-			APIServerURL:              clusterApiURL,
 			K8sVersion:                k8sVersion,
 			Recorder:                  seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:             safetyBackoff,
@@ -230,7 +231,7 @@ func main() {
 			ShootNamespace:            v2.FirewallShootNamespace,
 			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 			Recorder:                  seedMgr.GetEventRecorderFor("firewall-controller"),
-			APIServerURL:              clusterApiURL,
+			APIServerURL:              shootApiURL,
 			ShootKubeconfigSecretName: shootKubeconfigSecret,
 			ShootTokenSecretName:      shootTokenSecret,
 			SSHKeySecretName:          sshKeySecret,
@@ -251,7 +252,7 @@ func main() {
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespace,
 			K8sVersion:    k8sVersion,
-			APIServerURL:  clusterApiURL,
+			APIServerURL:  seedApiURL,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
 	}
