@@ -250,6 +250,8 @@ func main() {
 			Shoot:         shootMgr.GetClient(),
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespace,
+			K8sVersion:    k8sVersion,
+			APIServerURL:  clusterApiURL,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
 	}

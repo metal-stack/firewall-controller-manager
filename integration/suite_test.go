@@ -162,6 +162,8 @@ var _ = BeforeSuite(func() {
 			Shoot:         k8sClient,
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespaceName,
+			APIServerURL:  "http://shoot-api",
+			K8sVersion:    semver.MustParse("v1.25.0"),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
 	}).SetupWithManager(mgr)

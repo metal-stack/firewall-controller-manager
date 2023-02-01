@@ -1,7 +1,17 @@
 package v2
 
 import (
+	"github.com/Masterminds/semver/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// FirewallUserdataCompatibilityAnnotation can be used as an annotation to the firewall deployment resource in order
+	// to indicate with which version of the firewall-controller the provided userdata is compatible with.
+	//
+	// The deployment controller will prevent updates of the managed firewall sets when this constraint violates with
+	// the version of the firewall-controller version.
+	FirewallUserdataCompatibilityAnnotation = "firewall.metal-stack.io/userdata-firewall-controller-compatibility"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -93,4 +103,26 @@ func (f *FirewallDeploymentList) GetItems() []*FirewallDeployment {
 		result = append(result, &f.Items[i])
 	}
 	return result
+}
+
+// IsUserdataCompatibleWithFirewallController returns false if there is a firewall userdata
+// annotation present on the firewall deployment, which conflicts with the firewall controller
+// version in the firewall spec.
+func (f *FirewallDeployment) IsUserdataCompatibleWithFirewallController() bool {
+	value, ok := f.Annotations[FirewallUserdataCompatibilityAnnotation]
+	if !ok {
+		return true
+	}
+
+	constraint, err := semver.NewConstraint(value)
+	if err != nil {
+		return true
+	}
+
+	fcv, err := semver.NewVersion(f.Spec.Template.Spec.ControllerVersion)
+	if err != nil {
+		return true
+	}
+
+	return constraint.Check(fcv)
 }

@@ -15,6 +15,13 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 	}
 
 	if newSetRequired {
+		if !r.Target.IsUserdataCompatibleWithFirewallController() {
+			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Not creating firewall set because userdata is incompatible with specified controller version %q.", r.Target.Spec.Template.Spec.ControllerVersion))
+			r.Target.Status.Conditions.Set(cond)
+
+			return fmt.Errorf("not creating firewall set because userdata is incompatible with specified controller version %q.", r.Target.Spec.Template.Spec.ControllerVersion)
+		}
+
 		r.Log.Info("significant changes detected in the spec, cleaning up old sets then create new firewall set")
 
 		err = c.deleteFirewallSets(r, ownedSets...)

@@ -3,6 +3,7 @@ package monitor
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +22,8 @@ type (
 	ControllerConfig struct {
 		Seed          client.Client
 		Shoot         client.Client
+		APIServerURL  string
+		K8sVersion    *semver.Version
 		Namespace     string
 		SeedNamespace string
 	}
@@ -37,11 +40,17 @@ func (c *Config) validate() error {
 	if c.Shoot == nil {
 		return fmt.Errorf("shoot client must be specified")
 	}
+	if c.K8sVersion == nil {
+		return fmt.Errorf("k8s version must be specified")
+	}
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
 	}
 	if c.SeedNamespace == "" {
 		return fmt.Errorf("seed namespace must be specified")
+	}
+	if c.APIServerURL == "" {
+		return fmt.Errorf("api server url must be specified")
 	}
 
 	return nil
