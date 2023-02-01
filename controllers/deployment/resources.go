@@ -91,7 +91,7 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
-				APIGroups: []string{v2.GroupVersion.String()},
+				APIGroups: []string{v2.GroupVersion.Group},
 				Resources: []string{"firewalls/status"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
