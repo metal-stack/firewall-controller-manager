@@ -79,7 +79,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 
 // offerFirewallControllerMigrationSecret provides a secret that the firewall-controller can use to update from v1.x to v2.x
 //
-// this function can be removed when
+// this function can be removed when all firewall-controllers are running v2.x or newer.
 func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor], fw *v2.Firewall) error {
 	migrationSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
