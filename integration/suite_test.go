@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,6 +79,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(cfg)
+	version, err := discoveryClient.ServerVersion()
+	Expect(err).NotTo(HaveOccurred())
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:             scheme.Scheme,
 		MetricsBindAddress: "0",
@@ -93,7 +98,7 @@ var _ = BeforeSuite(func() {
 		Seed:          k8sClient,
 		Namespace:     namespaceName,
 		SSHSecretName: sshSecret.Name,
-		K8sVersion:    semver.MustParse("v1.25.0"),
+		K8sVersion:    semver.MustParse(version.String()),
 		APIServerURL:  "http://shoot-api",
 	}
 
@@ -105,7 +110,7 @@ var _ = BeforeSuite(func() {
 			ShootKubeconfigSecretName: "kubeconfig-secret-name",
 			ShootTokenSecretName:      "token",
 			SSHKeySecretName:          sshSecret.Name,
-			K8sVersion:                semver.MustParse("v1.25.0"),
+			K8sVersion:                semver.MustParse(version.String()),
 			Recorder:                  mgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:             3 * time.Second,
 			ProgressDeadline:          10 * time.Minute,
@@ -162,7 +167,7 @@ var _ = BeforeSuite(func() {
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespaceName,
 			APIServerURL:  "http://shoot-api",
-			K8sVersion:    semver.MustParse("v1.25.0"),
+			K8sVersion:    semver.MustParse(version.String()),
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
 	}).SetupWithManager(mgr)
