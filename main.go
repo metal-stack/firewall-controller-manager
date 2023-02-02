@@ -98,6 +98,7 @@ func main() {
 		seedConfig      = ctrl.GetConfigOrDie()
 		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
 		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
+		stop            = ctrl.SetupSignalHandler()
 	)
 
 	mclient, err := getMetalClient(metalURL)
@@ -150,7 +151,9 @@ func main() {
 			l.Fatalw("unable to create seed client", "error", err)
 		}
 
-		shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
+		var expiresAt *time.Time
+
+		expiresAt, shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
@@ -159,6 +162,11 @@ func main() {
 		if err != nil {
 			l.Fatalw("unable to create shoot client", "error", err)
 		}
+
+		// as we are creating the client without projected token mount and tokenfile,
+		// we need to regularly check for token expiration and restart the controller if necessary
+		// in order to recreate the shoot client.
+		helper.ShutdownOnTokenExpiration(ctrl.Log.WithName("token-expiration"), expiresAt, stop)
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
@@ -259,8 +267,6 @@ func main() {
 	if err := monitorConfig.SetupWithManager(shootMgr); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
 	}
-
-	stop := ctrl.SetupSignalHandler()
 
 	go func() {
 		l.Infow("starting shoot controller", "version", v.V)
