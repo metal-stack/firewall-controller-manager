@@ -58,9 +58,6 @@ func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAcc
 	kubeconfig.AuthInfos[0].AuthInfo.TokenFile = ""
 	kubeconfig.AuthInfos[0].AuthInfo.Token = token
 
-	fmt.Println("hallo")
-	fmt.Println(token)
-
 	claims := &jwt.RegisteredClaims{}
 	_, _, err = new(jwt.Parser).ParseUnverified(token, claims)
 	if err != nil {
