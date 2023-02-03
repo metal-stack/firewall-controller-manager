@@ -17,7 +17,7 @@ import (
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	if _, ok := r.Target.Annotations[v2.FirewallControllerReconcileAnnotation]; ok {
-		r.Log.Info("firewall controller put reconcile annotation on firewall resource, cleaning it up")
+		r.Log.Info("reconcile annotation for firewall-controller on firewall resource, cleaning it up")
 
 		delete(r.Target.Annotations, v2.FirewallControllerReconcileAnnotation)
 

@@ -77,6 +77,7 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		}).
 		WithEventFilter(v2.SkipRollSetAnnotationRemoval()).
+		WithEventFilter(v2.SkipReconcileAnnotationRemoval()).
 		Complete(g)
 }
 
