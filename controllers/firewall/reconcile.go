@@ -16,19 +16,6 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
-	if _, ok := r.Target.Annotations[v2.FirewallControllerReconcileAnnotation]; ok {
-		r.Log.Info("reconcile annotation for firewall-controller on firewall resource, cleaning it up")
-
-		delete(r.Target.Annotations, v2.FirewallControllerReconcileAnnotation)
-
-		err := c.Seed.Update(r.Ctx, r.Target)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
 	var f *models.V1FirewallResponse
 	defer func() {
 		_, err := c.ensureFirewallMonitor(r)

@@ -18,13 +18,6 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	if _, ok := r.Target.Annotations[v2.FirewallControllerReconcileAnnotation]; ok {
-		err := c.reconcileFirewallControllerAnnotation(r)
-		if err != nil {
-			return err
-		}
-	}
-
 	fw, err := c.updateFirewallStatus(r)
 	if err != nil {
 		r.Log.Error(err, "unable to update firewall status")
@@ -38,44 +31,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	}
 
 	return c.rollSetAnnotation(r)
-}
-
-func (c *controller) reconcileFirewallControllerAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	r.Log.Info("reconcile annotation was put on, passing it on to firewall resource and cleaning it up")
-
-	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Target.Name,
-			Namespace: c.SeedNamespace,
-		},
-	}
-	err := c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
-	if err != nil {
-		r.Log.Error(err, "unable to find out associated firewall in seed")
-		return client.IgnoreNotFound(err)
-	}
-
-	if fw.Annotations == nil {
-		fw.Annotations = map[string]string{
-			v2.FirewallControllerReconcileAnnotation: "",
-		}
-	} else {
-		fw.Annotations[v2.FirewallControllerReconcileAnnotation] = ""
-	}
-
-	err = c.Seed.Update(r.Ctx, fw)
-	if err != nil {
-		return fmt.Errorf("unable to annotate firewall: %w", err)
-	}
-
-	delete(r.Target.Annotations, v2.FirewallControllerReconcileAnnotation)
-
-	err = c.Shoot.Update(r.Ctx, r.Target)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
