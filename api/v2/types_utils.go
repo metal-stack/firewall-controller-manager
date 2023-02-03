@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -112,14 +113,22 @@ func SkipRollSetAnnotationRemoval() predicate.Funcs {
 }
 
 func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
+	if cmp.Equal(update.ObjectOld.GetAnnotations(), update.ObjectNew.GetAnnotations()) {
+		return false
+	}
+
 	var (
 		_, o = update.ObjectOld.GetAnnotations()[annotation]
 		_, n = update.ObjectNew.GetAnnotations()[annotation]
 	)
 
-	if o && !n {
-		return true
+	if n {
+		return false
 	}
 
-	return false
+	if !o {
+		return false
+	}
+
+	return o && !n
 }
