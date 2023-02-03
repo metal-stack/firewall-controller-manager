@@ -92,7 +92,7 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 
 	isOldController := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Reason == "NotChecking" && r.Target.ControllerStatus == nil
 	if !isOldController {
-		r.Log.Info("firewall-controller is already running with version v2.x or later, not offering migration secret")
+		// firewall-controller is already running with version v2.x or later, not offering migration secret
 		return client.IgnoreNotFound(c.Shoot.Delete(r.Ctx, migrationSecret))
 	}
 
