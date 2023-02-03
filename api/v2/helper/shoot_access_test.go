@@ -75,7 +75,7 @@ users:
 			}
 
 			if got != nil {
-				assert.Equal(t, got.Host, "https://kube-apiserver")
+				assert.Equal(t, got.Host, "https://shoot-name")
 			}
 		})
 	}

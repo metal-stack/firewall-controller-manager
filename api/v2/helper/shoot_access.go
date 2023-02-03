@@ -52,11 +52,19 @@ func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAcc
 	if len(kubeconfig.AuthInfos) != 1 {
 		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single user")
 	}
+	if len(kubeconfig.Clusters) != 1 {
+		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single cluster")
+	}
+	if len(kubeconfig.Contexts) != 1 {
+		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single context")
+	}
 
 	token := string(tokenSecret.Data["token"])
 
 	kubeconfig.AuthInfos[0].AuthInfo.TokenFile = ""
 	kubeconfig.AuthInfos[0].AuthInfo.Token = token
+	kubeconfig.Clusters[0].Cluster.Server = access.APIServerURL
+	kubeconfig.Contexts[0].Context.Namespace = access.Namespace
 
 	claims := &jwt.RegisteredClaims{}
 	_, _, err = new(jwt.Parser).ParseUnverified(token, claims)
