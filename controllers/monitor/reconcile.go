@@ -70,7 +70,7 @@ func (c *controller) reconcileFirewallControllerAnnotation(r *controllers.Ctx[*v
 
 	delete(r.Target.Annotations, v2.FirewallControllerReconcileAnnotation)
 
-	err = c.Seed.Update(r.Ctx, r.Target)
+	err = c.Shoot.Update(r.Ctx, r.Target)
 	if err != nil {
 		return err
 	}
