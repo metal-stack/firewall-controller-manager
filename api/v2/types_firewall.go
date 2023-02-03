@@ -2,6 +2,8 @@ package v2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -11,7 +13,9 @@ const (
 	//
 	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
 	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
-
+	// FirewallControllerReconcileAnnotation can be put on the firewall resource to trigger a reconcilation of the firewall-controller.
+	// The firewall-controller-manager will remove the annotation immediately and not reconcile the firewall if present.
+	FirewallControllerReconcileAnnotation = "firewall.metal-stack.io/reconcile"
 	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
 	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
 	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.
@@ -242,4 +246,14 @@ func (f *FirewallList) GetItems() []*Firewall {
 		result = append(result, &f.Items[i])
 	}
 	return result
+}
+
+// SkipReconcileAnnotationRemoval returns a predicate when the firewall controller reconcile annotation
+// was cleaned up.
+func SkipReconcileAnnotationRemoval() predicate.Funcs {
+	return predicate.Funcs{
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return !annotationWasRemoved(update, FirewallControllerReconcileAnnotation)
+		},
+	}
 }
