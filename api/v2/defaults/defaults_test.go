@@ -63,6 +63,9 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "a",
 					Namespace: "b",
+					Annotations: map[string]string{
+						v2.FirewallUserdataCompatibilityAnnotation: ">=v2.0.0",
+					},
 				},
 				Spec: v2.FirewallDeploymentSpec{
 					Replicas: 1,

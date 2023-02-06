@@ -93,7 +93,7 @@ var _ = Context("integration test", Ordered, func() {
 						Image:             "firewall-ubuntu-2.0",
 						Networks:          []string{"internet"},
 						ControllerURL:     "http://controller.tar.gz",
-						ControllerVersion: "v0.0.1",
+						ControllerVersion: "v2.0.0",
 					},
 				},
 			},
@@ -766,7 +766,7 @@ var _ = Context("migration path", Ordered, func() {
 				Image:             "firewall-ubuntu-2.0",
 				Networks:          []string{"internet"},
 				ControllerURL:     "http://controller.tar.gz",
-				ControllerVersion: "v0.0.1",
+				ControllerVersion: "v2.0.0",
 			},
 		}
 
@@ -789,7 +789,7 @@ var _ = Context("migration path", Ordered, func() {
 						Image:             "firewall-ubuntu-2.0",
 						Networks:          []string{"internet"},
 						ControllerURL:     "http://controller.tar.gz",
-						ControllerVersion: "v0.0.1",
+						ControllerVersion: "v2.0.0",
 					},
 				},
 			},

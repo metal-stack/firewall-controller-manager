@@ -11,7 +11,6 @@ const (
 	//
 	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
 	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
-
 	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
 	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
 	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.

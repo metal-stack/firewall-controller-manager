@@ -124,7 +124,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		networks []*models.V1MachineAllocationNetwork
 		tags     = []string{
 			c.ClusterTag,
-			fmt.Sprintf("%s=%s", v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager),
+			v2.FirewallManagedByTag(),
 		}
 	)
 	for _, n := range r.Target.Spec.Networks {
@@ -211,12 +211,18 @@ func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1Fire
 	var (
 		newTags          []string
 		controllerRefTag = v2.FirewallSetTag(r.Target.Name)
+		managerTag       = v2.FirewallManagedByTag()
 	)
 
 	for _, tag := range m.Tags {
 		key, value, found := strings.Cut(tag, "=")
 
 		if found && key == v2.FirewallControllerSetAnnotation && value != controllerRefTag {
+			newTags = append(newTags, controllerRefTag)
+			continue
+		}
+
+		if found && key == v2.FirewallControllerManagedByAnnotation && value != managerTag {
 			newTags = append(newTags, controllerRefTag)
 			continue
 		}

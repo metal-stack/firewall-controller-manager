@@ -1,6 +1,11 @@
 package v2
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+)
 
 const (
 	FinalizerName      = "firewall.metal-stack.io/firewall-controller-manager"
@@ -95,4 +100,35 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 		newConditions = append(newConditions, c)
 	}
 	return newConditions
+}
+
+// SkipReconcileAnnotationRemoval returns a predicate when the firewall controller reconcile annotation
+// was cleaned up.
+func SkipRollSetAnnotationRemoval() predicate.Funcs {
+	return predicate.Funcs{
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return !annotationWasRemoved(update, RollSetAnnotation)
+		},
+	}
+}
+
+func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
+	if cmp.Equal(update.ObjectOld.GetAnnotations(), update.ObjectNew.GetAnnotations()) {
+		return false
+	}
+
+	var (
+		_, o = update.ObjectOld.GetAnnotations()[annotation]
+		_, n = update.ObjectNew.GetAnnotations()[annotation]
+	)
+
+	if n {
+		return false
+	}
+
+	if !o {
+		return false
+	}
+
+	return o && !n
 }

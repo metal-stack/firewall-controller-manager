@@ -142,6 +142,14 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			return err
 		}
 
+		if f.Annotations == nil {
+			f.Annotations = map[string]string{
+				v2.FirewallUserdataCompatibilityAnnotation: ">=v2.0.0",
+			}
+		} else {
+			f.Annotations[v2.FirewallUserdataCompatibilityAnnotation] = ">=v2.0.0"
+		}
+
 		f.Spec.Template.Spec.Userdata = userdata
 	}
 

@@ -1,7 +1,19 @@
 package v2
 
 import (
+	"fmt"
+
+	"github.com/Masterminds/semver/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// FirewallUserdataCompatibilityAnnotation can be used as an annotation to the firewall deployment resource in order
+	// to indicate with which version of the firewall-controller the provided userdata is compatible with.
+	//
+	// The deployment controller will prevent updates of the managed firewall sets when this constraint violates with
+	// the version of the firewall-controller version.
+	FirewallUserdataCompatibilityAnnotation = "firewall.metal-stack.io/userdata-firewall-controller-compatibility"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -93,4 +105,27 @@ func (f *FirewallDeploymentList) GetItems() []*FirewallDeployment {
 		result = append(result, &f.Items[i])
 	}
 	return result
+}
+
+func (f *FirewallDeployment) IsFirewallUserdataCompatibilityAnnotationPresent() bool {
+	return f.Annotations[FirewallUserdataCompatibilityAnnotation] != ""
+}
+
+// IsUserdataCompatibleWithFirewallController returns false if there is a firewall userdata
+// annotation present on the firewall deployment, which conflicts with the firewall controller
+// version in the firewall spec.
+func (f *FirewallDeployment) IsUserdataCompatibleWithFirewallController() (bool, error) {
+	rawConstraint := f.Annotations[FirewallUserdataCompatibilityAnnotation]
+
+	constraint, err := semver.NewConstraint(rawConstraint)
+	if err != nil {
+		return false, fmt.Errorf("firewall-controller userdata constraint is not parsable: %w", err)
+	}
+
+	fcv, err := semver.NewVersion(f.Spec.Template.Spec.ControllerVersion)
+	if err != nil {
+		return false, fmt.Errorf("firewall-controller version is not parsable (maybe an unreleased binary is used?), if you know what you are doing consider removing userdata compatibility annotation manually: %w", err)
+	}
+
+	return constraint.Check(fcv), nil
 }

@@ -30,7 +30,6 @@ type (
 		Metal                     metalgo.Client
 		K8sVersion                *semver.Version
 		Namespace                 string
-		APIServerURL              string
 		ShootKubeconfigSecretName string
 		ShootTokenSecretName      string
 		SSHKeySecretName          string
@@ -57,9 +56,6 @@ func (c *Config) validate() error {
 	}
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
-	}
-	if c.APIServerURL == "" {
-		return fmt.Errorf("api server url must be specified")
 	}
 	if c.Recorder == nil {
 		return fmt.Errorf("recorder must be specified")

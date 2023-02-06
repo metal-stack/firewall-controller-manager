@@ -6,21 +6,34 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/metal-lib/pkg/pointer"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	err := c.updateFirewallStatus(r)
+	fw, err := c.updateFirewallStatus(r)
 	if err != nil {
-		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")
+		r.Log.Error(err, "unable to update firewall status")
+		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying: %w")
 	}
 
-	return c.setRollAnnotation(r)
+	err = c.offerFirewallControllerMigrationSecret(r, fw)
+	if err != nil {
+		r.Log.Error(err, "unable to offer firewall-controller migration secret")
+		return controllers.RequeueAfter(10*time.Second, "unable to offer firewall-controller migration secret, retrying")
+	}
+
+	return c.rollSetAnnotation(r)
 }
 
-func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) error {
+func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
@@ -29,7 +42,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 	}
 	err := c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 	if err != nil {
-		return fmt.Errorf("associated firewall of monitor not found: %w", err)
+		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
 	if enabled, err := strconv.ParseBool(fw.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
@@ -60,13 +73,50 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 
 	err = c.Seed.Status().Update(r.Ctx, fw)
 	if err != nil {
-		return fmt.Errorf("unable to update firewall status: %w", err)
+		return nil, fmt.Errorf("unable to update firewall status: %w", err)
+	}
+
+	return fw, nil
+}
+
+// offerFirewallControllerMigrationSecret provides a secret that the firewall-controller can use to update from v1.x to v2.x
+//
+// this function can be removed when all firewall-controllers are running v2.x or newer.
+func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor], fw *v2.Firewall) error {
+	migrationSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-migration-secret",
+			Namespace: c.Namespace,
+		},
+	}
+
+	isOldController := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Reason == "NotChecking" && r.Target.ControllerStatus == nil
+	if !isOldController {
+		// firewall-controller is already running with version v2.x or later, not offering migration secret
+		return client.IgnoreNotFound(c.Shoot.Delete(r.Ctx, migrationSecret))
+	}
+
+	r.Log.Info("firewall-controller seems to be running with v1.x, offering migration secret")
+
+	kubeconfig, err := helper.SeedAccessKubeconfig(r.Ctx, c.Seed, c.K8sVersion, c.SeedNamespace, c.APIServerURL)
+	if err != nil {
+		return fmt.Errorf("error creating kubeconfig for firewall-controller migration secret: %w", err)
+	}
+
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, migrationSecret, func() error {
+		migrationSecret.Data = map[string][]byte{
+			"kubeconfig": kubeconfig,
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring firewall-controller migration secret: %w", err)
 	}
 
 	return nil
 }
 
-func (c *controller) setRollAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
+func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	v, ok := r.Target.Annotations[v2.RollSetAnnotation]
 	if !ok {
 		return nil
