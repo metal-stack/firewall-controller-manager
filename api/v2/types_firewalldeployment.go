@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -105,24 +107,25 @@ func (f *FirewallDeploymentList) GetItems() []*FirewallDeployment {
 	return result
 }
 
+func (f *FirewallDeployment) IsFirewallUserdataCompatibilityAnnotationPresent() bool {
+	return f.Annotations[FirewallUserdataCompatibilityAnnotation] != ""
+}
+
 // IsUserdataCompatibleWithFirewallController returns false if there is a firewall userdata
 // annotation present on the firewall deployment, which conflicts with the firewall controller
 // version in the firewall spec.
-func (f *FirewallDeployment) IsUserdataCompatibleWithFirewallController() bool {
-	value, ok := f.Annotations[FirewallUserdataCompatibilityAnnotation]
-	if !ok {
-		return true
-	}
+func (f *FirewallDeployment) IsUserdataCompatibleWithFirewallController() (bool, error) {
+	rawConstraint := f.Annotations[FirewallUserdataCompatibilityAnnotation]
 
-	constraint, err := semver.NewConstraint(value)
+	constraint, err := semver.NewConstraint(rawConstraint)
 	if err != nil {
-		return true
+		return false, fmt.Errorf("firewall-controller userdata constraint is not parsable: %w", err)
 	}
 
 	fcv, err := semver.NewVersion(f.Spec.Template.Spec.ControllerVersion)
 	if err != nil {
-		return true
+		return false, fmt.Errorf("firewall-controller version is not parsable (maybe an unreleased binary is used?), if you know what you are doing consider removing userdata compatibility annotation manually: %w", err)
 	}
 
-	return constraint.Check(fcv)
+	return constraint.Check(fcv), nil
 }
