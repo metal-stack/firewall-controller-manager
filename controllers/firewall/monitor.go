@@ -6,6 +6,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -48,23 +49,31 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 			Name:      r.Target.Name,
 			Namespace: c.ShootNamespace,
 		},
+		Size:                   r.Target.Spec.Size,
+		Image:                  r.Target.Spec.Image,
+		Partition:              r.Target.Spec.Partition,
+		Project:                r.Target.Spec.Project,
+		Networks:               r.Target.Spec.Networks,
+		RateLimits:             r.Target.Spec.RateLimits,
+		EgressRules:            r.Target.Spec.EgressRules,
+		LogAcceptedConnections: r.Target.Spec.LogAcceptedConnections,
+		MachineStatus:          r.Target.Status.MachineStatus,
+		Conditions:             r.Target.Status.Conditions,
 	}
 
-	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, mon, func() error {
-		mon.Size = r.Target.Spec.Size
-		mon.Image = r.Target.Spec.Image
-		mon.Partition = r.Target.Spec.Partition
-		mon.Project = r.Target.Spec.Project
-		mon.Networks = r.Target.Spec.Networks
-		mon.RateLimits = r.Target.Spec.RateLimits
-		mon.EgressRules = r.Target.Spec.EgressRules
-		mon.LogAcceptedConnections = r.Target.Spec.LogAcceptedConnections
-		mon.MachineStatus = r.Target.Status.MachineStatus
-		mon.Conditions = r.Target.Status.Conditions
-		return nil
-	})
+	// on purpose not using controllerutil.CreateOrUpdate because it will not trigger an empty update
+	// event in case nothing changes, such that the firewall monitor controller will not be started.
+	err = c.Shoot.Update(r.Ctx, mon)
 	if err != nil {
-		return nil, fmt.Errorf("unable to ensure firewall monitor resource: %w", err)
+		if apierrors.IsNotFound(err) {
+			err = c.Shoot.Create(r.Ctx, mon)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create firewall monitor resource: %w", err)
+			}
+
+			return mon, nil
+		}
+		return nil, fmt.Errorf("unable to update firewall monitor resource: %w", err)
 	}
 
 	return mon, nil
