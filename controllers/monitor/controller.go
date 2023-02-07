@@ -7,7 +7,6 @@ import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -69,13 +68,6 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v2.FirewallMonitor{}).
 		Named("FirewallMonitor").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(_ event.CreateEvent) bool {
-				// no need to reconcile on creation (it's deployed by the firewall controller)
-				// we are only interested in updates
-				return false
-			},
-		}).
 		WithEventFilter(v2.SkipRollSetAnnotationRemoval()).
 		Complete(g)
 }
