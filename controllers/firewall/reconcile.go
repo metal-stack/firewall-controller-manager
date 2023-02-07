@@ -209,25 +209,13 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 
 func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
 	var (
-		newTags          []string
-		controllerRefTag = v2.FirewallSetTag(r.Target.Name)
-		managerTag       = v2.FirewallManagedByTag()
+		newTags []string
+		ref     = metav1.GetControllerOf(r.Target)
 	)
 
-	for _, tag := range m.Tags {
-		key, value, found := strings.Cut(tag, "=")
-
-		if found && key == v2.FirewallControllerSetAnnotation && value != controllerRefTag {
-			newTags = append(newTags, controllerRefTag)
-			continue
-		}
-
-		if found && key == v2.FirewallControllerManagedByAnnotation && value != managerTag {
-			newTags = append(newTags, controllerRefTag)
-			continue
-		}
-
-		newTags = append(newTags, tag)
+	newTags = ensureTag(m.Tags, v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager)
+	if ref != nil {
+		newTags = ensureTag(newTags, v2.FirewallControllerSetAnnotation, ref.Name)
 	}
 
 	if sets.NewString(newTags...).Equal(sets.NewString(m.Tags...)) {
@@ -243,4 +231,34 @@ func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1Fire
 	}
 
 	return nil
+}
+
+func ensureTag(currentTags []string, key, value string) []string {
+	var (
+		newTags  []string
+		foundTag = false
+	)
+
+	for _, tag := range currentTags {
+		k, _, found := strings.Cut(tag, "=")
+		if !found {
+			newTags = append(newTags, tag)
+			continue
+		}
+
+		if k != key {
+			newTags = append(newTags, tag)
+			continue
+		}
+
+		foundTag = true
+
+		newTags = append(newTags, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	if !foundTag {
+		newTags = append(newTags, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return newTags
 }
