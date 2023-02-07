@@ -30,7 +30,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 		return controllers.RequeueAfter(10*time.Second, "unable to offer firewall-controller migration secret, retrying")
 	}
 
-	return c.rollSetAnnotation(r)
+	err = c.rollSetAnnotation(r)
+	if err != nil {
+		r.Log.Error(err, "unable to handle roll set annotation")
+		return err
+	}
+
+	return controllers.RequeueAfter(2*time.Minute, "continue reconciling monitor")
 }
 
 func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
