@@ -11,6 +11,8 @@ const (
 	FinalizerName      = "firewall.metal-stack.io/firewall-controller-manager"
 	RollSetAnnotation  = "firewall.metal-stack.io/roll-set"
 	RevisionAnnotation = "firewall.metal-stack.io/revision"
+
+	FirewallControllerMigrationSecretName = "firewall-controller-migration-secret"
 )
 
 // ConditionStatus is the status of a condition.

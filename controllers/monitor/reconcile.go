@@ -91,7 +91,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor], fw *v2.Firewall) error {
 	migrationSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-migration-secret",
+			Name:      v2.FirewallControllerMigrationSecretName,
 			Namespace: c.Namespace,
 		},
 	}
