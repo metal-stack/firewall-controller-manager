@@ -20,7 +20,7 @@ import (
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*time.Time, *rest.Config, error) {
+func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*time.Time, []byte, *rest.Config, error) {
 	kubeconfigTemplate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      access.GenericKubeconfigSecretName,
@@ -29,7 +29,7 @@ func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAcc
 	}
 	err := seed.Get(ctx, client.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to read generic kubeconfig secret: %w", err)
+		return nil, nil, nil, fmt.Errorf("unable to read generic kubeconfig secret: %w", err)
 	}
 
 	tokenSecret := &corev1.Secret{
@@ -40,23 +40,23 @@ func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAcc
 	}
 	err = seed.Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to read token secret: %w", err)
+		return nil, nil, nil, fmt.Errorf("unable to read token secret: %w", err)
 	}
 
 	kubeconfig := &configv1.Config{}
 	err = runtime.DecodeInto(configlatest.Codec, kubeconfigTemplate.Data["kubeconfig"], kubeconfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to decode kubeconfig from generic kubeconfig template: %w", err)
+		return nil, nil, nil, fmt.Errorf("unable to decode kubeconfig from generic kubeconfig template: %w", err)
 	}
 
 	if len(kubeconfig.AuthInfos) != 1 {
-		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single user")
+		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single user")
 	}
 	if len(kubeconfig.Clusters) != 1 {
-		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single cluster")
+		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single cluster")
 	}
 	if len(kubeconfig.Contexts) != 1 {
-		return nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single context")
+		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single context")
 	}
 
 	token := string(tokenSecret.Data["token"])
@@ -69,24 +69,24 @@ func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAcc
 	claims := &jwt.RegisteredClaims{}
 	_, _, err = new(jwt.Parser).ParseUnverified(token, claims)
 	if err != nil {
-		return nil, nil, fmt.Errorf("shoot access token is not parsable: %w", err)
+		return nil, nil, nil, fmt.Errorf("shoot access token is not parsable: %w", err)
 	}
 
 	raw, err := runtime.Encode(configlatest.Codec, kubeconfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to encode kubeconfig: %w", err)
+		return nil, nil, nil, fmt.Errorf("unable to encode kubeconfig: %w", err)
 	}
 
 	config, err := clientcmd.RESTConfigFromKubeConfig(raw)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create rest config from bytes: %w", err)
+		return nil, nil, nil, fmt.Errorf("unable to create rest config from bytes: %w", err)
 	}
 
 	if claims.ExpiresAt != nil {
-		return &claims.ExpiresAt.Time, config, nil
+		return &claims.ExpiresAt.Time, raw, config, nil
 	}
 
-	return nil, config, nil
+	return nil, raw, config, nil
 }
 
 func ShutdownOnTokenExpiration(log logr.Logger, expiresAt *time.Time, stop context.Context) {

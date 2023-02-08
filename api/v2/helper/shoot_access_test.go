@@ -69,7 +69,7 @@ users:
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			_, got, err := NewShootConfig(context.Background(), tt.seed, tt.access)
+			_, _, got, err := NewShootConfig(context.Background(), tt.seed, tt.access)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}

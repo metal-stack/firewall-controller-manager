@@ -153,7 +153,7 @@ func main() {
 
 		var expiresAt *time.Time
 
-		expiresAt, shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
+		expiresAt, _, shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
