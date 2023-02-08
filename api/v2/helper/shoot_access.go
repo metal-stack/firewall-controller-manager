@@ -21,6 +21,10 @@ import (
 )
 
 func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*time.Time, []byte, *rest.Config, error) {
+	if access == nil {
+		return nil, nil, nil, fmt.Errorf("shoot access is nil")
+	}
+
 	kubeconfigTemplate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      access.GenericKubeconfigSecretName,
