@@ -112,9 +112,7 @@ func ShutdownOnTokenExpiration(log logr.Logger, expiresAt *time.Time, stop conte
 
 				log.Info("token is expiring, shutting down and restart to renew clients")
 
-				ctx, cancel := context.WithTimeout(stop, 10*time.Second)
-				defer cancel()
-				ctx.Done()
+				stop.Done()
 
 				return
 			}
