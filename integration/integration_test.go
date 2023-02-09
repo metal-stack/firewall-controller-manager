@@ -172,9 +172,15 @@ var _ = Context("integration test", Ordered, func() {
 			mon *v2.FirewallMonitor
 		)
 
-		When("creating a firewall deployment", func() {
+		When("creating a firewall deployment", Ordered, func() {
 			It("the creation works", func() {
 				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
+			})
+
+			It("the userdata was rendered by the defaulting webhook", func() {
+				deploy := deployment.DeepCopy()
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), deploy)).To(Succeed())
+				Expect(deploy.Spec.Template.Spec.Userdata).NotTo(BeEmpty())
 			})
 		})
 

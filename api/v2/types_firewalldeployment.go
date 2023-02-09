@@ -51,9 +51,11 @@ const (
 // FirewallDeploymentSpec specifies the firewall deployment.
 type FirewallDeploymentSpec struct {
 	// Strategy describes the strategy how firewalls are updated in case the update requires a physical recreation of the firewalls.
-	Strategy FirewallUpdateStrategy `json:"strategy"`
+	// Defaults to RollingUpdate strategy.
+	Strategy FirewallUpdateStrategy `json:"strategy,omitempty"`
 	// Replicas is the amount of firewall replicas targeted to be running.
-	Replicas int `json:"replicas"`
+	// Defaults to 1.
+	Replicas int `json:"replicas,omitempty"`
 	// Selector is a label query over firewalls that should match the replicas count.
 	// If selector is empty, it is defaulted to the labels present on the firewall template.
 	// Label keys and values that must match in order to be controlled by this replication
