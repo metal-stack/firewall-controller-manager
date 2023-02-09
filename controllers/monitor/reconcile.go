@@ -89,6 +89,12 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 //
 // this function can be removed when all firewall-controllers are running v2.x or newer.
 func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor], fw *v2.Firewall) error {
+	if metav1.GetControllerOf(fw) == nil {
+		// it can be that there is no set or deployment governing the firewall.
+		// in this case there may be no rbac resources deployed for seed access, so we cannot offer a migration secret.
+		return nil
+	}
+
 	migrationSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      v2.FirewallControllerMigrationSecretName,
