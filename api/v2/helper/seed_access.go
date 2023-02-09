@@ -5,13 +5,129 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+func EnsureFirewallControllerRBAC(ctx context.Context, k8sVersion *semver.Version, seed client.Client, deploy *v2.FirewallDeployment, shootAccess *v2.ShootAccess) error {
+	var (
+		name           = "firewall-controller-seed-access"
+		serviceAccount = &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: deploy.Namespace,
+			},
+		}
+	)
+
+	_, err := controllerutil.CreateOrUpdate(ctx, seed, serviceAccount, func() error {
+		serviceAccount.Labels = map[string]string{
+			"token-invalidator.resources.gardener.cloud/skip": "true",
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring service account: %w", err)
+	}
+
+	if VersionGreaterOrEqual125(k8sVersion) {
+		serviceAccountSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: deploy.Namespace,
+			},
+		}
+
+		_, err := controllerutil.CreateOrUpdate(ctx, seed, serviceAccountSecret, func() error {
+			serviceAccountSecret.Annotations = map[string]string{
+				"kubernetes.io/service-account.name": serviceAccount.Name,
+			}
+			serviceAccountSecret.Type = corev1.SecretTypeServiceAccountToken
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("error ensuring service account token secret: %w", err)
+		}
+	}
+
+	var shootAccessSecretNames []string
+	if shootAccess.GenericKubeconfigSecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, shootAccess.GenericKubeconfigSecretName)
+	}
+	if shootAccess.TokenSecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, shootAccess.TokenSecretName)
+	}
+	if shootAccess.SSHKeySecretName != "" {
+		shootAccessSecretNames = append(shootAccessSecretNames, shootAccess.SSHKeySecretName)
+	}
+
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: deploy.Namespace,
+		},
+	}
+	_, err = controllerutil.CreateOrUpdate(ctx, seed, role, func() error {
+		role.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{v2.GroupVersion.Group},
+				Resources: []string{"firewalls"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{v2.GroupVersion.Group},
+				Resources: []string{"firewalls/status"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				Verbs:         []string{"get", "list", "watch"},
+				ResourceNames: shootAccessSecretNames,
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring role: %w", err)
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: deploy.Namespace,
+		},
+	}
+	_, err = controllerutil.CreateOrUpdate(ctx, seed, roleBinding, func() error {
+		roleBinding.RoleRef = rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     name,
+		}
+		roleBinding.Subjects = []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      name,
+				Namespace: deploy.Namespace,
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error ensuring role binding: %w", err)
+	}
+
+	return nil
+}
 
 func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semver.Version, namespace, apiServerURL string) ([]byte, error) {
 	var (

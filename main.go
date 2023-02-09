@@ -99,6 +99,12 @@ func main() {
 		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
 		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
 		stop            = ctrl.SetupSignalHandler()
+		shootAccess     = &v2.ShootAccess{
+			GenericKubeconfigSecretName: shootKubeconfigSecret,
+			TokenSecretName:             shootTokenSecret,
+			Namespace:                   namespace,
+			APIServerURL:                shootApiURL,
+		}
 	)
 
 	mclient, err := getMetalClient(metalURL)
@@ -153,12 +159,7 @@ func main() {
 
 		var expiresAt *time.Time
 
-		expiresAt, _, shootConfig, err = helper.NewShootConfig(context.Background(), client, &v2.ShootAccess{
-			GenericKubeconfigSecretName: shootKubeconfigSecret,
-			TokenSecretName:             shootTokenSecret,
-			Namespace:                   namespace,
-			APIServerURL:                shootApiURL,
-		})
+		expiresAt, _, shootConfig, err = helper.NewShootConfig(context.Background(), client, shootAccess)
 		if err != nil {
 			l.Fatalw("unable to create shoot client", "error", err)
 		}
@@ -170,26 +171,23 @@ func main() {
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:           ctrl.Log.WithName("defaulting-webhook"),
-		Seed:          seedMgr.GetClient(),
-		Namespace:     namespace,
-		SSHSecretName: sshKeySecret,
-		K8sVersion:    k8sVersion,
-		APIServerURL:  seedApiURL,
+		Log:         ctrl.Log.WithName("defaulting-webhook"),
+		Seed:        seedMgr.GetClient(),
+		Namespace:   namespace,
+		K8sVersion:  k8sVersion,
+		ShootAccess: shootAccess,
 	}
 
 	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
-			Seed:                      seedMgr.GetClient(),
-			Metal:                     mclient,
-			Namespace:                 namespace,
-			K8sVersion:                k8sVersion,
-			Recorder:                  seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:             safetyBackoff,
-			ProgressDeadline:          progressDeadline,
-			ShootKubeconfigSecretName: shootKubeconfigSecret,
-			ShootTokenSecretName:      shootTokenSecret,
-			SSHKeySecretName:          sshKeySecret,
+			Seed:             seedMgr.GetClient(),
+			Metal:            mclient,
+			Namespace:        namespace,
+			K8sVersion:       k8sVersion,
+			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:    safetyBackoff,
+			ProgressDeadline: progressDeadline,
+			ShootAccess:      shootAccess,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}

@@ -93,12 +93,17 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			r, err := NewFirewallDeploymentDefaulter(&DefaulterConfig{
-				Log:           testr.New(t),
-				Seed:          tt.seed,
-				Namespace:     tt.obj.Namespace,
-				SSHSecretName: "ssh-secret",
-				K8sVersion:    semver.MustParse("v1.25.0"),
-				APIServerURL:  "https://shot-api",
+				Log:        testr.New(t),
+				Seed:       tt.seed,
+				Namespace:  tt.obj.Namespace,
+				K8sVersion: semver.MustParse("v1.25.0"),
+				ShootAccess: &v2.ShootAccess{
+					GenericKubeconfigSecretName: "generic",
+					TokenSecretName:             "token",
+					Namespace:                   "seed-namespace",
+					APIServerURL:                "https://shot-api",
+					SSHKeySecretName:            "ssh-secret",
+				},
 			})
 			require.NoError(t, err)
 

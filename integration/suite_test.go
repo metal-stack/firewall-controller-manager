@@ -93,27 +93,32 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	shootAccess := &v2.ShootAccess{
+		GenericKubeconfigSecretName: "kubeconfig-secret-name",
+		TokenSecretName:             "token",
+		Namespace:                   namespaceName,
+		APIServerURL:                "http://shoot-api",
+		SSHKeySecretName:            sshSecret.Name,
+	}
+
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:           ctrl.Log.WithName("defaulting-webhook"),
-		Seed:          k8sClient,
-		Namespace:     namespaceName,
-		SSHSecretName: sshSecret.Name,
-		K8sVersion:    semver.MustParse(version.String()),
-		APIServerURL:  "http://shoot-api",
+		Log:         ctrl.Log.WithName("defaulting-webhook"),
+		Seed:        k8sClient,
+		Namespace:   namespaceName,
+		K8sVersion:  semver.MustParse(version.String()),
+		ShootAccess: shootAccess,
 	}
 
 	deploymentconfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
-			Seed:                      k8sClient,
-			Metal:                     metalClient,
-			Namespace:                 namespaceName,
-			ShootKubeconfigSecretName: "kubeconfig-secret-name",
-			ShootTokenSecretName:      "token",
-			SSHKeySecretName:          sshSecret.Name,
-			K8sVersion:                semver.MustParse(version.String()),
-			Recorder:                  mgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:             3 * time.Second,
-			ProgressDeadline:          10 * time.Minute,
+			Seed:             k8sClient,
+			Metal:            metalClient,
+			Namespace:        namespaceName,
+			ShootAccess:      shootAccess,
+			K8sVersion:       semver.MustParse(version.String()),
+			Recorder:         mgr.GetEventRecorderFor("firewall-deployment-controller"),
+			SafetyBackoff:    3 * time.Second,
+			ProgressDeadline: 10 * time.Minute,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
 	}

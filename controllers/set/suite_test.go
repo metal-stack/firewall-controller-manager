@@ -102,12 +102,17 @@ var _ = BeforeSuite(func() {
 	})
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:           ctrl.Log.WithName("defaulting-webhook"),
-		Seed:          k8sClient,
-		Namespace:     namespaceName,
-		SSHSecretName: sshSecret.Name,
-		K8sVersion:    semver.MustParse(version.String()),
-		APIServerURL:  "http://shoot-api",
+		Log:        ctrl.Log.WithName("defaulting-webhook"),
+		Seed:       k8sClient,
+		Namespace:  namespaceName,
+		K8sVersion: semver.MustParse(version.String()),
+		ShootAccess: &v2.ShootAccess{
+			GenericKubeconfigSecretName: "generic",
+			TokenSecretName:             "token-secret",
+			Namespace:                   namespaceName,
+			APIServerURL:                "http://shoot-api",
+			SSHKeySecretName:            sshSecret.Name,
+		},
 	}
 
 	setConfig := &set.Config{

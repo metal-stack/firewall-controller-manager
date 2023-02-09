@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,12 +17,11 @@ import (
 
 type (
 	DefaulterConfig struct {
-		Log           logr.Logger
-		Seed          client.Client
-		Namespace     string
-		SSHSecretName string
-		K8sVersion    *semver.Version
-		APIServerURL  string
+		Log         logr.Logger
+		Seed        client.Client
+		Namespace   string
+		K8sVersion  *semver.Version
+		ShootAccess *v2.ShootAccess
 	}
 	firewallDefaulter struct {
 		*DefaulterConfig
@@ -46,11 +46,8 @@ func (c *DefaulterConfig) validate() error {
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
 	}
-	if c.APIServerURL == "" {
-		return fmt.Errorf("api server url must be specified")
-	}
-	if c.SSHSecretName == "" {
-		return fmt.Errorf("shoot ssh key secret name must be specified")
+	if c.ShootAccess == nil {
+		return fmt.Errorf("shoot access must be specified")
 	}
 
 	return nil
@@ -137,7 +134,12 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	defaultFirewallSpec(&f.Spec.Template.Spec)
 
 	if f.Spec.Template.Spec.Userdata == "" {
-		userdata, err := createUserdata(ctx, r.Seed, r.K8sVersion, r.Namespace, r.APIServerURL)
+		err := helper.EnsureFirewallControllerRBAC(ctx, r.K8sVersion, r.Seed, f, r.ShootAccess)
+		if err != nil {
+			return err
+		}
+
+		userdata, err := createUserdata(ctx, r.Seed, r.K8sVersion, r.Namespace, r.ShootAccess.APIServerURL)
 		if err != nil {
 			return err
 		}
@@ -174,7 +176,7 @@ func defaultFirewallSpec(f *v2.FirewallSpec) {
 func (f *firewallDeploymentDefaulter) getSSHPublicKey(ctx context.Context) (string, error) {
 	sshSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.SSHSecretName,
+			Name:      f.ShootAccess.SSHKeySecretName,
 			Namespace: f.Namespace,
 		},
 	}
