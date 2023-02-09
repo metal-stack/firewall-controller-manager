@@ -104,6 +104,7 @@ func main() {
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
 			APIServerURL:                shootApiURL,
+			SSHKeySecretName:            sshKeySecret,
 		}
 	)
 
