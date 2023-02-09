@@ -57,7 +57,7 @@ type FirewallSpec struct {
 
 	// Userdata contains the userdata used for the creation of the firewall.
 	// It gets defaulted to a userdata matching for the firewall-controller with connection to Gardener shoot and seed.
-	Userdata string `json:"userdata"`
+	Userdata string `json:"userdata,omitempty"`
 	// SSHPublicKeys are public keys which are added to the firewall's authorized keys file on creation.
 	// It gets defaulted to the public key of ssh secret as provided by the controller flags.
 	SSHPublicKeys []string `json:"sshPublicKeys,omitempty"`
