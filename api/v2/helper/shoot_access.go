@@ -3,6 +3,7 @@ package helper
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -110,9 +111,14 @@ func ShutdownOnTokenExpiration(log logr.Logger, expiresAt *time.Time, stop conte
 					continue
 				}
 
-				log.Info("token is expiring, shutting down and restart to renew clients")
+				log.Info("token is expiring, shutting down and restart to renew clients (deadline 10s)")
 
-				stop.Done()
+				ctx, cancel := context.WithDeadline(stop, time.Now().Add(10*time.Second))
+				defer cancel()
+
+				<-ctx.Done()
+
+				os.Exit(0)
 
 				return
 			}
