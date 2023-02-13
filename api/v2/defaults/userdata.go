@@ -1,15 +1,12 @@
 package defaults
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/flatcar/container-linux-config-transpiler/config/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -17,8 +14,8 @@ const (
 	DroptailerClientName   = "droptailer"
 )
 
-func createUserdata(ctx context.Context, c client.Client, k8sVersion *semver.Version, namespace, apiServerURL string) (string, error) {
-	kubeconfig, err := helper.SeedAccessKubeconfig(ctx, c, k8sVersion, namespace, apiServerURL)
+func createUserdata(c *helper.SeedAccessConfig) (string, error) {
+	kubeconfig, err := helper.SeedAccessKubeconfig(c)
 	if err != nil {
 		return "", err
 	}

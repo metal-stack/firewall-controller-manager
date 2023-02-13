@@ -139,7 +139,14 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			return err
 		}
 
-		userdata, err := createUserdata(ctx, r.Seed, r.K8sVersion, r.Namespace, r.ShootAccess.APIServerURL)
+		userdata, err := createUserdata(&helper.SeedAccessConfig{
+			Ctx:          ctx,
+			Client:       r.Seed,
+			K8sVersion:   r.K8sVersion,
+			Namespace:    r.Namespace,
+			ApiServerURL: r.ShootAccess.APIServerURL,
+			Deployment:   f,
+		})
 		if err != nil {
 			return err
 		}

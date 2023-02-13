@@ -28,7 +28,7 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 			name: "all defaults applied",
 			seed: fake.NewClientBuilder().WithObjects(&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "firewall-controller-seed-access",
+					Name:      "firewall-controller-seed-access-a",
 					Namespace: "b",
 				},
 				Data: map[string][]byte{

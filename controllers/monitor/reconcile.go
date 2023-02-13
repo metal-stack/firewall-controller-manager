@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -110,7 +111,29 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 
 	r.Log.Info("firewall-controller seems to be running with v1.x, offering migration secret")
 
-	kubeconfig, err := helper.SeedAccessKubeconfig(r.Ctx, c.Seed, c.K8sVersion, c.SeedNamespace, c.APIServerURL)
+	set, err := findCorrespondingSet(r.Ctx, c.Seed, fw)
+	if err != nil {
+		return err
+	}
+
+	ref := metav1.GetControllerOf(set)
+	if ref == nil {
+		return fmt.Errorf("unable to find out associated firewall deployment in seed: no owner ref found")
+	}
+
+	kubeconfig, err := helper.SeedAccessKubeconfig(&helper.SeedAccessConfig{
+		Ctx:          r.Ctx,
+		Client:       c.Seed,
+		K8sVersion:   c.K8sVersion,
+		Namespace:    c.SeedNamespace,
+		ApiServerURL: c.APIServerURL,
+		Deployment: &v2.FirewallDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ref.Name,
+				Namespace: c.SeedNamespace,
+			},
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("error creating kubeconfig for firewall-controller migration secret: %w", err)
 	}
@@ -160,27 +183,9 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 				Namespace: c.SeedNamespace,
 			},
 		}
-		err = c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
-		if err != nil {
-			r.Log.Error(err, "unable to find out associated firewall in seed")
-			return client.IgnoreNotFound(err)
-		}
 
-		ref := metav1.GetControllerOf(fw)
-		if ref == nil {
-			r.Log.Error(fmt.Errorf("no owner ref found"), "unable to find out associated firewall set in seed, aborting")
-			return nil
-		}
-
-		set := &v2.FirewallSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ref.Name,
-				Namespace: c.SeedNamespace,
-			},
-		}
-		err = c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(set), set)
+		set, err := findCorrespondingSet(r.Ctx, c.Seed, fw)
 		if err != nil {
-			r.Log.Error(err, "unable to find out associated firewall set in seed")
 			return client.IgnoreNotFound(err)
 		}
 
@@ -195,4 +200,29 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 	}
 
 	return nil
+}
+
+func findCorrespondingSet(ctx context.Context, c client.Client, fw *v2.Firewall) (*v2.FirewallSet, error) {
+	err := c.Get(ctx, client.ObjectKeyFromObject(fw), fw)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find out associated firewall in seed: %w", err)
+	}
+
+	ref := metav1.GetControllerOf(fw)
+	if ref == nil {
+		return nil, fmt.Errorf("unable to find out associated firewall set in seed: no owner ref found")
+	}
+
+	set := &v2.FirewallSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ref.Name,
+			Namespace: fw.Namespace,
+		},
+	}
+	err = c.Get(ctx, client.ObjectKeyFromObject(set), set)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find out associated firewall set in seed: %w", err)
+	}
+
+	return set, nil
 }

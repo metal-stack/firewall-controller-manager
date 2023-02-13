@@ -20,7 +20,7 @@ import (
 
 func EnsureFirewallControllerRBAC(ctx context.Context, k8sVersion *semver.Version, seed client.Client, deploy *v2.FirewallDeployment, shootAccess *v2.ShootAccess) error {
 	var (
-		name           = "firewall-controller-seed-access"
+		name           = seedAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -129,20 +129,58 @@ func EnsureFirewallControllerRBAC(ctx context.Context, k8sVersion *semver.Versio
 	return nil
 }
 
-func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semver.Version, namespace, apiServerURL string) ([]byte, error) {
+type SeedAccessConfig struct {
+	Ctx          context.Context
+	Client       client.Client
+	K8sVersion   *semver.Version
+	Namespace    string
+	ApiServerURL string
+	Deployment   *v2.FirewallDeployment
+}
+
+func (s *SeedAccessConfig) validate() error {
+	if s.Ctx == nil {
+		return fmt.Errorf("context must be specified")
+	}
+	if s.Client == nil {
+		return fmt.Errorf("client must be specified")
+	}
+	if s.K8sVersion == nil {
+		return fmt.Errorf("k8s version must be specified")
+	}
+	if s.Namespace == "" {
+		return fmt.Errorf("namespace must be specified")
+	}
+	if s.ApiServerURL == "" {
+		return fmt.Errorf("api server url must be specified")
+	}
+	if s.Deployment == nil {
+		return fmt.Errorf("deployment must be specified")
+	}
+
+	return nil
+}
+
+func SeedAccessKubeconfig(c *SeedAccessConfig) ([]byte, error) {
 	var (
+		name  = seedAccessResourceName(c.Deployment)
 		ca    []byte
 		token string
 	)
 
-	if VersionGreaterOrEqual125(k8sVersion) {
+	err := c.validate()
+	if err != nil {
+		return nil, err
+	}
+
+	if VersionGreaterOrEqual125(c.K8sVersion) {
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "firewall-controller-seed-access",
-				Namespace: namespace,
+				Name:      name,
+				Namespace: c.Namespace,
 			},
 		}
-		err := c.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		err := c.Client.Get(c.Ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -152,11 +190,11 @@ func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semv
 	} else {
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "firewall-controller-seed-access",
-				Namespace: namespace,
+				Name:      name,
+				Namespace: c.Namespace,
 			},
 		}
-		err := c.Get(ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
+		err := c.Client.Get(c.Ctx, client.ObjectKeyFromObject(sa), sa, &client.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -168,10 +206,10 @@ func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semv
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      sa.Secrets[0].Name,
-				Namespace: namespace,
+				Namespace: c.Namespace,
 			},
 		}
-		err = c.Get(ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+		err = c.Client.Get(c.Ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -185,28 +223,28 @@ func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semv
 	}
 
 	config := &configv1.Config{
-		CurrentContext: namespace,
+		CurrentContext: c.Namespace,
 		Clusters: []configv1.NamedCluster{
 			{
-				Name: namespace,
+				Name: c.Namespace,
 				Cluster: configv1.Cluster{
 					CertificateAuthorityData: ca,
-					Server:                   apiServerURL,
+					Server:                   c.ApiServerURL,
 				},
 			},
 		},
 		Contexts: []configv1.NamedContext{
 			{
-				Name: namespace,
+				Name: c.Namespace,
 				Context: configv1.Context{
-					Cluster:  namespace,
-					AuthInfo: namespace,
+					Cluster:  c.Namespace,
+					AuthInfo: c.Namespace,
 				},
 			},
 		},
 		AuthInfos: []configv1.NamedAuthInfo{
 			{
-				Name: namespace,
+				Name: c.Namespace,
 				AuthInfo: configv1.AuthInfo{
 					Token: token,
 				},
@@ -220,4 +258,8 @@ func SeedAccessKubeconfig(ctx context.Context, c client.Client, k8sVersion *semv
 	}
 
 	return kubeconfig, nil
+}
+
+func seedAccessResourceName(deploy *v2.FirewallDeployment) string {
+	return "firewall-controller-seed-access-" + deploy.Name
 }

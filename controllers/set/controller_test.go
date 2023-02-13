@@ -15,16 +15,6 @@ import (
 )
 
 var (
-	accessSecret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
-			Namespace: namespaceName,
-		},
-		Data: map[string][]byte{
-			"token":  []byte(`a-token`),
-			"ca.crt": []byte(`a-ca-crt`),
-		},
-	}
 	sshSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ssh-secret",
@@ -66,7 +56,6 @@ var _ = Context("firewall set controller", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
 	})
 

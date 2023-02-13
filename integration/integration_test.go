@@ -45,7 +45,7 @@ var (
 
 	accessSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
+			Name:      "firewall-controller-seed-access-test",
 			Namespace: namespaceName,
 		},
 		Data: map[string][]byte{
@@ -58,10 +58,10 @@ var (
 	// envtest setup which can issue a long-lived token for the secret
 	fakeTokenSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access",
+			Name:      "firewall-controller-seed-access-test",
 			Namespace: namespaceName,
 			Annotations: map[string]string{
-				"kubernetes.io/service-account.name": "firewall-controller-seed-access",
+				"kubernetes.io/service-account.name": "firewall-controller-seed-access-test",
 			},
 		},
 		StringData: map[string]string{
