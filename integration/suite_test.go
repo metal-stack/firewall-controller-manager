@@ -102,11 +102,12 @@ var _ = BeforeSuite(func() {
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:         ctrl.Log.WithName("defaulting-webhook"),
-		Seed:        k8sClient,
-		Namespace:   namespaceName,
-		K8sVersion:  semver.MustParse(version.String()),
-		ShootAccess: shootAccess,
+		Log:              ctrl.Log.WithName("defaulting-webhook"),
+		Seed:             k8sClient,
+		Namespace:        namespaceName,
+		K8sVersion:       semver.MustParse(version.String()),
+		SeedAPIServerURL: "http://seed-api",
+		ShootAccess:      shootAccess,
 	}
 
 	deploymentconfig := &deployment.Config{

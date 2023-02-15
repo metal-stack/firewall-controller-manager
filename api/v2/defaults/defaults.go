@@ -17,11 +17,12 @@ import (
 
 type (
 	DefaulterConfig struct {
-		Log         logr.Logger
-		Seed        client.Client
-		Namespace   string
-		K8sVersion  *semver.Version
-		ShootAccess *v2.ShootAccess
+		Log              logr.Logger
+		Seed             client.Client
+		Namespace        string
+		K8sVersion       *semver.Version
+		SeedAPIServerURL string
+		ShootAccess      *v2.ShootAccess
 	}
 	firewallDefaulter struct {
 		*DefaulterConfig
@@ -48,6 +49,9 @@ func (c *DefaulterConfig) validate() error {
 	}
 	if c.ShootAccess == nil {
 		return fmt.Errorf("shoot access must be specified")
+	}
+	if c.SeedAPIServerURL == "" {
+		return fmt.Errorf("seed api server url must be specified")
 	}
 
 	return nil
@@ -144,7 +148,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			Client:       r.Seed,
 			K8sVersion:   r.K8sVersion,
 			Namespace:    r.Namespace,
-			ApiServerURL: r.ShootAccess.APIServerURL,
+			ApiServerURL: r.SeedAPIServerURL,
 			Deployment:   f,
 		})
 		if err != nil {

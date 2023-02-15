@@ -102,10 +102,11 @@ var _ = BeforeSuite(func() {
 	})
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:        ctrl.Log.WithName("defaulting-webhook"),
-		Seed:       k8sClient,
-		Namespace:  namespaceName,
-		K8sVersion: semver.MustParse(version.String()),
+		Log:              ctrl.Log.WithName("defaulting-webhook"),
+		Seed:             k8sClient,
+		Namespace:        namespaceName,
+		K8sVersion:       semver.MustParse(version.String()),
+		SeedAPIServerURL: "http://seed-api",
 		ShootAccess: &v2.ShootAccess{
 			GenericKubeconfigSecretName: "generic",
 			TokenSecretName:             "token-secret",

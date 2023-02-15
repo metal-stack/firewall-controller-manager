@@ -172,11 +172,12 @@ func main() {
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:         ctrl.Log.WithName("defaulting-webhook"),
-		Seed:        seedMgr.GetClient(),
-		Namespace:   namespace,
-		K8sVersion:  k8sVersion,
-		ShootAccess: shootAccess,
+		Log:              ctrl.Log.WithName("defaulting-webhook"),
+		Seed:             seedMgr.GetClient(),
+		SeedAPIServerURL: seedApiURL,
+		Namespace:        namespace,
+		K8sVersion:       k8sVersion,
+		ShootAccess:      shootAccess,
 	}
 
 	deploymentConfig := &deployment.Config{

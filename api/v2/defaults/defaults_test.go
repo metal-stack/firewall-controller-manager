@@ -81,7 +81,7 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 						},
 						Spec: v2.FirewallSpec{
 							Interval:      "10s",
-							Userdata:      `{"ignition":{"config":{},"security":{"tls":{}},"timeouts":{},"version":"2.3.0"},"networkd":{},"passwd":{},"storage":{"files":[{"filesystem":"root","group":{"id":0},"path":"/etc/firewall-controller/.kubeconfig","user":{"id":0},"contents":{"source":"data:,apiVersion%3A%20v1%0Aclusters%3A%0A-%20cluster%3A%0A%20%20%20%20certificate-authority-data%3A%20YS1jYS1jcnQ%3D%0A%20%20%20%20server%3A%20https%3A%2F%2Fshot-api%0A%20%20name%3A%20b%0Acontexts%3A%0A-%20context%3A%0A%20%20%20%20cluster%3A%20b%0A%20%20%20%20user%3A%20b%0A%20%20name%3A%20b%0Acurrent-context%3A%20b%0Akind%3A%20Config%0Apreferences%3A%20%7B%7D%0Ausers%3A%0A-%20name%3A%20b%0A%20%20user%3A%0A%20%20%20%20token%3A%20a-token%0A","verification":{}},"mode":384}]},"systemd":{"units":[{"enable":true,"enabled":true,"name":"firewall-controller.service"},{"enable":true,"enabled":true,"name":"droptailer.service"}]}}`,
+							Userdata:      `{"ignition":{"config":{},"security":{"tls":{}},"timeouts":{},"version":"2.3.0"},"networkd":{},"passwd":{},"storage":{"files":[{"filesystem":"root","group":{"id":0},"path":"/etc/firewall-controller/.kubeconfig","user":{"id":0},"contents":{"source":"data:,apiVersion%3A%20v1%0Aclusters%3A%0A-%20cluster%3A%0A%20%20%20%20certificate-authority-data%3A%20YS1jYS1jcnQ%3D%0A%20%20%20%20server%3A%20https%3A%2F%2Fseed-api%0A%20%20name%3A%20b%0Acontexts%3A%0A-%20context%3A%0A%20%20%20%20cluster%3A%20b%0A%20%20%20%20user%3A%20b%0A%20%20name%3A%20b%0Acurrent-context%3A%20b%0Akind%3A%20Config%0Apreferences%3A%20%7B%7D%0Ausers%3A%0A-%20name%3A%20b%0A%20%20user%3A%0A%20%20%20%20token%3A%20a-token%0A","verification":{}},"mode":384}]},"systemd":{"units":[{"enable":true,"enabled":true,"name":"firewall-controller.service"},{"enable":true,"enabled":true,"name":"droptailer.service"}]}}`,
 							SSHPublicKeys: []string{"ssh-public-key"},
 						},
 					},
@@ -93,10 +93,11 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			r, err := NewFirewallDeploymentDefaulter(&DefaulterConfig{
-				Log:        testr.New(t),
-				Seed:       tt.seed,
-				Namespace:  tt.obj.Namespace,
-				K8sVersion: semver.MustParse("v1.25.0"),
+				Log:              testr.New(t),
+				Seed:             tt.seed,
+				Namespace:        tt.obj.Namespace,
+				K8sVersion:       semver.MustParse("v1.25.0"),
+				SeedAPIServerURL: "https://seed-api",
 				ShootAccess: &v2.ShootAccess{
 					GenericKubeconfigSecretName: "generic",
 					TokenSecretName:             "token",
@@ -111,6 +112,7 @@ func Test_firewallDeploymentDefaulter_Default(t *testing.T) {
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}
+
 			if diff := cmp.Diff(tt.want, tt.obj); diff != "" {
 				t.Errorf("diff (+got -want):\n %s", diff)
 			}
