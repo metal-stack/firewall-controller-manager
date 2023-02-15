@@ -12,7 +12,7 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
-	ownedFirewalls, orphaned, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+	ownedFirewalls, orphaned, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
@@ -29,7 +29,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	for _, fw := range ownedFirewalls {
 		fw.Spec = r.Target.Spec.Template.Spec
 
-		err := c.Seed.Update(r.Ctx, fw, &client.UpdateOptions{})
+		err := c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error updating firewall spec: %w", err)
 		}
@@ -48,7 +48,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
-			c.Recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
+			c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
 
 			ownedFirewalls = append(ownedFirewalls, fw)
 		}
@@ -114,7 +114,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		Spec:       r.Target.Spec.Template.Spec,
 	}
 
-	err = c.Seed.Create(r.Ctx, fw, &client.CreateOptions{})
+	err = c.c.GetSeedClient().Create(r.Ctx, fw, &client.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create firewall resource: %w", err)
 	}
@@ -156,7 +156,7 @@ func (c *controller) adoptFirewall(r *controllers.Ctx[*v2.FirewallSet], fw *v2.F
 
 	fw.OwnerReferences = append(fw.OwnerReferences, *metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")))
 
-	err = c.Seed.Update(r.Ctx, fw)
+	err = c.c.GetSeedClient().Update(r.Ctx, fw)
 	if err != nil {
 		return false, client.IgnoreNotFound(err)
 	}

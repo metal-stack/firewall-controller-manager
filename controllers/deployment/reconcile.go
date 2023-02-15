@@ -22,7 +22,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return err
 	}
 
-	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeploy
 }
 
 func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], revision int) (*v2.FirewallSet, error) {
-	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.SafetyBackoff {
+	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.c.GetSafetyBackoff() {
 		// this is just for safety reasons to prevent mass-allocations
 		r.Log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
 		return nil, controllers.RequeueAfter(10*time.Second, "delaying firewall set creation")
@@ -106,7 +106,7 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		},
 	}
 
-	err = c.Seed.Create(r.Ctx, set, &client.CreateOptions{})
+	err = c.c.GetSeedClient().Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {
 		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s.", err))
 		r.Target.Status.Conditions.Set(cond)
@@ -128,7 +128,7 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	set.Spec.Replicas = r.Target.Spec.Replicas
 	set.Spec.Template = r.Target.Spec.Template
 
-	err := c.Seed.Update(r.Ctx, set)
+	err := c.c.GetSeedClient().Update(r.Ctx, set)
 	if err != nil {
 		return fmt.Errorf("unable to update/sync firewall set: %w", err)
 	}
@@ -138,7 +138,7 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", set.Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.Recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
+	c.recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
 
 	return nil
 }
@@ -164,7 +164,7 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		return ok, nil
 	}
 
-	ok, err := osImageHasChanged(r.Ctx, c.Metal, newS, oldS)
+	ok, err := osImageHasChanged(r.Ctx, c.c.GetMetal(), newS, oldS)
 	if err != nil {
 		return false, err
 	}

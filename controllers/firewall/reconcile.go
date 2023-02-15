@@ -123,7 +123,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	var (
 		networks []*models.V1MachineAllocationNetwork
 		tags     = []string{
-			c.ClusterTag,
+			c.c.GetClusterTag(),
 			v2.FirewallManagedByTag(),
 		}
 	)
@@ -155,7 +155,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		Tags:        tags,
 	}
 
-	resp, err := c.Metal.Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(r.Ctx), nil)
+	resp, err := c.c.GetMetal().Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(r.Ctx), nil)
 	if err != nil {
 		r.Log.Error(err, "error creating firewall")
 
@@ -170,7 +170,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.Recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
+	c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
 
 	return resp.Payload, nil
 }
@@ -222,7 +222,7 @@ func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1Fire
 		return nil
 	}
 
-	_, err := c.Metal.Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
+	_, err := c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
 		ID:   m.ID,
 		Tags: newTags,
 	}).WithContext(r.Ctx), nil)

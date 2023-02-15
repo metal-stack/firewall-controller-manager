@@ -26,7 +26,7 @@ func renderUserdata(kubeconfig, seedKubeconfig []byte) (string, error) {
 						Enable:  true,
 						Enabled: pointer.Pointer(true),
 					},
-					types.SystemdUnit{
+					{
 						Name:    fmt.Sprintf("%s.service", DroptailerClientName),
 						Enable:  true,
 						Enabled: pointer.Pointer(true),

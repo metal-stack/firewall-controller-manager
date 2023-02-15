@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
+	controllerconfig "github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
@@ -96,93 +96,63 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	shootAccess := &v2.ShootAccess{
-		GenericKubeconfigSecretName: "kubeconfig-secret-name",
-		TokenSecretName:             "token",
-		Namespace:                   namespaceName,
-		APIServerURL:                apiHost,
-		SSHKeySecretName:            sshSecret.Name,
-	}
-
-	defaulterConfig := &defaults.DefaulterConfig{
-		Log:               ctrl.Log.WithName("defaulting-webhook"),
+	cc, err := controllerconfig.New(&controllerconfig.NewControllerConfig{
 		SeedClient:        k8sClient,
 		SeedConfig:        cfg,
 		SeedNamespace:     namespaceName,
-		ShootNamespace:    namespaceName,
 		SeedAPIServerURL:  apiHost,
+		ShootClient:       k8sClient,
+		ShootConfig:       cfg,
+		ShootNamespace:    namespaceName,
 		ShootAPIServerURL: apiHost,
-		ShootAccess:       shootAccess,
-	}
-
-	deploymentconfig := &deployment.Config{
-		ControllerConfig: deployment.ControllerConfig{
-			Seed:             k8sClient,
-			SeedConfig:       cfg,
-			ShootNamespace:   namespaceName,
-			Metal:            metalClient,
-			Namespace:        namespaceName,
-			ShootAccess:      shootAccess,
-			Recorder:         mgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:    3 * time.Second,
-			ProgressDeadline: 10 * time.Minute,
+		ShootAccess: &v2.ShootAccess{
+			GenericKubeconfigSecretName: "kubeconfig-secret-name",
+			TokenSecretName:             "token",
+			Namespace:                   namespaceName,
+			APIServerURL:                apiHost,
+			SSHKeySecretName:            sshSecret.Name,
 		},
-		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
-	}
-	err = deploymentconfig.SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
-	err = deploymentconfig.SetupWebhookWithManager(mgr, defaulterConfig)
+		Metal:                 metalClient,
+		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
+		SafetyBackoff:         10 * time.Second,
+		ProgressDeadline:      10 * time.Minute,
+		FirewallHealthTimeout: 20 * time.Minute,
+		CreateTimeout:         10 * time.Minute,
+	})
 	Expect(err).ToNot(HaveOccurred())
 
-	setConfig := &set.Config{
-		ControllerConfig: set.ControllerConfig{
-			Seed:                  k8sClient,
-			Metal:                 metalClient,
-			Namespace:             namespaceName,
-			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			FirewallHealthTimeout: 20 * time.Minute,
-			CreateTimeout:         10 * time.Minute,
-			Recorder:              mgr.GetEventRecorderFor("firewall-set-controller"),
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("set"),
-	}
-	err = setConfig.SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
-	err = setConfig.SetupWebhookWithManager(mgr, defaulterConfig)
+	err = deployment.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("deployment"),
+		mgr.GetEventRecorderFor("firewall-deployment-controller"),
+		mgr,
+		cc,
+	)
 	Expect(err).ToNot(HaveOccurred())
 
-	firewallConfig := &firewall.Config{
-		ControllerConfig: firewall.ControllerConfig{
-			Seed:                      k8sClient,
-			Shoot:                     k8sClient,
-			Metal:                     metalClient,
-			Namespace:                 namespaceName,
-			ShootNamespace:            v2.FirewallShootNamespace,
-			ShootKubeconfigSecretName: "kubeconfig-secret-name",
-			ShootTokenSecretName:      "token",
-			SSHKeySecretName:          sshSecret.Name,
-			APIServerURL:              "http://shoot-api",
-			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
-			Recorder:                  mgr.GetEventRecorderFor("firewall-controller"),
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
-	}
-	err = firewallConfig.SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
-	err = firewallConfig.SetupWebhookWithManager(mgr, defaulterConfig)
+	err = set.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("set"),
+		mgr.GetEventRecorderFor("firewall-set-controller"),
+		mgr,
+		cc,
+	)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&monitor.Config{
-		ControllerConfig: monitor.ControllerConfig{
-			Seed:          k8sClient,
-			SeedConfig:    cfg,
-			Shoot:         k8sClient,
-			Namespace:     v2.FirewallShootNamespace,
-			SeedNamespace: namespaceName,
-			APIServerURL:  apiHost,
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
-	}).SetupWithManager(mgr)
+	err = firewall.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("firewall"),
+		mgr.GetEventRecorderFor("firewall-controller"),
+		mgr,
+		cc,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)
+	Expect(err).ToNot(HaveOccurred())
+	err = set.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)
+	Expect(err).ToNot(HaveOccurred())
+	err = firewall.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), mgr, cc)
 	Expect(err).ToNot(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

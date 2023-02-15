@@ -229,7 +229,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should create a firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 15*time.Second)
 			})
@@ -477,7 +477,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should create another firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 15*time.Second)
 			})
@@ -597,7 +597,7 @@ var _ = Context("integration test", Ordered, func() {
 					GenericKubeconfigSecretName: "kubeconfig-secret-name",
 					TokenSecretName:             "token",
 					Namespace:                   namespaceName,
-					APIServerURL:                "http://shoot-api",
+					APIServerURL:                apiHost,
 					SSHKeySecretName:            sshSecret.Name,
 				}))
 			})
@@ -746,7 +746,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should delete firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 				Expect(mon.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
@@ -775,7 +775,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should delete firewall monitor", func() {
-				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 10*time.Second)
 			})
@@ -943,7 +943,7 @@ var _ = Context("migration path", Ordered, func() {
 			})
 
 			It("should create a firewall monitor", func() {
-				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 			})

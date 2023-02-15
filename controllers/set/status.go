@@ -29,7 +29,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 			continue
 		}
 
-		if created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) < c.FirewallHealthTimeout {
+		if created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) < c.c.GetFirewallHealthTimeout() {
 			r.Target.Status.ProgressingReplicas++
 			continue
 		}

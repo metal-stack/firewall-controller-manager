@@ -14,7 +14,7 @@ import (
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
-	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
@@ -33,14 +33,14 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 			continue
 		}
 
-		err := c.Seed.Delete(r.Ctx, fw)
+		err := c.c.GetSeedClient().Delete(r.Ctx, fw)
 		if err != nil {
 			return err
 		}
 
 		r.Log.Info("set deletion timestamp on firewall", "firewall-name", fw.Name)
 
-		c.Recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s", fw.Name)
+		c.recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s", fw.Name)
 	}
 
 	if len(fws) > 0 {
@@ -62,7 +62,7 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 
 		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
 
-		if !connected && time.Since(fw.CreationTimestamp.Time) > c.CreateTimeout {
+		if !connected && time.Since(fw.CreationTimestamp.Time) > c.c.GetCreateTimeout() {
 			r.Log.Info("firewall not getting ready, deleting from set", "firewall-name", fw.Name)
 
 			err := c.deleteFirewalls(r, fw)
@@ -82,9 +82,9 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 //
 // such firewalls will be deleted in the backend.
 func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
-	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+	resp, err := c.c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationProject: r.Target.Spec.Template.Spec.Project,
-		Tags:              []string{c.ClusterTag, v2.FirewallSetTag(r.Target.Name)},
+		Tags:              []string{c.c.GetClusterTag(), v2.FirewallSetTag(r.Target.Name)},
 	}).WithContext(r.Ctx), nil)
 	if err != nil {
 		r.Log.Error(err, "unable to retrieve firewalls for orphan checking, backing off...")
@@ -96,12 +96,12 @@ func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) 
 	}
 
 	fws := &v2.FirewallList{}
-	err = c.Seed.List(r.Ctx, fws, client.InNamespace(c.Namespace))
+	err = c.c.GetSeedClient().List(r.Ctx, fws, client.InNamespace(c.c.GetSeedNamespace()))
 	if err != nil {
 		return err
 	}
 
-	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
 	})
 	if err != nil {
@@ -123,12 +123,12 @@ func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) 
 
 		r.Log.Info("found physical orphan firewall, deleting", "firewall-name", *fw.Allocation.Name, "id", *fw.ID, "non-orphans", existingNames)
 
-		_, err = c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
+		_, err = c.c.GetMetal().Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*fw.ID), nil)
 		if err != nil {
 			return fmt.Errorf("error deleting orphaned firewall: %w", err)
 		}
 
-		c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID)
+		c.recorder.Eventf(r.Target, "Normal", "Delete", "deleted orphaned firewall %s id %s", *fw.Allocation.Name, *fw.ID)
 	}
 
 	return nil
