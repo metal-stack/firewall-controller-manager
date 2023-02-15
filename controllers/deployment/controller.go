@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -27,8 +27,9 @@ type (
 	}
 	ControllerConfig struct {
 		Seed             client.Client
+		SeedConfig       *rest.Config
 		Metal            metalgo.Client
-		K8sVersion       *semver.Version
+		ShootNamespace   string
 		ShootAccess      *v2.ShootAccess
 		Namespace        string
 		Recorder         record.EventRecorder
@@ -46,11 +47,11 @@ func (c *Config) validate() error {
 	if c.Seed == nil {
 		return fmt.Errorf("seed client must be specified")
 	}
+	if c.SeedConfig == nil {
+		return fmt.Errorf("seed config must be specified")
+	}
 	if c.Metal == nil {
 		return fmt.Errorf("metal client must be specified")
-	}
-	if c.K8sVersion == nil {
-		return fmt.Errorf("k8s version must be specified")
 	}
 	if c.Namespace == "" {
 		return fmt.Errorf("namespace must be specified")
@@ -63,6 +64,9 @@ func (c *Config) validate() error {
 	}
 	if c.ProgressDeadline <= 0 {
 		return fmt.Errorf("progress deadline must be specified")
+	}
+	if c.ShootNamespace == "" {
+		return fmt.Errorf("shoot namespace must be specified")
 	}
 	if c.ShootAccess == nil {
 		return fmt.Errorf("shoot access must be specified")

@@ -7,17 +7,11 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/client-go/discovery"
-
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/zapr"
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	"github.com/metal-stack/v"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +33,7 @@ const (
 
 func main() {
 	var (
-		scheme   = runtime.NewScheme()
+		scheme   = helper.MustNewFirewallScheme()
 		metalURL string
 
 		logLevel                string
@@ -91,15 +85,11 @@ func main() {
 	}
 	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
 
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v2.AddToScheme(scheme))
-
 	var (
-		seedConfig      = ctrl.GetConfigOrDie()
-		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
-		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
-		stop            = ctrl.SetupSignalHandler()
-		shootAccess     = &v2.ShootAccess{
+		seedConfig  = ctrl.GetConfigOrDie()
+		shootConfig = seedConfig // defaults to seed, e.g. for devel purposes
+		stop        = ctrl.SetupSignalHandler()
+		shootAccess = &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
@@ -111,18 +101,6 @@ func main() {
 	mclient, err := getMetalClient(metalURL)
 	if err != nil {
 		l.Fatalw("unable to create metal client", "error", err)
-	}
-
-	version, err := discoveryClient.ServerVersion()
-	if err != nil {
-		l.Fatalw("unable to discover server version", "error", err)
-	}
-
-	l.Infow("seed kubernetes version", "version", version.String())
-
-	k8sVersion, err := semver.NewVersion(version.GitVersion)
-	if err != nil {
-		l.Fatalw("unable to parse kubernetes version version", "error", err)
 	}
 
 	seedMgr, err := ctrl.NewManager(seedConfig, ctrl.Options{
@@ -172,20 +150,23 @@ func main() {
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:              ctrl.Log.WithName("defaulting-webhook"),
-		Seed:             seedMgr.GetClient(),
-		SeedAPIServerURL: seedApiURL,
-		Namespace:        namespace,
-		K8sVersion:       k8sVersion,
-		ShootAccess:      shootAccess,
+		Log:               ctrl.Log.WithName("defaulting-webhook"),
+		SeedClient:        seedMgr.GetClient(),
+		SeedConfig:        seedConfig,
+		SeedAPIServerURL:  seedApiURL,
+		ShootAPIServerURL: shootApiURL,
+		SeedNamespace:     namespace,
+		ShootNamespace:    v2.FirewallShootNamespace,
+		ShootAccess:       shootAccess,
 	}
 
 	deploymentConfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:             seedMgr.GetClient(),
+			SeedConfig:       seedConfig,
+			ShootNamespace:   v2.FirewallShootNamespace,
 			Metal:            mclient,
 			Namespace:        namespace,
-			K8sVersion:       k8sVersion,
 			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:    safetyBackoff,
 			ProgressDeadline: progressDeadline,
@@ -256,10 +237,10 @@ func main() {
 	monitorConfig := &monitor.Config{
 		ControllerConfig: monitor.ControllerConfig{
 			Seed:          seedMgr.GetClient(),
+			SeedConfig:    seedConfig,
 			Shoot:         shootMgr.GetClient(),
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespace,
-			K8sVersion:    k8sVersion,
 			APIServerURL:  seedApiURL,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),

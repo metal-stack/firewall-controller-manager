@@ -121,10 +121,9 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 		return fmt.Errorf("unable to find out associated firewall deployment in seed: no owner ref found")
 	}
 
-	kubeconfig, err := helper.SeedAccessKubeconfig(&helper.SeedAccessConfig{
+	kubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
 		Ctx:          r.Ctx,
-		Client:       c.Seed,
-		K8sVersion:   c.K8sVersion,
+		Config:       c.SeedConfig,
 		Namespace:    c.SeedNamespace,
 		ApiServerURL: c.APIServerURL,
 		Deployment: &v2.FirewallDeployment{

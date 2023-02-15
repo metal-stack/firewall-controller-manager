@@ -2,12 +2,11 @@ package controllers_test
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/Masterminds/semver/v3"
 
 	"github.com/go-logr/zapr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -21,7 +20,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +37,10 @@ var (
 	k8sClient  client.Client
 	testEnv    *envtest.Environment
 	configPath = filepath.Join("..", "config")
+	apiHost    string
+	apiCA      string
+	apiCert    string
+	apiKey     string
 )
 
 func TestAPIs(t *testing.T) {
@@ -73,15 +75,16 @@ var _ = BeforeSuite(func() {
 	err = v2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	apiHost = cfg.Host
+	apiCert = base64.StdEncoding.EncodeToString(cfg.CertData)
+	apiKey = base64.StdEncoding.EncodeToString(cfg.KeyData)
+	apiCA = base64.StdEncoding.EncodeToString(cfg.CAData)
+
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(cfg)
-	version, err := discoveryClient.ServerVersion()
-	Expect(err).NotTo(HaveOccurred())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:             scheme.Scheme,
@@ -97,26 +100,29 @@ var _ = BeforeSuite(func() {
 		GenericKubeconfigSecretName: "kubeconfig-secret-name",
 		TokenSecretName:             "token",
 		Namespace:                   namespaceName,
-		APIServerURL:                "http://shoot-api",
+		APIServerURL:                apiHost,
 		SSHKeySecretName:            sshSecret.Name,
 	}
 
 	defaulterConfig := &defaults.DefaulterConfig{
-		Log:              ctrl.Log.WithName("defaulting-webhook"),
-		Seed:             k8sClient,
-		Namespace:        namespaceName,
-		K8sVersion:       semver.MustParse(version.String()),
-		SeedAPIServerURL: "http://seed-api",
-		ShootAccess:      shootAccess,
+		Log:               ctrl.Log.WithName("defaulting-webhook"),
+		SeedClient:        k8sClient,
+		SeedConfig:        cfg,
+		SeedNamespace:     namespaceName,
+		ShootNamespace:    namespaceName,
+		SeedAPIServerURL:  apiHost,
+		ShootAPIServerURL: apiHost,
+		ShootAccess:       shootAccess,
 	}
 
 	deploymentconfig := &deployment.Config{
 		ControllerConfig: deployment.ControllerConfig{
 			Seed:             k8sClient,
+			SeedConfig:       cfg,
+			ShootNamespace:   namespaceName,
 			Metal:            metalClient,
 			Namespace:        namespaceName,
 			ShootAccess:      shootAccess,
-			K8sVersion:       semver.MustParse(version.String()),
 			Recorder:         mgr.GetEventRecorderFor("firewall-deployment-controller"),
 			SafetyBackoff:    3 * time.Second,
 			ProgressDeadline: 10 * time.Minute,
@@ -169,11 +175,11 @@ var _ = BeforeSuite(func() {
 	err = (&monitor.Config{
 		ControllerConfig: monitor.ControllerConfig{
 			Seed:          k8sClient,
+			SeedConfig:    cfg,
 			Shoot:         k8sClient,
 			Namespace:     v2.FirewallShootNamespace,
 			SeedNamespace: namespaceName,
-			APIServerURL:  "http://shoot-api",
-			K8sVersion:    semver.MustParse(version.String()),
+			APIServerURL:  apiHost,
 		},
 		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
 	}).SetupWithManager(mgr)

@@ -4,25 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type (
 	DefaulterConfig struct {
-		Log              logr.Logger
-		Seed             client.Client
-		Namespace        string
-		K8sVersion       *semver.Version
-		SeedAPIServerURL string
-		ShootAccess      *v2.ShootAccess
+		Log               logr.Logger
+		SeedClient        client.Client
+		SeedConfig        *rest.Config
+		SeedNamespace     string
+		ShootNamespace    string
+		ShootAPIServerURL string
+		SeedAPIServerURL  string
+		ShootAccess       *v2.ShootAccess
 	}
 	firewallDefaulter struct {
 		*DefaulterConfig
@@ -38,20 +40,26 @@ type (
 )
 
 func (c *DefaulterConfig) validate() error {
-	if c.Seed == nil {
+	if c.SeedClient == nil {
 		return fmt.Errorf("seed client must be specified")
 	}
-	if c.K8sVersion == nil {
-		return fmt.Errorf("k8s version must be specified")
+	if c.SeedConfig == nil {
+		return fmt.Errorf("seed config must be specified")
 	}
-	if c.Namespace == "" {
-		return fmt.Errorf("namespace must be specified")
+	if c.SeedNamespace == "" {
+		return fmt.Errorf("seed namespace must be specified")
+	}
+	if c.ShootNamespace == "" {
+		return fmt.Errorf("shoot namespace must be specified")
 	}
 	if c.ShootAccess == nil {
 		return fmt.Errorf("shoot access must be specified")
 	}
 	if c.SeedAPIServerURL == "" {
 		return fmt.Errorf("seed api server url must be specified")
+	}
+	if c.ShootAPIServerURL == "" {
+		return fmt.Errorf("shoot api server url must be specified")
 	}
 
 	return nil
@@ -138,19 +146,39 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	defaultFirewallSpec(&f.Spec.Template.Spec)
 
 	if f.Spec.Template.Spec.Userdata == "" {
-		err := helper.EnsureFirewallControllerRBAC(ctx, r.K8sVersion, r.Seed, f, r.ShootAccess)
+		err := helper.EnsureFirewallControllerRBAC(ctx, r.SeedConfig, f, r.ShootNamespace, r.ShootAccess)
 		if err != nil {
 			return err
 		}
 
-		userdata, err := createUserdata(&helper.SeedAccessConfig{
+		_, _, shootConfig, err := helper.NewShootConfig(ctx, r.SeedClient, r.ShootAccess)
+		if err != nil {
+			return err
+		}
+
+		shootKubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
 			Ctx:          ctx,
-			Client:       r.Seed,
-			K8sVersion:   r.K8sVersion,
-			Namespace:    r.Namespace,
+			Config:       shootConfig,
+			Namespace:    r.ShootNamespace,
+			ApiServerURL: r.ShootAPIServerURL,
+			Deployment:   f,
+		})
+		if err != nil {
+			return err
+		}
+
+		seedKubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
+			Ctx:          ctx,
+			Config:       r.SeedConfig,
+			Namespace:    r.SeedNamespace,
 			ApiServerURL: r.SeedAPIServerURL,
 			Deployment:   f,
 		})
+		if err != nil {
+			return err
+		}
+
+		userdata, err := renderUserdata(shootKubeconfig, seedKubeconfig)
 		if err != nil {
 			return err
 		}
@@ -188,10 +216,10 @@ func (f *firewallDeploymentDefaulter) getSSHPublicKey(ctx context.Context) (stri
 	sshSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      f.ShootAccess.SSHKeySecretName,
-			Namespace: f.Namespace,
+			Namespace: f.SeedNamespace,
 		},
 	}
-	err := f.Seed.Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)
+	err := f.SeedClient.Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)
 	if err != nil {
 		return "", fmt.Errorf("ssh secret not found: %w", err)
 	}

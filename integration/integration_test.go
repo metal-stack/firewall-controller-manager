@@ -43,14 +43,44 @@ var (
 		},
 	}
 
-	accessSecret = &corev1.Secret{
+	genericKubeconfigSecret = func(apiCA, apiHost, apiCert, apiKey string) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kubeconfig-secret-name",
+				Namespace: namespaceName,
+			},
+			Data: map[string][]byte{
+				"kubeconfig": []byte(fmt.Sprintf(`apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: %s
+    server: %s
+  name: shoot-name
+contexts:
+- context:
+    cluster: shoot-name
+    user: shoot-name
+  name: shoot-name
+current-context: shoot-name
+kind: Config
+preferences: {}
+users:
+- name: shoot-name
+  user:
+    client-certificate-data: %s
+    client-key-data: %s
+
+`, apiCA, apiHost, apiCert, apiKey))},
+		}
+	}
+
+	shootTokenSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access-test",
+			Name:      "token",
 			Namespace: namespaceName,
 		},
 		Data: map[string][]byte{
-			"token":  []byte(`a-token`),
-			"ca.crt": []byte(`a-ca-crt`),
+			"token": []byte(`eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ`),
 		},
 	}
 
@@ -104,7 +134,8 @@ var _ = Context("integration test", Ordered, func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
@@ -806,7 +837,8 @@ var _ = Context("migration path", Ordered, func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
