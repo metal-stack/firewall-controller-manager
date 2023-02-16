@@ -124,6 +124,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			Namespace:    r.c.GetShootNamespace(),
 			ApiServerURL: r.c.GetShootAPIServerURL(),
 			Deployment:   f,
+			ForShoot:     true,
 		})
 		if err != nil {
 			return err
