@@ -86,12 +86,26 @@ users:
 
 	// we need to fake the secret as there is no kube-controller-manager in the
 	// envtest setup which can issue a long-lived token for the secret
-	fakeTokenSecret = &corev1.Secret{
+	fakeTokenSecretSeed = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-controller-seed-access-test",
 			Namespace: namespaceName,
 			Annotations: map[string]string{
 				"kubernetes.io/service-account.name": "firewall-controller-seed-access-test",
+			},
+		},
+		StringData: map[string]string{
+			"token":  "a-token",
+			"ca.crt": "ca-crt",
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+	}
+	fakeTokenSecretShoot = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-shoot-access-test",
+			Namespace: namespaceName,
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "firewall-controller-shoot-access-test",
 			},
 		},
 		StringData: map[string]string{
@@ -132,7 +146,8 @@ var _ = Context("integration test", Ordered, func() {
 
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretSeed.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretShoot.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
@@ -835,7 +850,8 @@ var _ = Context("migration path", Ordered, func() {
 
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretSeed.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretShoot.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
