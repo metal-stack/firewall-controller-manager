@@ -39,14 +39,14 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 			continue
 		}
 
-		resp, err := c.Metal.Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(r.Ctx), nil)
+		resp, err := c.c.GetMetal().Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(r.Ctx), nil)
 		if err != nil {
 			return fmt.Errorf("firewall delete error: %w", err)
 		}
 
 		r.Log.Info("deleted firewall", "firewall-name", f.Name, "id", *resp.Payload.ID)
 
-		c.Recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
+		c.recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
 	}
 
 	return nil
@@ -56,11 +56,11 @@ func (c *controller) deleteFirewallMonitor(ctx context.Context, fw *v2.Firewall)
 	mon := &v2.FirewallMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fw.Name,
-			Namespace: c.ShootNamespace,
+			Namespace: c.c.GetShootNamespace(),
 		},
 	}
 
-	err := c.Shoot.Delete(ctx, mon)
+	err := c.c.GetShootClient().Delete(ctx, mon)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}

@@ -16,22 +16,6 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	}
 
 	if newSetRequired {
-		if r.Target.IsFirewallUserdataCompatibilityAnnotationPresent() {
-			compatible, err := r.Target.IsUserdataCompatibleWithFirewallController()
-			if err != nil {
-				cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Not creating firewall set because userdata may be incompatible with specified controller version %q: %s.", r.Target.Spec.Template.Spec.ControllerVersion, err.Error()))
-				r.Target.Status.Conditions.Set(cond)
-
-				return fmt.Errorf("not creating firewall set because unable to decide if userdata is incompatible with controller version %q: %w", r.Target.Spec.Template.Spec.ControllerVersion, err)
-			}
-			if !compatible {
-				cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Not creating firewall set because userdata is incompatible with specified controller version %q.", r.Target.Spec.Template.Spec.ControllerVersion))
-				r.Target.Status.Conditions.Set(cond)
-
-				return fmt.Errorf("not creating firewall set because userdata is incompatible with specified controller version %q.", r.Target.Spec.Template.Spec.ControllerVersion)
-			}
-		}
-
 		r.Log.Info("significant changes detected in the spec, creating new firewall set")
 
 		newSet, err := c.createNextFirewallSet(r, current)
@@ -39,7 +23,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 			return err
 		}
 
-		c.Recorder.Eventf(newSet, "Normal", "Create", "created firewallset %s", newSet.Name)
+		c.recorder.Eventf(newSet, "Normal", "Create", "created firewallset %s", newSet.Name)
 
 		ownedSets = append(ownedSets, newSet)
 
@@ -54,7 +38,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	if current.Status.ReadyReplicas != current.Spec.Replicas {
 		r.Log.Info("set replicas are not yet ready")
 
-		if time.Since(current.CreationTimestamp.Time) > c.ProgressDeadline {
+		if time.Since(current.CreationTimestamp.Time) > c.c.GetProgressDeadline() {
 			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", current.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}

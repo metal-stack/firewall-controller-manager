@@ -9,7 +9,7 @@ import (
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
-	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.Seed, nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
 	if err != nil {
@@ -28,14 +28,14 @@ func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeploymen
 			continue
 		}
 
-		err := c.Seed.Delete(r.Ctx, set)
+		err := c.c.GetSeedClient().Delete(r.Ctx, set)
 		if err != nil {
 			return err
 		}
 
 		r.Log.Info("set deletion timestamp on firewall set", "set-name", set.Name)
 
-		c.Recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
+		c.recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
 	}
 
 	if len(sets) > 0 {

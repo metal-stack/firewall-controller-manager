@@ -43,25 +43,69 @@ var (
 		},
 	}
 
-	accessSecret = &corev1.Secret{
+	genericKubeconfigSecret = func(apiCA, apiHost, apiCert, apiKey string) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kubeconfig-secret-name",
+				Namespace: namespaceName,
+			},
+			Data: map[string][]byte{
+				"kubeconfig": []byte(fmt.Sprintf(`apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: %s
+    server: %s
+  name: shoot-name
+contexts:
+- context:
+    cluster: shoot-name
+    user: shoot-name
+  name: shoot-name
+current-context: shoot-name
+kind: Config
+preferences: {}
+users:
+- name: shoot-name
+  user:
+    client-certificate-data: %s
+    client-key-data: %s
+
+`, apiCA, apiHost, apiCert, apiKey))},
+		}
+	}
+
+	shootTokenSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access-test",
+			Name:      "token",
 			Namespace: namespaceName,
 		},
 		Data: map[string][]byte{
-			"token":  []byte(`a-token`),
-			"ca.crt": []byte(`a-ca-crt`),
+			"token": []byte(`eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ`),
 		},
 	}
 
 	// we need to fake the secret as there is no kube-controller-manager in the
 	// envtest setup which can issue a long-lived token for the secret
-	fakeTokenSecret = &corev1.Secret{
+	fakeTokenSecretSeed = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-controller-seed-access-test",
 			Namespace: namespaceName,
 			Annotations: map[string]string{
 				"kubernetes.io/service-account.name": "firewall-controller-seed-access-test",
+			},
+		},
+		StringData: map[string]string{
+			"token":  "a-token",
+			"ca.crt": "ca-crt",
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+	}
+	fakeTokenSecretShoot = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "firewall-controller-shoot-access-test",
+			Namespace: namespaceName,
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "firewall-controller-shoot-access-test",
 			},
 		},
 		StringData: map[string]string{
@@ -102,9 +146,11 @@ var _ = Context("integration test", Ordered, func() {
 
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretSeed.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretShoot.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
@@ -198,7 +244,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should create a firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 15*time.Second)
 			})
@@ -446,7 +492,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should create another firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 2, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 15*time.Second)
 			})
@@ -566,7 +612,7 @@ var _ = Context("integration test", Ordered, func() {
 					GenericKubeconfigSecretName: "kubeconfig-secret-name",
 					TokenSecretName:             "token",
 					Namespace:                   namespaceName,
-					APIServerURL:                "http://shoot-api",
+					APIServerURL:                apiHost,
 					SSHKeySecretName:            sshSecret.Name,
 				}))
 			})
@@ -715,7 +761,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should delete firewall monitor", func() {
-				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 				Expect(mon.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
@@ -744,7 +790,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should delete firewall monitor", func() {
-				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 10*time.Second)
 			})
@@ -804,9 +850,11 @@ var _ = Context("migration path", Ordered, func() {
 
 	BeforeAll(func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, namespace.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretSeed.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fakeTokenSecretShoot.DeepCopy()))).To(Succeed())
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, sshSecret.DeepCopy()))).To(Succeed())
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, accessSecret.DeepCopy()))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, genericKubeconfigSecret(apiCA, apiHost, apiCert, apiKey)))).To(Succeed())
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
@@ -911,7 +959,7 @@ var _ = Context("migration path", Ordered, func() {
 			})
 
 			It("should create a firewall monitor", func() {
-				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, v2.FirewallShootNamespace, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+				_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 					return l.GetItems()
 				}, 5*time.Second)
 			})

@@ -9,10 +9,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/cache"
@@ -20,82 +20,22 @@ import (
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
-
-	metalgo "github.com/metal-stack/metal-go"
 )
 
-type (
-	Config struct {
-		Log logr.Logger
-		ControllerConfig
-	}
-	ControllerConfig struct {
-		Seed                      client.Client
-		Shoot                     client.Client
-		Metal                     metalgo.Client
-		Namespace                 string
-		ShootNamespace            string
-		ClusterTag                string
-		APIServerURL              string
-		ShootKubeconfigSecretName string
-		ShootTokenSecretName      string
-		SSHKeySecretName          string
-		Recorder                  record.EventRecorder
-	}
-
-	controller struct {
-		*ControllerConfig
-		networkCache *cache.Cache[*models.V1NetworkResponse]
-	}
-)
-
-func (c *Config) validate() error {
-	if c.Seed == nil {
-		return fmt.Errorf("seed client must be specified")
-	}
-	if c.Shoot == nil {
-		return fmt.Errorf("shoot client must be specified")
-	}
-	if c.Metal == nil {
-		return fmt.Errorf("metal client must be specified")
-	}
-	if c.Namespace == "" {
-		return fmt.Errorf("namespace must be specified")
-	}
-	if c.APIServerURL == "" {
-		return fmt.Errorf("api server url must be specified")
-	}
-	if c.ShootNamespace == "" {
-		return fmt.Errorf("shoot namespace must be specified")
-	}
-	if c.ClusterTag == "" {
-		return fmt.Errorf("cluster tag must be specified")
-	}
-	if c.Recorder == nil {
-		return fmt.Errorf("recorder must be specified")
-	}
-	if c.ShootKubeconfigSecretName == "" {
-		return fmt.Errorf("shoot kubeconfig secret must be specified")
-	}
-	if c.ShootTokenSecretName == "" {
-		return fmt.Errorf("shoot token secret name must be specified")
-	}
-	if c.SSHKeySecretName == "" {
-		return fmt.Errorf("shoot ssh key secret name must be specified")
-	}
-
-	return nil
+type controller struct {
+	c            *config.ControllerConfig
+	log          logr.Logger
+	recorder     record.EventRecorder
+	networkCache *cache.Cache[*models.V1NetworkResponse]
 }
 
-func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
-	if err := c.validate(); err != nil {
-		return err
-	}
-
-	g := controllers.NewGenericController[*v2.Firewall](c.Log, c.Seed, c.Namespace, &controller{
-		ControllerConfig: &c.ControllerConfig,
+func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
+	g := controllers.NewGenericController[*v2.Firewall](log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
+		log:      log,
+		recorder: recorder,
+		c:        c,
 		networkCache: cache.New(5*time.Minute, func(ctx context.Context, key any) (*models.V1NetworkResponse, error) {
-			resp, err := c.Metal.Network().FindNetwork(network.NewFindNetworkParams().WithID(key.(string)).WithContext(ctx), nil)
+			resp, err := c.GetMetal().Network().FindNetwork(network.NewFindNetworkParams().WithID(key.(string)).WithContext(ctx), nil)
 			if err != nil {
 				return nil, fmt.Errorf("network find error: %w", err)
 			}
@@ -107,16 +47,12 @@ func (c *Config) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v2.Firewall{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
 		// don't think about owning the firewall monitor here, it's in the shoot cluster, we cannot watch two clusters with controller-runtime
 		Named("Firewall").
-		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.Namespace))).
+		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
 		Complete(g)
 }
 
-func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager, dc *defaults.DefaulterConfig) error {
-	if err := c.validate(); err != nil {
-		return err
-	}
-
-	defaulter, err := defaults.NewFirewallDefaulter(dc)
+func SetupWebhookWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerConfig) error {
+	defaulter, err := defaults.NewFirewallDefaulter(log, c)
 	if err != nil {
 		return err
 	}
@@ -124,7 +60,7 @@ func (c *Config) SetupWebhookWithManager(mgr ctrl.Manager, dc *defaults.Defaulte
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&v2.Firewall{}).
 		WithDefaulter(defaulter).
-		WithValidator(validation.NewFirewallValidator(c.Log.WithName("validating-webhook"))).
+		WithValidator(validation.NewFirewallValidator(log.WithName("validating-webhook"))).
 		Complete()
 }
 
@@ -137,10 +73,10 @@ func (c *controller) SetStatus(reconciled *v2.Firewall, refetched *v2.Firewall) 
 }
 
 func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
-	resp, err := c.Metal.Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+	resp, err := c.c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 		AllocationName:    fw.Name,
 		AllocationProject: fw.Spec.Project,
-		Tags:              []string{c.ClusterTag},
+		Tags:              []string{c.c.GetClusterTag()},
 	}).WithContext(ctx), nil)
 	if err != nil {
 		return nil, fmt.Errorf("firewall find error: %w", err)

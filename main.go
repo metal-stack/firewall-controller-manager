@@ -1,30 +1,25 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
-	"k8s.io/client-go/discovery"
-
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/zapr"
+
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	"github.com/metal-stack/v"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/deployment"
@@ -39,7 +34,7 @@ const (
 
 func main() {
 	var (
-		scheme   = runtime.NewScheme()
+		scheme   = helper.MustNewFirewallScheme()
 		metalURL string
 
 		logLevel                string
@@ -91,15 +86,10 @@ func main() {
 	}
 	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
 
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v2.AddToScheme(scheme))
-
 	var (
-		seedConfig      = ctrl.GetConfigOrDie()
-		shootConfig     = seedConfig // defaults to seed, e.g. for devel purposes
-		discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(seedConfig)
-		stop            = ctrl.SetupSignalHandler()
-		shootAccess     = &v2.ShootAccess{
+		stop        = ctrl.SetupSignalHandler()
+		expiresAt   *time.Time
+		shootAccess = &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
@@ -113,19 +103,7 @@ func main() {
 		l.Fatalw("unable to create metal client", "error", err)
 	}
 
-	version, err := discoveryClient.ServerVersion()
-	if err != nil {
-		l.Fatalw("unable to discover server version", "error", err)
-	}
-
-	l.Infow("seed kubernetes version", "version", version.String())
-
-	k8sVersion, err := semver.NewVersion(version.GitVersion)
-	if err != nil {
-		l.Fatalw("unable to parse kubernetes version version", "error", err)
-	}
-
-	seedMgr, err := ctrl.NewManager(seedConfig, ctrl.Options{
+	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
 		Port:                    9443,
@@ -137,86 +115,21 @@ func main() {
 		CertDir:                 certDir,
 	})
 	if err != nil {
-		l.Fatalw("unable to start firewall-controller-manager", "error", err)
+		l.Fatalw("unable to setup firewall-controller-manager", "error", err)
 	}
 
-	if shootKubeconfigSecret == "" && shootTokenSecret == "" {
-		l.Infow("no shoot kubeconfig configured, running in single-cluster mode (dev mode)")
-
-		shootKubeconfigSecret = "dev-mode"
-		shootTokenSecret = "dev-mode"
-		sshKeySecret = "dev-mode"
-	} else {
-		l.Infow("shoot kubeconfig configured, running in split-cluster mode (seed/shoot)")
-
-		// cannot use seedMgr.GetClient() because it gets initialized at a later point in time
-		// we have to create an own client
-		client, err := controllerclient.New(seedConfig, controllerclient.Options{
-			Scheme: scheme,
-		})
-		if err != nil {
-			l.Fatalw("unable to create seed client", "error", err)
-		}
-
-		var expiresAt *time.Time
-
-		expiresAt, _, shootConfig, err = helper.NewShootConfig(context.Background(), client, shootAccess)
-		if err != nil {
-			l.Fatalw("unable to create shoot client", "error", err)
-		}
-
-		// as we are creating the client without projected token mount and tokenfile,
-		// we need to regularly check for token expiration and restart the controller if necessary
-		// in order to recreate the shoot client.
-		helper.ShutdownOnTokenExpiration(ctrl.Log.WithName("token-expiration"), expiresAt, stop)
+	// cannot use seedMgr.GetClient() because it gets initialized at a later point in time
+	// we have to create an own client
+	seedClient, err := controllerclient.New(seedMgr.GetConfig(), controllerclient.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		l.Fatalw("unable to create seed client", "error", err)
 	}
 
-	defaulterConfig := &defaults.DefaulterConfig{
-		Log:              ctrl.Log.WithName("defaulting-webhook"),
-		Seed:             seedMgr.GetClient(),
-		SeedAPIServerURL: seedApiURL,
-		Namespace:        namespace,
-		K8sVersion:       k8sVersion,
-		ShootAccess:      shootAccess,
-	}
-
-	deploymentConfig := &deployment.Config{
-		ControllerConfig: deployment.ControllerConfig{
-			Seed:             seedMgr.GetClient(),
-			Metal:            mclient,
-			Namespace:        namespace,
-			K8sVersion:       k8sVersion,
-			Recorder:         seedMgr.GetEventRecorderFor("firewall-deployment-controller"),
-			SafetyBackoff:    safetyBackoff,
-			ProgressDeadline: progressDeadline,
-			ShootAccess:      shootAccess,
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("deployment"),
-	}
-	if err := deploymentConfig.SetupWithManager(seedMgr); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "deployment")
-	}
-	if err := deploymentConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
-		l.Fatalw("unable to setup webhook", "error", err, "controller", "deployment")
-	}
-
-	setConfig := &set.Config{
-		ControllerConfig: set.ControllerConfig{
-			Seed:                  seedMgr.GetClient(),
-			Metal:                 mclient,
-			Namespace:             namespace,
-			ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			FirewallHealthTimeout: firewallHealthTimeout,
-			CreateTimeout:         createTimeout,
-			Recorder:              seedMgr.GetEventRecorderFor("firewall-set-controller"),
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("set"),
-	}
-	if err := setConfig.SetupWithManager(seedMgr); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "set")
-	}
-	if err := setConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
-		l.Fatalw("unable to setup webhook", "error", err, "controller", "set")
+	expiresAt, _, shootConfig, err := helper.NewShootConfig(stop, seedClient, shootAccess)
+	if err != nil {
+		l.Fatalw("unable to create shoot client", "error", err)
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
@@ -230,43 +143,54 @@ func main() {
 		l.Fatalw("unable to start firewall-controller-manager-monitor", "error", err)
 	}
 
-	firewallConfig := &firewall.Config{
-		ControllerConfig: firewall.ControllerConfig{
-			Seed:                      seedMgr.GetClient(),
-			Shoot:                     shootMgr.GetClient(),
-			Metal:                     mclient,
-			Namespace:                 namespace,
-			ShootNamespace:            v2.FirewallShootNamespace,
-			ClusterTag:                fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
-			Recorder:                  seedMgr.GetEventRecorderFor("firewall-controller"),
-			APIServerURL:              shootApiURL,
-			ShootKubeconfigSecretName: shootKubeconfigSecret,
-			ShootTokenSecretName:      shootTokenSecret,
-			SSHKeySecretName:          sshKeySecret,
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("firewall"),
+	cc, err := config.New(&config.NewControllerConfig{
+		SeedClient:            seedMgr.GetClient(),
+		SeedConfig:            seedMgr.GetConfig(),
+		SeedNamespace:         namespace,
+		SeedAPIServerURL:      seedApiURL,
+		ShootClient:           shootMgr.GetClient(),
+		ShootConfig:           shootMgr.GetConfig(),
+		ShootNamespace:        v2.FirewallShootNamespace,
+		ShootAPIServerURL:     shootApiURL,
+		ShootAccess:           shootAccess,
+		Metal:                 mclient,
+		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		SafetyBackoff:         safetyBackoff,
+		ProgressDeadline:      progressDeadline,
+		FirewallHealthTimeout: firewallHealthTimeout,
+		CreateTimeout:         createTimeout,
+	})
+	if err != nil {
+		l.Fatalw("unable to create controller config", "error", err)
 	}
-	if err := firewallConfig.SetupWithManager(seedMgr); err != nil {
+
+	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorderFor("firewall-deployment-controller"), seedMgr, cc); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "deployment")
+	}
+	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorderFor("firewall-set-controller"), seedMgr, cc); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "set")
+	}
+	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorderFor("firewall-controller"), seedMgr, cc); err != nil {
 		l.Fatalw("unable to setup controller", "error", err, "controller", "firewall")
 	}
-	if err := firewallConfig.SetupWebhookWithManager(seedMgr, defaulterConfig); err != nil {
+	if err := monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), shootMgr, cc); err != nil {
+		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
+	}
+
+	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
+		l.Fatalw("unable to setup webhook", "error", err, "controller", "deployment")
+	}
+	if err := set.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
+		l.Fatalw("unable to setup webhook", "error", err, "controller", "set")
+	}
+	if err := firewall.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
 		l.Fatalw("unable to setup webhook", "error", err, "controller", "firewall")
 	}
 
-	monitorConfig := &monitor.Config{
-		ControllerConfig: monitor.ControllerConfig{
-			Seed:          seedMgr.GetClient(),
-			Shoot:         shootMgr.GetClient(),
-			Namespace:     v2.FirewallShootNamespace,
-			SeedNamespace: namespace,
-			K8sVersion:    k8sVersion,
-			APIServerURL:  seedApiURL,
-		},
-		Log: ctrl.Log.WithName("controllers").WithName("firewall-monitor"),
-	}
-	if err := monitorConfig.SetupWithManager(shootMgr); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
-	}
+	// as we are creating the client without projected token mount and tokenfile,
+	// we need to regularly check for token expiration and restart the controller if necessary
+	// in order to recreate the shoot client.
+	helper.ShutdownOnTokenExpiration(ctrl.Log.WithName("token-expiration"), expiresAt, stop)
 
 	go func() {
 		l.Infow("starting shoot controller", "version", v.V)

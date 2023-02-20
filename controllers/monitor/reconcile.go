@@ -44,10 +44,10 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
-			Namespace: c.SeedNamespace,
+			Namespace: c.c.GetSeedNamespace(),
 		},
 	}
-	err := c.Seed.Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
+	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 	if err != nil {
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
@@ -78,7 +78,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		}
 	}
 
-	err = c.Seed.Status().Update(r.Ctx, fw)
+	err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update firewall status: %w", err)
 	}
@@ -99,19 +99,19 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 	migrationSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      v2.FirewallControllerMigrationSecretName,
-			Namespace: c.Namespace,
+			Namespace: c.c.GetShootNamespace(),
 		},
 	}
 
 	isOldController := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Reason == "NotChecking" && r.Target.ControllerStatus == nil
 	if !isOldController {
 		// firewall-controller is already running with version v2.x or later, not offering migration secret
-		return client.IgnoreNotFound(c.Shoot.Delete(r.Ctx, migrationSecret))
+		return client.IgnoreNotFound(c.c.GetShootClient().Delete(r.Ctx, migrationSecret))
 	}
 
 	r.Log.Info("firewall-controller seems to be running with v1.x, offering migration secret")
 
-	set, err := findCorrespondingSet(r.Ctx, c.Seed, fw)
+	set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
 	if err != nil {
 		return err
 	}
@@ -121,16 +121,15 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 		return fmt.Errorf("unable to find out associated firewall deployment in seed: no owner ref found")
 	}
 
-	kubeconfig, err := helper.SeedAccessKubeconfig(&helper.SeedAccessConfig{
+	kubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
 		Ctx:          r.Ctx,
-		Client:       c.Seed,
-		K8sVersion:   c.K8sVersion,
-		Namespace:    c.SeedNamespace,
-		ApiServerURL: c.APIServerURL,
+		Config:       c.c.GetSeedConfig(),
+		Namespace:    c.c.GetSeedNamespace(),
+		ApiServerURL: c.c.GetSeedAPIServerURL(),
 		Deployment: &v2.FirewallDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ref.Name,
-				Namespace: c.SeedNamespace,
+				Namespace: c.c.GetSeedNamespace(),
 			},
 		},
 	})
@@ -138,7 +137,7 @@ func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*
 		return fmt.Errorf("error creating kubeconfig for firewall-controller migration secret: %w", err)
 	}
 
-	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, migrationSecret, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), migrationSecret, func() error {
 		migrationSecret.Data = map[string][]byte{
 			"kubeconfig": kubeconfig,
 		}
@@ -161,7 +160,7 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 
 	delete(r.Target.Annotations, v2.RollSetAnnotation)
 
-	err := c.Shoot.Update(r.Ctx, r.Target)
+	err := c.c.GetShootClient().Update(r.Ctx, r.Target)
 	if err != nil {
 		return err
 	}
@@ -180,18 +179,18 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 		fw := &v2.Firewall{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.Target.Name,
-				Namespace: c.SeedNamespace,
+				Namespace: c.c.GetSeedNamespace(),
 			},
 		}
 
-		set, err := findCorrespondingSet(r.Ctx, c.Seed, fw)
+		set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
 		if err != nil {
 			return client.IgnoreNotFound(err)
 		}
 
 		set.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
 
-		err = c.Seed.Update(r.Ctx, set)
+		err = c.c.GetSeedClient().Update(r.Ctx, set)
 		if err != nil {
 			return fmt.Errorf("unable to annotate firewall set: %w", err)
 		}

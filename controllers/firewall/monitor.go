@@ -33,10 +33,10 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: c.ShootNamespace,
+			Name: c.c.GetShootNamespace(),
 		},
 	}
-	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, ns, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), ns, func() error {
 		return nil
 	})
 	if err != nil {
@@ -46,11 +46,11 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 	mon := &v2.FirewallMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
-			Namespace: c.ShootNamespace,
+			Namespace: c.c.GetShootNamespace(),
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.Shoot, mon, func() error {
+	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), mon, func() error {
 		mon.Size = r.Target.Spec.Size
 		mon.Image = r.Target.Spec.Image
 		mon.Partition = r.Target.Spec.Partition
