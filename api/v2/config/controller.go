@@ -33,26 +33,6 @@ type NewControllerConfig struct {
 }
 
 type ControllerConfig struct {
-	SeedClient       client.Client
-	SeedConfig       *rest.Config
-	SeedNamespace    string
-	SeedAPIServerURL string
-
-	ShootClient       client.Client
-	ShootConfig       *rest.Config
-	ShootNamespace    string
-	ShootAPIServerURL string
-
-	ShootAccess *v2.ShootAccess
-
-	Metal      metalgo.Client
-	ClusterTag string
-
-	SafetyBackoff         time.Duration
-	ProgressDeadline      time.Duration
-	FirewallHealthTimeout time.Duration
-	CreateTimeout         time.Duration
-
 	seedClient       client.Client
 	seedConfig       *rest.Config
 	seedNamespace    string

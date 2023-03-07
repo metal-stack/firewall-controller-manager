@@ -53,6 +53,7 @@ type FirewallSpec struct {
 	Project string `json:"project"`
 	// Networks are the networks to which this firewall is connected.
 	// An update on this field requires the recreation of the physical firewall and can therefore lead to traffic interruption for the cluster.
+	// Detailed information about the networks are fetched continuously during runtime and stored in the status.firewallNetworks.
 	Networks []string `json:"networks"`
 
 	// Userdata contains the userdata used for the creation of the firewall.
@@ -74,7 +75,7 @@ type FirewallSpec struct {
 	Interval string `json:"interval,omitempty"`
 	// DryRun if set to true, firewall rules are not applied. For devel-purposes only.
 	DryRun bool `json:"dryRun,omitempty"`
-	// TrafficControl defines where to store the generated ipv4 firewall rules on disk.
+	// Ipv4RuleFile defines where to store the generated ipv4 firewall rules on disk.
 	Ipv4RuleFile string `json:"ipv4RuleFile,omitempty"`
 	// ControllerVersion holds the firewall-controller version to reconcile.
 	ControllerVersion string `json:"controllerVersion,omitempty"`
@@ -118,9 +119,12 @@ type FirewallStatus struct {
 	// MachineStatus holds the status of the firewall machine containing information from the metal-stack api.
 	MachineStatus *MachineStatus `json:"machineStatus,omitempty"`
 	// ControllerStatus holds the a brief version of the firewall-controller reconciling this firewall.
+	// The firewall-controller itself has only read-access to resources in the seed, including the firewall status
+	// inside the firewall resource. This will be updated by the firewall monitor controller.
 	ControllerStatus *ControllerConnection `json:"controllerStatus,omitempty"`
 	// FirewallNetworks holds refined information about the networks that this firewall is connected to.
 	// The information is used by the firewall-controller in order to reconcile this firewall.
+	// See .spec.networks.
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`

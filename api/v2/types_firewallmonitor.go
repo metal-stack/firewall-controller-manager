@@ -19,6 +19,9 @@ const (
 // +kubebuilder:printcolumn:name="Size",type="string",JSONPath=".size"
 // +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".machineStatus.lastEvent.event"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".machineStatus.allocationTimestamp"
+//
+// FirewallMonitor is typically deployed into the shoot cluster in comparison to the other resources of this controller
+// which are deployed into the seed cluster's shoot namespace.
 type FirewallMonitor struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -87,8 +90,6 @@ type DeviceStatsByDevice map[string]DeviceStat
 type DeviceStat struct {
 	InBytes  uint64 `json:"in"`
 	OutBytes uint64 `json:"out"`
-	// Deprecated: TotalBytes is kept for backwards compatibility
-	TotalBytes uint64 `json:"total"`
 }
 
 type IDSStatsByDevice map[string]InterfaceStat

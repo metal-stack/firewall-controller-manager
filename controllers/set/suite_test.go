@@ -33,6 +33,7 @@ const (
 )
 
 var (
+	testingT   *testing.T
 	ctx        context.Context
 	cancel     context.CancelFunc
 	k8sClient  client.Client
@@ -41,6 +42,7 @@ var (
 )
 
 func TestAPIs(t *testing.T) {
+	testingT = t
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
@@ -88,7 +90,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	_, metalClient := metalclient.NewMetalMockClient(&metalclient.MetalMockFns{
+	_, metalClient := metalclient.NewMetalMockClient(testingT, &metalclient.MetalMockFns{
 		Firewall: func(m *mock.Mock) {
 			// muting the orphan controller
 			m.On("FindFirewalls", mock.Anything, mock.Anything).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}, nil)
