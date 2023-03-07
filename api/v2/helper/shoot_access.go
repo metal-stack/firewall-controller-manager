@@ -21,6 +21,14 @@ import (
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
+// NewShootConfig creates a new rest config for accessing the shoot cluster.
+//
+// it reads the generic kubeconfig and a token secret as provisioned by the Gardener and puts the token
+// into the kubeconfig. because of this, this kubeconfig will expire when the token in the tokenfile expires
+// and it will not be dynamically refreshed. the ShutdownOnTokenExpiration function in this package can be
+// used to shut down the application as soon as the token expires.
+//
+// TODO: there is probably a better approach of handling this in general.
 func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*time.Time, []byte, *rest.Config, error) {
 	if access == nil {
 		return nil, nil, nil, fmt.Errorf("shoot access is nil")
