@@ -317,7 +317,7 @@ var (
 // we are sharing a client for the tests, so we need to make sure we do not run contradicting tests in parallel
 // we can swap the client with this function
 func swapMetalClient(mockFns *metalclient.MetalMockFns) {
-	newClient, _ := metalclient.NewMetalMockClient(mockFns)
+	newClient, _ := metalclient.NewMetalMockClient(testingT, mockFns)
 
 	if metalClient == nil {
 		metalClient = newClient

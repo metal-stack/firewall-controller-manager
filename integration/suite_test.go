@@ -41,9 +41,12 @@ var (
 	apiCA      string
 	apiCert    string
 	apiKey     string
+	testingT   *testing.T
 )
 
 func TestAPIs(t *testing.T) {
+	testingT = t
+
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")

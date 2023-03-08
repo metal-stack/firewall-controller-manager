@@ -154,10 +154,10 @@ var _ = Context("integration test", Ordered, func() {
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
-					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
+					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
 
 					// we need to filter the orphan controller as it would delete the firewall
-					call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+					call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 					call.Run(func(args mock.Arguments) {
 						resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 						params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -171,11 +171,11 @@ var _ = Context("integration test", Ordered, func() {
 					})
 				},
 				Network: func(m *mock.Mock) {
-					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 				},
 				Machine: func(m *mock.Mock) {
-					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
-					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
+					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 				},
 			})
 			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, deployment.DeepCopy()))).To(Succeed())
@@ -188,10 +188,10 @@ var _ = Context("integration test", Ordered, func() {
 	Describe("the good case", Ordered, func() {
 		swapMetalClient(&metalclient.MetalMockFns{
 			Firewall: func(m *mock.Mock) {
-				m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
+				m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
 
 				// we need to filter the orphan controller as it would delete the firewall
-				call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+				call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 				call.Run(func(args mock.Arguments) {
 					resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 					params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -205,10 +205,10 @@ var _ = Context("integration test", Ordered, func() {
 				})
 			},
 			Network: func(m *mock.Mock) {
-				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 			},
 			Machine: func(m *mock.Mock) {
-				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 			},
 		})
 
@@ -447,10 +447,10 @@ var _ = Context("integration test", Ordered, func() {
 
 				swapMetalClient(&metalclient.MetalMockFns{
 					Firewall: func(m *mock.Mock) {
-						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: installingFirewall}, nil)
+						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: installingFirewall}, nil).Maybe()
 
 						// we need to filter the orphan controller as it would delete the firewall
-						call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+						call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 						call.Run(func(args mock.Arguments) {
 							resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 							params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -464,11 +464,10 @@ var _ = Context("integration test", Ordered, func() {
 						})
 					},
 					Network: func(m *mock.Mock) {
-						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 					},
-
 					Machine: func(m *mock.Mock) {
-						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 					},
 				})
 
@@ -713,12 +712,12 @@ var _ = Context("integration test", Ordered, func() {
 			It("should allow an update of the firewall monitor", func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Machine: func(m *mock.Mock) {
-						m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
-						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+						m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
+						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 					},
 					Firewall: func(m *mock.Mock) {
 						// we need to filter the orphan controller as it would delete the firewall
-						call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+						call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 						call.Run(func(args mock.Arguments) {
 							resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 							params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -732,7 +731,7 @@ var _ = Context("integration test", Ordered, func() {
 						})
 					},
 					Network: func(m *mock.Mock) {
-						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 					},
 				})
 
@@ -858,10 +857,8 @@ var _ = Context("migration path", Ordered, func() {
 		DeferCleanup(func() {
 			swapMetalClient(&metalclient.MetalMockFns{
 				Firewall: func(m *mock.Mock) {
-					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil)
-
 					// we need to filter the orphan controller as it would delete the firewall
-					call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+					call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 					call.Run(func(args mock.Arguments) {
 						resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 						params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -875,11 +872,11 @@ var _ = Context("migration path", Ordered, func() {
 					})
 				},
 				Network: func(m *mock.Mock) {
-					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 				},
 				Machine: func(m *mock.Mock) {
-					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil)
-					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
+					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 				},
 			})
 			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, deployment.DeepCopy()))).To(Succeed())
@@ -893,7 +890,7 @@ var _ = Context("migration path", Ordered, func() {
 		swapMetalClient(&metalclient.MetalMockFns{
 			Firewall: func(m *mock.Mock) {
 				// we need to filter the orphan controller as it would delete the firewall
-				call := m.On("FindFirewalls", mock.Anything, mock.Anything)
+				call := m.On("FindFirewalls", mock.Anything, mock.Anything).Maybe()
 				call.Run(func(args mock.Arguments) {
 					resp := &metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}
 					params, ok := args.Get(0).(*firewall.FindFirewallsParams)
@@ -907,10 +904,10 @@ var _ = Context("migration path", Ordered, func() {
 				})
 			},
 			Network: func(m *mock.Mock) {
-				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil)
+				m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 			},
 			Machine: func(m *mock.Mock) {
-				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil)
+				m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 			},
 		})
 
