@@ -77,10 +77,17 @@ type FirewallSpec struct {
 	DryRun bool `json:"dryRun,omitempty"`
 	// Ipv4RuleFile defines where to store the generated ipv4 firewall rules on disk.
 	Ipv4RuleFile string `json:"ipv4RuleFile,omitempty"`
+
 	// ControllerVersion holds the firewall-controller version to reconcile.
 	ControllerVersion string `json:"controllerVersion,omitempty"`
-	// ControllerURL points to the downloadable binary artifact of the firewall controller
+	// ControllerURL points to the downloadable binary artifact of the firewall controller.
 	ControllerURL string `json:"controllerURL,omitempty"`
+
+	// NftablesExporterVersion holds the nftables exporter version to reconcile.
+	NftablesExporterVersion string `json:"nftablesExporterVersion,omitempty"`
+	// NftablesExporterURL points to the downloadable binary artifact of the nftables exporter.
+	NftablesExporterURL string `json:"nftablesExporterURL,omitempty"`
+
 	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
 	// DNSServerAddress specifies DNS server address used by DNS proxy

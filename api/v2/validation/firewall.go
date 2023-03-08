@@ -32,6 +32,8 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 	r := requiredFields{
 		{path: fldPath.Child("controllerURL"), value: f.ControllerURL},
 		{path: fldPath.Child("controllerVersion"), value: f.ControllerVersion},
+		{path: fldPath.Child("nftablesExporterURL"), value: f.NftablesExporterURL},
+		{path: fldPath.Child("nftablesExporterVersion"), value: f.NftablesExporterVersion},
 		{path: fldPath.Child("image"), value: f.Image},
 		{path: fldPath.Child("partition"), value: f.Partition},
 		{path: fldPath.Child("project"), value: f.Project},
@@ -53,6 +55,11 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 	_, err = url.ParseRequestURI(f.ControllerURL)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("controllerURL"), f.ControllerURL, "url must be parsable http url"))
+	}
+
+	_, err = url.ParseRequestURI(f.NftablesExporterURL)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("nftablesExporterURL"), f.NftablesExporterURL, "url must be parsable http url"))
 	}
 
 	for _, rule := range f.EgressRules {
