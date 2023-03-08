@@ -22,7 +22,8 @@ type NewControllerConfig struct {
 	ShootNamespace    string
 	ShootAPIServerURL string
 
-	ShootAccess *v2.ShootAccess
+	ShootAccess       *v2.ShootAccess
+	ShootAccessHelper *helper.ShootAccessHelper
 
 	Metal      metalgo.Client
 	ClusterTag string
@@ -64,6 +65,11 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		return nil, err
 	}
 
+	helper := helper.NewShootAccessHelper(c.SeedClient, c.ShootAccess)
+	if c.ShootAccessHelper != nil {
+		helper = c.ShootAccessHelper
+	}
+
 	return &ControllerConfig{
 		seedClient:            c.SeedClient,
 		seedConfig:            c.SeedConfig,
@@ -74,7 +80,7 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		shootNamespace:        c.ShootNamespace,
 		shootAPIServerURL:     c.ShootAPIServerURL,
 		shootAccess:           c.ShootAccess,
-		shootAccessHelper:     helper.NewShootAccessHelper(c.SeedClient, c.ShootAccess),
+		shootAccessHelper:     helper,
 		metal:                 c.Metal,
 		clusterTag:            c.ClusterTag,
 		safetyBackoff:         c.SafetyBackoff,

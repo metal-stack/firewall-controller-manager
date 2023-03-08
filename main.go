@@ -185,6 +185,7 @@ func main() {
 		ShootNamespace:        v2.FirewallShootNamespace,
 		ShootAPIServerURL:     shootApiURL,
 		ShootAccess:           shootAccess,
+		ShootAccessHelper:     shootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 		SafetyBackoff:         safetyBackoff,
