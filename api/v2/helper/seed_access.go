@@ -21,18 +21,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.FirewallDeployment, shootNamespace string, shootAccess *v2.ShootAccess) error {
-	seed, err := ensureSeedRBAC(ctx, seedConfig, deploy, shootAccess)
+func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.FirewallDeployment, shootNamespace string, shootAccess *v2.ShootAccess, shootAccessHelper *ShootAccessHelper) error {
+	err := ensureSeedRBAC(ctx, seedConfig, deploy, shootAccess)
 	if err != nil {
 		return fmt.Errorf("unable to ensure seed rbac: %w", err)
 	}
 
-	_, _, shootConfig, err := NewShootConfig(ctx, seed, shootAccess)
-	if err != nil {
-		return fmt.Errorf("unable to create shoot client: %w", err)
-	}
-
-	err = ensureShootRBAC(ctx, shootConfig, shootNamespace, deploy)
+	err = ensureShootRBAC(ctx, shootAccessHelper, shootNamespace, deploy)
 	if err != nil {
 		return fmt.Errorf("unable to ensure shoot rbac: %w", err)
 	}
@@ -40,7 +35,7 @@ func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig *rest.Config, 
 	return nil
 }
 
-func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.FirewallDeployment, shootAccess *v2.ShootAccess) (client.Client, error) {
+func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.FirewallDeployment, shootAccess *v2.ShootAccess) error {
 	var (
 		name           = seedAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
@@ -65,14 +60,14 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 
 	k8sVersion, err := determineK8sVersion(seedConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unable to determine seed k8s version: %w", err)
+		return fmt.Errorf("unable to determine seed k8s version: %w", err)
 	}
 
 	seed, err := controllerclient.New(seedConfig, controllerclient.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to create seed client: %w", err)
+		return fmt.Errorf("unable to create seed client: %w", err)
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, seed, serviceAccount, func() error {
@@ -82,7 +77,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring service account: %w", err)
+		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
 	if versionGreaterOrEqual125(k8sVersion) {
@@ -101,7 +96,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 			return nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error ensuring service account token secret: %w", err)
+			return fmt.Errorf("error ensuring service account token secret: %w", err)
 		}
 	}
 
@@ -138,7 +133,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring role: %w", err)
+		return fmt.Errorf("error ensuring role: %w", err)
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, seed, roleBinding, func() error {
@@ -157,13 +152,13 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring role binding: %w", err)
+		return fmt.Errorf("error ensuring role binding: %w", err)
 	}
 
-	return seed, nil
+	return nil
 }
 
-func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespace string, deploy *v2.FirewallDeployment) error {
+func ensureShootRBAC(ctx context.Context, shootAccessHelper *ShootAccessHelper, shootNamespace string, deploy *v2.FirewallDeployment) error {
 	var (
 		name           = shootAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
@@ -184,14 +179,12 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 		}
 	)
 
-	k8sVersion, err := determineK8sVersion(shootConfig)
+	k8sVersion, err := shootAccessHelper.K8sVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to determine shoot k8s version: %w", err)
 	}
 
-	shoot, err := controllerclient.New(shootConfig, controllerclient.Options{
-		Scheme: scheme,
-	})
+	shoot, err := shootAccessHelper.Client(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to create shoot client: %w", err)
 	}

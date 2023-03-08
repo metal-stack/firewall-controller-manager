@@ -42,6 +42,7 @@ func main() {
 		enableLeaderElection    bool
 		shootKubeconfigSecret   string
 		shootTokenSecret        string
+		shootTokenPath          string
 		sshKeySecret            string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
@@ -76,6 +77,7 @@ func main() {
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
+	flag.StringVar(&shootTokenPath, "shoot-token-path", "/", "the path where to store the token file for shoot access")
 
 	flag.Parse()
 
@@ -88,7 +90,6 @@ func main() {
 
 	var (
 		stop        = ctrl.SetupSignalHandler()
-		expiresAt   *time.Time
 		shootAccess = &v2.ShootAccess{
 			GenericKubeconfigSecretName: shootKubeconfigSecret,
 			TokenSecretName:             shootTokenSecret,
@@ -127,9 +128,37 @@ func main() {
 		l.Fatalw("unable to create seed client", "error", err)
 	}
 
-	expiresAt, _, shootConfig, err := helper.NewShootConfig(stop, seedClient, shootAccess)
+	shootAccessHelper := helper.NewShootAccessHelper(seedClient, shootAccess)
 	if err != nil {
-		l.Fatalw("unable to create shoot client", "error", err)
+		l.Fatalw("unable to create shoot helper", "error", err)
+	}
+
+	// we do not mount the shoot client kubeconfig + token secret into the container
+	// through projected token mount as the other controllers deployed by Gardener.
+	//
+	// the reasoning for this is:
+	//
+	//   - we have to pass on the shoot access to the firewall-controller, too
+	//   - the firewall-controller is not a member of the Kubernetes cluster and
+	//     pushing files onto the firewall is not possible
+	//   - therefore, we defined flags for the shoot access generic kubeconfig and token
+	//     secret for this controller and expose the access secrets through the firewall
+	//     status resource, which can be read by the firewall-controller
+	//   - the firewall-controller can then create a client from these secrets but
+	//     it has to contiuously update the token file because the token will expire
+	//   - we can re-use the same approach for this controller as well and do not have
+	//     to do any additional mounts for the deployment of the controller
+	//
+	updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
+	if err != nil {
+		l.Fatalw("unable to create shoot access token updater", "error", err)
+	}
+
+	updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
+
+	shootConfig, err := shootAccessHelper.RESTConfig(stop)
+	if err != nil {
+		l.Fatalw("unable to create shoot config", "error", err)
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
@@ -186,11 +215,6 @@ func main() {
 	if err := firewall.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
 		l.Fatalw("unable to setup webhook", "error", err, "controller", "firewall")
 	}
-
-	// as we are creating the client without projected token mount and tokenfile,
-	// we need to regularly check for token expiration and restart the controller if necessary
-	// in order to recreate the shoot client.
-	helper.ShutdownOnTokenExpiration(ctrl.Log.WithName("token-expiration"), expiresAt, stop)
 
 	go func() {
 		l.Infow("starting shoot controller", "version", v.V)
