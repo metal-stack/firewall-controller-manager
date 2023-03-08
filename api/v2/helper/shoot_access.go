@@ -183,7 +183,23 @@ func NewShootAccessTokenUpdater(s *ShootAccessHelper, tokenDir string) (*ShootAc
 	}, nil
 }
 
-func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop context.Context) {
+func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop context.Context) error {
+	log.Info("updating token file", "path", s.s.tokenPath)
+
+	ctx, cancel := context.WithTimeout(stop, 3*time.Second)
+	_, token, err := s.s.ReadTokenSecret(ctx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("unable to read token secret: %w", err)
+	}
+
+	err = os.WriteFile(s.s.tokenPath, []byte(token), 0600)
+	if err != nil {
+		return fmt.Errorf("unable to write token file: %w", err)
+	}
+
+	log.Info("updated token file successfully, next update in 5 minutes")
+
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
@@ -207,12 +223,12 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 					break
 				}
 
-				log.Info("updated token file successfully")
+				log.Info("updated token file successfully, next update in 5 minutes")
 			case <-stop.Done():
 				return
 			}
 		}
 	}()
 
-	return
+	return nil
 }

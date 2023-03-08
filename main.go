@@ -154,7 +154,10 @@ func main() {
 		l.Fatalw("unable to create shoot access token updater", "error", err)
 	}
 
-	updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
+	err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
+	if err != nil {
+		l.Fatalw("unable to start token updater", "error", err)
+	}
 
 	shootConfig, err := shootAccessHelper.RESTConfig(stop)
 	if err != nil {
