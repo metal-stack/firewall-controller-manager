@@ -77,7 +77,7 @@ func main() {
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
-	flag.StringVar(&shootTokenPath, "shoot-token-path", "/", "the path where to store the token file for shoot access")
+	flag.StringVar(&shootTokenPath, "shoot-token-path", "/tmp", "the path where to store the token file for shoot access")
 
 	flag.Parse()
 
