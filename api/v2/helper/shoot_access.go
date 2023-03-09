@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -13,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/golang-jwt/jwt/v4"
 
@@ -21,91 +24,181 @@ import (
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-// NewShootConfig creates a new rest config for accessing the shoot cluster.
-//
-// it reads the generic kubeconfig and a token secret as provisioned by the Gardener and puts the token
-// into the kubeconfig. because of this, this kubeconfig will expire when the token in the tokenfile expires
-// and it will not be dynamically refreshed. the ShutdownOnTokenExpiration function in this package can be
-// used to shut down the application as soon as the token expires.
-//
-// TODO: there is probably a better approach of handling this in general.
-func NewShootConfig(ctx context.Context, seed client.Client, access *v2.ShootAccess) (*time.Time, []byte, *rest.Config, error) {
-	if access == nil {
-		return nil, nil, nil, fmt.Errorf("shoot access is nil")
-	}
+type ShootAccessHelper struct {
+	seed      client.Client
+	access    *v2.ShootAccess
+	tokenPath string
+}
 
+func NewShootAccessHelper(seed client.Client, access *v2.ShootAccess) *ShootAccessHelper {
+	return &ShootAccessHelper{
+		seed:   seed,
+		access: access,
+	}
+}
+
+func (s *ShootAccessHelper) Config(ctx context.Context) (*configv1.Config, error) {
 	kubeconfigTemplate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      access.GenericKubeconfigSecretName,
-			Namespace: access.Namespace,
+			Name:      s.access.GenericKubeconfigSecretName,
+			Namespace: s.access.Namespace,
 		},
-	}
-	err := seed.Get(ctx, client.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to read generic kubeconfig secret: %w", err)
 	}
 
-	tokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      access.TokenSecretName,
-			Namespace: access.Namespace,
-		},
-	}
-	err = seed.Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret)
+	err := s.seed.Get(ctx, client.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to read token secret: %w", err)
+		return nil, fmt.Errorf("unable to read generic kubeconfig secret: %w", err)
 	}
 
 	kubeconfig := &configv1.Config{}
 	err = runtime.DecodeInto(configlatest.Codec, kubeconfigTemplate.Data["kubeconfig"], kubeconfig)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to decode kubeconfig from generic kubeconfig template: %w", err)
+		return nil, fmt.Errorf("unable to decode kubeconfig from generic kubeconfig template: %w", err)
 	}
 
 	if len(kubeconfig.AuthInfos) != 1 {
-		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single user")
+		return nil, fmt.Errorf("parsed generic kubeconfig template expects exactly one user")
 	}
 	if len(kubeconfig.Clusters) != 1 {
-		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single cluster")
+		return nil, fmt.Errorf("parsed generic kubeconfig template expects exactly one cluster")
 	}
 	if len(kubeconfig.Contexts) != 1 {
-		return nil, nil, nil, fmt.Errorf("parsed generic kubeconfig template does not contain a single context")
+		return nil, fmt.Errorf("parsed generic kubeconfig template expects exactly one context")
+	}
+
+	kubeconfig.Clusters[0].Cluster.Server = s.access.APIServerURL
+	kubeconfig.Contexts[0].Context.Namespace = s.access.Namespace
+	if s.tokenPath != "" {
+		kubeconfig.AuthInfos[0].AuthInfo.TokenFile = s.tokenPath
+	}
+
+	return kubeconfig, nil
+}
+
+func (s *ShootAccessHelper) Raw(ctx context.Context) ([]byte, error) {
+	config, err := s.Config(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := runtime.Encode(configlatest.Codec, config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to encode kubeconfig: %w", err)
+	}
+
+	return raw, nil
+}
+
+func (s *ShootAccessHelper) RESTConfig(ctx context.Context) (*rest.Config, error) {
+	raw, err := s.Raw(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(raw)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create rest config from bytes: %w", err)
+	}
+
+	return restConfig, nil
+}
+
+func (s *ShootAccessHelper) Client(ctx context.Context) (client.Client, error) {
+	config, err := s.RESTConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := controllerclient.New(config, controllerclient.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create shoot client: %w", err)
+	}
+
+	return client, err
+}
+
+func (s *ShootAccessHelper) K8sVersion(ctx context.Context) (*semver.Version, error) {
+	config, err := s.RESTConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := determineK8sVersion(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, err
+}
+
+func (s *ShootAccessHelper) ReadTokenSecret(ctx context.Context) (*time.Time, string, error) {
+	tokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.access.TokenSecretName,
+			Namespace: s.access.Namespace,
+		},
+	}
+
+	err := s.seed.Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to read token secret: %w", err)
 	}
 
 	token := string(tokenSecret.Data["token"])
 
-	kubeconfig.AuthInfos[0].AuthInfo.TokenFile = ""
-	kubeconfig.AuthInfos[0].AuthInfo.Token = token
-	kubeconfig.Clusters[0].Cluster.Server = access.APIServerURL
-	kubeconfig.Contexts[0].Context.Namespace = access.Namespace
-
 	claims := &jwt.RegisteredClaims{}
 	_, _, err = new(jwt.Parser).ParseUnverified(token, claims)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("shoot access token is not parsable: %w", err)
-	}
-
-	raw, err := runtime.Encode(configlatest.Codec, kubeconfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to encode kubeconfig: %w", err)
-	}
-
-	config, err := clientcmd.RESTConfigFromKubeConfig(raw)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create rest config from bytes: %w", err)
+		return nil, "", fmt.Errorf("shoot access token is not parsable: %w", err)
 	}
 
 	if claims.ExpiresAt != nil {
-		return &claims.ExpiresAt.Time, raw, config, nil
+		return &claims.ExpiresAt.Time, token, nil
 	}
 
-	return nil, raw, config, nil
+	return nil, token, nil
 }
 
-func ShutdownOnTokenExpiration(log logr.Logger, expiresAt *time.Time, stop context.Context) {
-	if expiresAt == nil {
-		return
+type ShootAccessTokenUpdater struct {
+	s *ShootAccessHelper
+}
+
+func NewShootAccessTokenUpdater(s *ShootAccessHelper, tokenDir string) (*ShootAccessTokenUpdater, error) {
+	file, err := os.Create(path.Join(tokenDir, fmt.Sprintf("%s-token", v2.FirewallControllerManager)))
+	if err != nil {
+		return nil, fmt.Errorf("unable to file for shoot token: %w", err)
 	}
+
+	s.tokenPath = file.Name()
+
+	err = file.Close()
+	if err != nil {
+		return nil, fmt.Errorf("unable to close file for shoot token: %w", err)
+	}
+
+	return &ShootAccessTokenUpdater{
+		s: s,
+	}, nil
+}
+
+func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop context.Context) error {
+	log.Info("updating token file", "path", s.s.tokenPath)
+
+	ctx, cancel := context.WithTimeout(stop, 3*time.Second)
+	_, token, err := s.s.ReadTokenSecret(ctx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("unable to read token secret: %w", err)
+	}
+
+	err = os.WriteFile(s.s.tokenPath, []byte(token), 0600)
+	if err != nil {
+		return fmt.Errorf("unable to write token file: %w", err)
+	}
+
+	log.Info("updated token file successfully, next update in 5 minutes")
 
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
@@ -114,24 +207,28 @@ func ShutdownOnTokenExpiration(log logr.Logger, expiresAt *time.Time, stop conte
 		for {
 			select {
 			case <-ticker.C:
-				if time.Now().Add(10 * time.Minute).Before(*expiresAt) {
-					log.Info("token is not yet expiring, continue to run until around 10 minutes before expiration", "expiring-at", expiresAt.String())
-					continue
+				log.Info("updating token file", "path", s.s.tokenPath)
+
+				ctx, cancel := context.WithTimeout(stop, 3*time.Second)
+				_, token, err := s.s.ReadTokenSecret(ctx)
+				cancel()
+				if err != nil {
+					log.Error(err, "unable to read token secret")
+					break
 				}
 
-				log.Info("token is expiring, shutting down and restart to renew clients (deadline 10s)")
+				err = os.WriteFile(s.s.tokenPath, []byte(token), 0600)
+				if err != nil {
+					log.Error(err, "unable to update token file")
+					break
+				}
 
-				ctx, cancel := context.WithDeadline(stop, time.Now().Add(10*time.Second))
-				defer cancel()
-
-				<-ctx.Done()
-
-				os.Exit(0)
-
+				log.Info("updated token file successfully, next update in 5 minutes")
+			case <-stop.Done():
 				return
 			}
 		}
 	}()
 
-	return
+	return nil
 }

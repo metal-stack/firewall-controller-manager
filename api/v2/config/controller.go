@@ -5,6 +5,7 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	metalgo "github.com/metal-stack/metal-go"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,7 +22,8 @@ type NewControllerConfig struct {
 	ShootNamespace    string
 	ShootAPIServerURL string
 
-	ShootAccess *v2.ShootAccess
+	ShootAccess       *v2.ShootAccess
+	ShootAccessHelper *helper.ShootAccessHelper
 
 	Metal      metalgo.Client
 	ClusterTag string
@@ -44,6 +46,7 @@ type ControllerConfig struct {
 	shootAPIServerURL string
 
 	shootAccess               *v2.ShootAccess
+	shootAccessHelper         *helper.ShootAccessHelper
 	shootKubeconfigSecretName string
 	shootTokenSecretName      string
 	sshKeySecretName          string
@@ -62,6 +65,11 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		return nil, err
 	}
 
+	helper := helper.NewShootAccessHelper(c.SeedClient, c.ShootAccess)
+	if c.ShootAccessHelper != nil {
+		helper = c.ShootAccessHelper
+	}
+
 	return &ControllerConfig{
 		seedClient:            c.SeedClient,
 		seedConfig:            c.SeedConfig,
@@ -72,6 +80,7 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		shootNamespace:        c.ShootNamespace,
 		shootAPIServerURL:     c.ShootAPIServerURL,
 		shootAccess:           c.ShootAccess,
+		shootAccessHelper:     helper,
 		metal:                 c.Metal,
 		clusterTag:            c.ClusterTag,
 		safetyBackoff:         c.SafetyBackoff,
@@ -179,6 +188,10 @@ func (c *ControllerConfig) GetShootAPIServerURL() string {
 
 func (c *ControllerConfig) GetShootAccess() *v2.ShootAccess {
 	return c.shootAccess
+}
+
+func (c *ControllerConfig) GetShootAccessHelper() *helper.ShootAccessHelper {
+	return c.shootAccessHelper
 }
 
 func (c *ControllerConfig) GetShootKubeconfigSecretName() string {

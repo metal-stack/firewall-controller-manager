@@ -26,7 +26,7 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 		r.Target.Status.Conditions.Set(cond)
 	}()
 
-	err = helper.EnsureFirewallControllerRBAC(r.Ctx, c.c.GetSeedConfig(), r.Target, c.c.GetShootNamespace(), c.c.GetShootAccess())
+	err = helper.EnsureFirewallControllerRBAC(r.Ctx, c.c.GetSeedConfig(), r.Target, c.c.GetShootNamespace(), c.c.GetShootAccess(), c.c.GetShootAccessHelper())
 
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/metal-lib/pkg/genericcli"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -52,24 +53,18 @@ preferences: {}
 users:
 - name: shoot-name
   user:
-    tokenFile: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/token
-`)},
-			}, &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shoot-access-token",
-					Namespace: "shoot-namespace",
-				},
-				Data: map[string][]byte{
-					"token": []byte(`eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ`),
+    token: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/token
+`),
 				},
 			}).Build(),
-			wantErr: nil,
 		},
 	}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, got, err := NewShootConfig(context.Background(), tt.seed, tt.access)
+			h := NewShootAccessHelper(tt.seed, tt.access)
+			got, err := h.RESTConfig(context.Background())
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}
@@ -77,6 +72,31 @@ users:
 			if got != nil {
 				assert.Equal(t, got.Host, "https://shoot-name")
 			}
+
+			gotRaw, err := h.Raw(context.Background())
+			assert.NoError(t, err)
+			equal, err := genericcli.YamlIsEqual(gotRaw, []byte(`apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: dGVzdAo=
+    server: https://shoot-name
+  name: shoot-name
+contexts:
+- context:
+    cluster: shoot-name
+    namespace: shoot-namespace
+    user: shoot-name
+  name: shoot-name
+current-context: shoot-name
+kind: Config
+preferences: {}
+users:
+- name: shoot-name
+  user:
+    token: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/token
+`))
+			assert.NoError(t, err)
+			assert.True(t, equal)
 		})
 	}
 }
