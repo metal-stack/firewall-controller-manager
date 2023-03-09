@@ -27,8 +27,6 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 
 		cond := v2.NewCondition(v2.FirewallMonitorDeployed, v2.ConditionTrue, "Deployed", "Successfully deployed firewall-monitor.")
 		r.Target.Status.Conditions.Set(cond)
-
-		return
 	}()
 
 	ns := &corev1.Namespace{
