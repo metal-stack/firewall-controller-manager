@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// Reconciler must always return either a error or requeue to ensure that it detects if a firewall get lost etc.
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	var f *models.V1FirewallResponse
 	defer func() {
@@ -32,8 +33,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		if err := c.setStatus(r, f); err != nil {
 			r.Log.Error(err, "unable to set firewall status")
 		}
-
-		return
 	}()
 
 	fws, err := c.findAssociatedFirewalls(r.Ctx, r.Target)
@@ -182,9 +181,11 @@ func isFirewallProgressing(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
+	// TODO replace with models.V1LivelinessAlive once merged
 	if status.Liveliness != "Alive" {
 		return false
 	}
+	// TODO replace with models.V1LivelinessPhonedHome once merged
 	if status.LastEvent.Event != "Phoned Home" {
 		return true
 	}
@@ -198,9 +199,11 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
+	// TODO replace with models.V1LivelinessAlive once merged
 	if status.Liveliness != "Alive" {
 		return false
 	}
+	// TODO replace with models.V1LivelinessPhonedHome once merged
 	if status.LastEvent.Event == "Phoned Home" {
 		return true
 	}

@@ -2,6 +2,7 @@ package firewall
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -14,20 +15,20 @@ import (
 )
 
 func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
-	var errors []error
+	var errs []error
 
 	machineStatus, err := getMachineStatus(m)
 	if err == nil {
 		r.Target.Status.MachineStatus = machineStatus
 	} else {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
 
 	firewallNetworks, err := getFirewallNetworks(r.Ctx, c.networkCache, m)
 	if err == nil {
 		r.Target.Status.FirewallNetworks = firewallNetworks
 	} else {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
 
 	if enabled, err := strconv.ParseBool(r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
@@ -40,7 +41,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 
 	r.Target.Status.ShootAccess = c.c.GetShootAccess()
 
-	return controllers.CombineErrors(errors...)
+	return errors.Join(errs...)
 }
 
 func getMachineStatus(m *models.V1FirewallResponse) (*v2.MachineStatus, error) {
