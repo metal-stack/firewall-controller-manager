@@ -15,18 +15,18 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
-	"github.com/metal-stack/firewall-controller-manager/cache"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
+	"github.com/metal-stack/metal-lib/pkg/cache"
 )
 
 type controller struct {
 	c            *config.ControllerConfig
 	log          logr.Logger
 	recorder     record.EventRecorder
-	networkCache *cache.Cache[*models.V1NetworkResponse]
+	networkCache *cache.Cache[string, *models.V1NetworkResponse]
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
@@ -34,8 +34,8 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		log:      log,
 		recorder: recorder,
 		c:        c,
-		networkCache: cache.New(5*time.Minute, func(ctx context.Context, key any) (*models.V1NetworkResponse, error) {
-			resp, err := c.GetMetal().Network().FindNetwork(network.NewFindNetworkParams().WithID(key.(string)).WithContext(ctx), nil)
+		networkCache: cache.New(5*time.Minute, func(ctx context.Context, id string) (*models.V1NetworkResponse, error) {
+			resp, err := c.GetMetal().Network().FindNetwork(network.NewFindNetworkParams().WithID(id).WithContext(ctx), nil)
 			if err != nil {
 				return nil, fmt.Errorf("network find error: %w", err)
 			}

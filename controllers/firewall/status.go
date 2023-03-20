@@ -8,9 +8,9 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	"github.com/metal-stack/firewall-controller-manager/cache"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/models"
+	"github.com/metal-stack/metal-lib/pkg/cache"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,7 +71,7 @@ func getMachineStatus(m *models.V1FirewallResponse) (*v2.MachineStatus, error) {
 	return result, nil
 }
 
-func getFirewallNetworks(ctx context.Context, cache *cache.Cache[*models.V1NetworkResponse], m *models.V1FirewallResponse) ([]v2.FirewallNetwork, error) {
+func getFirewallNetworks(ctx context.Context, cache *cache.Cache[string, *models.V1NetworkResponse], m *models.V1FirewallResponse) ([]v2.FirewallNetwork, error) {
 	// check whether network prefixes were updated in metal-api
 	// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
 	// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
