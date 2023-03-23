@@ -12,7 +12,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/metal-stack/metal-go v0.22.3
-	github.com/metal-stack/metal-lib v0.11.6-0.20230320083747-186e2cdfaa76
+	github.com/metal-stack/metal-lib v0.11.6
 	github.com/metal-stack/v v1.0.3
 	github.com/onsi/ginkgo/v2 v2.9.0
 	github.com/onsi/gomega v1.27.2
