@@ -27,6 +27,7 @@ func FirewallManagedByTag() string {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fwset
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.spec.replicas`
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Progressing",type=integer,JSONPath=`.status.progressingReplicas`
 // +kubebuilder:printcolumn:name="Unhealthy",type=integer,JSONPath=`.status.unhealthyReplicas`
