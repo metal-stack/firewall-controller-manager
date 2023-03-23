@@ -99,6 +99,7 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 			Annotations: map[string]string{
 				v2.RevisionAnnotation: strconv.Itoa(revision),
 			},
+			Labels: r.Target.Labels,
 		},
 		Spec: v2.FirewallSetSpec{
 			Replicas: r.Target.Spec.Replicas,

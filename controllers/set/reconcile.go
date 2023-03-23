@@ -109,6 +109,11 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")),
 	}
 
+	for k, v := range r.Target.Labels {
+		// inheriting labels from the firewall set to the firewall
+		meta.Labels[k] = v
+	}
+
 	fw := &v2.Firewall{
 		ObjectMeta: *meta,
 		Spec:       r.Target.Spec.Template.Spec,
