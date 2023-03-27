@@ -704,6 +704,15 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(deploy.Status.UnhealthyReplicas).To(Equal(0))
 				Expect(deploy.Status.ObservedRevision).To(Equal(1))
 			})
+
+			It("should not be possible to update deployment strategy while deployment has not converged", func() {
+				var deploy = deploy.DeepCopy()
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deploy), deploy)).To(Succeed())
+				deploy.Spec.Strategy = v2.StrategyRecreate
+				err := k8sClient.Update(ctx, deploy)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(`Invalid value: "Recreate": strategy can not be updated until target replicas have been reached (i.e. deployment has converged)`))
+			})
 		})
 
 		var (

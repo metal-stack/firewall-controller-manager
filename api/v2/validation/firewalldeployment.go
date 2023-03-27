@@ -67,21 +67,25 @@ func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.Firewall
 func (v *firewallDeploymentValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.FirewallDeployment) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpecUpdate(log, &oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, v.validateSpecUpdate(log, &oldF.Spec, &newF.Spec, &newF.Status, field.NewPath("spec"))...)
 
 	return allErrs
 }
 
-func (v *firewallDeploymentValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
+func (v *firewallDeploymentValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v2.FirewallDeploymentSpec, status *v2.FirewallDeploymentStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, v.validateSpec(log, newF, fldPath)...)
 
 	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Selector, oldF.Selector, fldPath.Child("selector"))...)
 	// TODO: theoretically, the selector or metadata should be changeable, but we need to think it through... let's simplify for now and just not support it.
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Strategy, oldF.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Selector, oldF.Selector, fldPath.Child("selector"))...)
+
+	if newF.Strategy != oldF.Strategy && status.TargetReplicas != status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("strategy"), newF.Strategy, "strategy can not be updated until target replicas have been reached (i.e. deployment has converged)"))
+	}
+
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Template.ObjectMeta, oldF.Template.ObjectMeta, fldPath.Child("template").Child("metadata"))...)
 
 	return allErrs
