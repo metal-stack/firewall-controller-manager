@@ -65,6 +65,8 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 				Updated:       r.Target.ControllerStatus.Updated,
 			}
 
+			fw.Status.ControllerStatus = connection
+
 			if connection.Updated.Time.IsZero() {
 				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
 				fw.Status.Conditions.Set(cond)

@@ -776,6 +776,14 @@ var _ = Context("integration test", Ordered, func() {
 				}, 5*time.Second)
 				Expect(mon.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
 			})
+
+			It("should populate the controller status field in the firewall resource", func() {
+				var fw = fw.DeepCopy()
+				Eventually(func() *v2.ControllerConnection {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+					return fw.Status.ControllerStatus
+				}, 15*time.Second, interval).Should(Not(BeNil()), "controller connection was not synced to firewall resource")
+			})
 		})
 	})
 
