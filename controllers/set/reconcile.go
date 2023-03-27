@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -112,6 +113,10 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	for k, v := range r.Target.Labels {
 		// inheriting labels from the firewall set to the firewall
 		meta.Labels[k] = v
+	}
+
+	if v, err := semver.NewVersion(r.Target.Spec.Template.Spec.ControllerVersion); err == nil && v.LessThan(semver.MustParse("v2.0.0")) {
+		meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = "true"
 	}
 
 	fw := &v2.Firewall{
