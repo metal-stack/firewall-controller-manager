@@ -116,6 +116,9 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	}
 
 	if v, err := semver.NewVersion(r.Target.Spec.Template.Spec.ControllerVersion); err == nil && v.LessThan(semver.MustParse("v2.0.0")) {
+		if meta.Annotations == nil {
+			meta.Annotations = map[string]string{}
+		}
 		meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = "true"
 	}
 
