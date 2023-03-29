@@ -32,7 +32,15 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v2.FirewallDeployment{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})). // prevents reconcile on status sub resource update
+		For(
+			&v2.FirewallDeployment{},
+			builder.WithPredicates(
+				predicate.Or(
+					predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
+					predicate.AnnotationChangedPredicate{},
+				),
+			),
+		).
 		Named("FirewallDeployment").
 		Owns(&v2.FirewallSet{}).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
