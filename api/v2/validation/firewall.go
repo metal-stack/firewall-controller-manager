@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -21,6 +22,7 @@ func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *fire
 func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
+	allErrs = append(allErrs, validateFirewallAnnotations(f)...)
 	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
 
 	return allErrs
@@ -98,6 +100,7 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 func (v *firewallValidator) ValidateUpdate(log logr.Logger, fOld, fNew *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
+	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
 	allErrs = append(allErrs, v.validateSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
 
 	return allErrs
@@ -110,6 +113,26 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.DNSPort, fOld.DNSPort, fldPath.Child("dnsPort"))...)
+
+	return allErrs
+}
+
+func validateFirewallAnnotations(f *v2.Firewall) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if v, ok := f.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+		_, err := strconv.ParseBool(v)
+		if err != nil {
+			allErrs = append(allErrs, field.TypeInvalid(field.NewPath("metadata").Child("annotations"), v, fmt.Sprintf("value of %q must be parsable as bool", v2.FirewallNoControllerConnectionAnnotation)))
+		}
+	}
+
+	if v, ok := f.Annotations[v2.FirewallWeightAnnotation]; ok {
+		_, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			allErrs = append(allErrs, field.TypeInvalid(field.NewPath("metadata").Child("annotations"), v, fmt.Sprintf("value of %q must be parsable as int", v2.FirewallWeightAnnotation)))
+		}
+	}
 
 	return allErrs
 }

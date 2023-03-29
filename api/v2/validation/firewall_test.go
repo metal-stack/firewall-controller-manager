@@ -17,6 +17,10 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "firewall-123",
 			Namespace: "default",
+			Annotations: map[string]string{
+				v2.FirewallWeightAnnotation:                 "100",
+				v2.FirewallNoControllerConnectionAnnotation: "true",
+			},
 		},
 		Spec: v2.FirewallSpec{
 			Interval:                "10s",
@@ -65,6 +69,18 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
 					Message: ` "firewall-123" is invalid: spec.networks: Required value: field is required`,
+				},
+			},
+		},
+		{
+			name: "bad weight annotation",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				f.Annotations[v2.FirewallWeightAnnotation] = "foo"
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall-123" is invalid: metadata.annotations: Invalid value: "foo": value of "firewall.metal-stack.io/weight" must be parsable as int`,
 				},
 			},
 		},
