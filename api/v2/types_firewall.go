@@ -271,7 +271,7 @@ func (f *FirewallList) GetItems() []*Firewall {
 // - Weight annotation (defaults to 0 if no annotation is present)
 // - Connected firewalls
 // - Ready firewalls
-// - Createed Firealls
+// - Created Firealls
 // - Younger Firewalls
 //
 // The firewalls at the beginning of the slice should be kept as long as possible.
