@@ -2,7 +2,6 @@ package set
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
@@ -58,10 +57,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	if currentAmount > r.Target.Spec.Replicas {
 		r.Log.Info("scale down", "current", currentAmount, "want", r.Target.Spec.Replicas)
 
-		sort.Slice(ownedFirewalls, func(i, j int) bool {
-			// put the oldest at the end of the slice, we will then pop them off
-			return !ownedFirewalls[i].CreationTimestamp.Before(&ownedFirewalls[j].CreationTimestamp)
-		})
+		// puts the least important at the end of the slice, we will then pop them off for deletion
+		v2.SortFirewallsDeletion(ownedFirewalls)
 
 		for i := r.Target.Spec.Replicas; i < currentAmount; i++ {
 			var fw *v2.Firewall
