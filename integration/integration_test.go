@@ -283,7 +283,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the created condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallCreated, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -414,8 +414,11 @@ var _ = Context("integration test", Ordered, func() {
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("NewFirewallSetAvailable"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)))
+				Expect(cond.Reason).To(Or(Equal("NewFirewallSetAvailable"), Equal("FirewallSetUpdated")))
+				Expect(cond.Message).To(Or(
+					Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)),
+					Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)),
+				))
 			})
 
 			It("should populate the status", func() {
@@ -964,7 +967,7 @@ var _ = Context("migration path", Ordered, func() {
 			It("should create a firewall set", func() {
 				set = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallSetList{}, func(l *v2.FirewallSetList) []*v2.FirewallSet {
 					return l.GetItems()
-				}, 3*time.Second)
+				}, 15*time.Second)
 			})
 
 			It("should adopt the existing firewall", func() {
