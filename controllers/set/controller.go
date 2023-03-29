@@ -33,6 +33,7 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 				predicate.Or(
 					predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
 					predicate.AnnotationChangedPredicate{},
+					predicate.LabelChangedPredicate{},
 				),
 			),
 		).
