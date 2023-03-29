@@ -1,6 +1,10 @@
 package v2
 
 import (
+	"sort"
+	"strconv"
+
+	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -13,6 +17,10 @@ const (
 	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
 	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
 	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
+	// FirewallWeightAnnotation is considered when deciding which firewall is thrown away on scale down.
+	// Value must be parsable as an integer. Firewalls with higher weight are kept longer.
+	// Defaults to 0 if no annotation is present.
+	FirewallWeightAnnotation = "firewall.metal-stack.io/weight"
 	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.
 	FirewallControllerManager = "firewall-controller-manager"
 )
@@ -254,4 +262,66 @@ func (f *FirewallList) GetItems() []*Firewall {
 		result = append(result, &f.Items[i])
 	}
 	return result
+}
+
+// SortFirewallsDeletion sorts the given firewall slice for deletion.
+// It considers certain criteria which firewalls should be kept longest and
+// which one's can be deleted first. The precedence is:
+//
+// - Weight annotation (defaults to 0 if no annotation is present)
+// - Connected firewalls
+// - Ready firewalls
+// - Createed Firealls
+// - Younger Firewalls
+//
+// The firewalls at the beginning of the slice should be kept as long as possible.
+// The firewalls at the end of the slice should be removed first.
+//
+// The firewalls can be popped off from the slice in a deletion loop.
+func SortFirewallsDeletion(fws []*Firewall) {
+	weight := func(fw *Firewall) (weight int) {
+		a, ok := fw.Annotations[FirewallWeightAnnotation]
+		if !ok {
+			return
+		}
+
+		parsed, err := strconv.ParseInt(a, 10, 32)
+		if err != nil {
+			return
+		}
+
+		weight = int(parsed)
+		return
+	}
+
+	conditionTypes := []ConditionType{FirewallControllerConnected, FirewallReady, FirewallCreated}
+
+	sort.Slice(fws, func(i, j int) bool {
+		a := fws[i]
+		b := fws[j]
+
+		// prefer heigher weight
+		if weight(a) > weight(b) {
+			return true
+		}
+		if weight(b) > weight(a) {
+			return false
+		}
+
+		// prefer firewalls that are "healthier"
+		for _, conditionType := range conditionTypes {
+			aTrue := pointer.SafeDeref(a.Status.Conditions.Get(conditionType)).Status == ConditionTrue
+			bTrue := pointer.SafeDeref(b.Status.Conditions.Get(conditionType)).Status == ConditionTrue
+
+			if aTrue && !bTrue {
+				return true
+			}
+			if !aTrue && bTrue {
+				return false
+			}
+		}
+
+		// prefer younger firewalls
+		return !a.CreationTimestamp.Before(&b.CreationTimestamp)
+	})
 }
