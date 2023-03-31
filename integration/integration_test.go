@@ -255,6 +255,8 @@ var _ = Context("integration test", Ordered, func() {
 
 			It("should allow an update of the firewall monitor", func() {
 				// simulating a firewall-controller updating the resource
+				mon := mon.DeepCopy()
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed())
 				mon.ControllerStatus = &v2.ControllerStatus{
 					Updated:  metav1.NewTime(time.Now()),
 					Distance: v2.FirewallShortestDistance,
