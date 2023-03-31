@@ -23,10 +23,11 @@ import (
 )
 
 type controller struct {
-	c            *config.ControllerConfig
-	log          logr.Logger
-	recorder     record.EventRecorder
-	networkCache *cache.Cache[string, *models.V1NetworkResponse]
+	c             *config.ControllerConfig
+	log           logr.Logger
+	recorder      record.EventRecorder
+	networkCache  *cache.Cache[string, *models.V1NetworkResponse]
+	firewallCache *cache.Cache[*v2.Firewall, []*models.V1FirewallResponse]
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
@@ -39,6 +40,18 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			if err != nil {
 				return nil, fmt.Errorf("network find error: %w", err)
 			}
+			return resp.Payload, nil
+		}),
+		firewallCache: cache.New(3*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
+			resp, err := c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+				AllocationName:    fw.Name,
+				AllocationProject: fw.Spec.Project,
+				Tags:              []string{c.GetClusterTag()},
+			}).WithContext(ctx), nil)
+			if err != nil {
+				return nil, fmt.Errorf("firewall find error: %w", err)
+			}
+
 			return resp.Payload, nil
 		}),
 	})
@@ -78,17 +91,4 @@ func (c *controller) New() *v2.Firewall {
 
 func (c *controller) SetStatus(reconciled *v2.Firewall, refetched *v2.Firewall) {
 	refetched.Status = reconciled.Status
-}
-
-func (c *controller) findAssociatedFirewalls(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
-	resp, err := c.c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-		AllocationName:    fw.Name,
-		AllocationProject: fw.Spec.Project,
-		Tags:              []string{c.c.GetClusterTag()},
-	}).WithContext(ctx), nil)
-	if err != nil {
-		return nil, fmt.Errorf("firewall find error: %w", err)
-	}
-
-	return resp.Payload, nil
 }

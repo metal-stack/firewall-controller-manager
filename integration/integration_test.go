@@ -255,8 +255,7 @@ var _ = Context("integration test", Ordered, func() {
 
 			It("should allow an update of the firewall monitor", func() {
 				// simulating a firewall-controller updating the resource
-				mon := mon.DeepCopy()
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				mon.ControllerStatus = &v2.ControllerStatus{
 					Updated:  metav1.NewTime(time.Now()),
 					Distance: v2.FirewallShortestDistance,
@@ -828,6 +827,10 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("the firewall set should be updated to shortest distance as the update has succeeded", func() {
+				Eventually(func() v2.FirewallDistance {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
+					return set.Spec.Distance
+				}).Within(5 * time.Second).ProbeEvery(200 * time.Millisecond).Should(Equal(v2.FirewallShortestDistance))
 				Expect(set.Spec.Distance).To(Equal(v2.FirewallShortestDistance))
 			})
 		})
