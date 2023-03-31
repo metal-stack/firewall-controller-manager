@@ -42,7 +42,8 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			}
 			return resp.Payload, nil
 		}),
-		firewallCache: cache.New(3*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
+		// the cache is only very short but on quickly repeated status updates, this should prevent the metal-api from being flooded
+		firewallCache: cache.New(5*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
 			resp, err := c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
 				AllocationName:    fw.Name,
 				AllocationProject: fw.Spec.Project,

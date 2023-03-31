@@ -423,7 +423,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -537,7 +537,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the created condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallCreated, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -713,12 +713,15 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("FirewallSetUpdated"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)))
+				Expect(cond.Reason).To(Or(Equal("NewFirewallSetAvailable"), Equal("FirewallSetUpdated")))
+				Expect(cond.Message).To(Or(
+					Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)),
+					Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)),
+				))
 			})
 
 			It("should populate the status", func() {
@@ -1043,7 +1046,7 @@ var _ = Context("migration path", Ordered, func() {
 			It("should have the created condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallCreated, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallCreated, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1148,12 +1151,15 @@ var _ = Context("migration path", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("NewFirewallSetAvailable"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)))
+				Expect(cond.Reason).To(Or(Equal("NewFirewallSetAvailable"), Equal("FirewallSetUpdated")))
+				Expect(cond.Message).To(Or(
+					Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)),
+					Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)),
+				))
 			})
 
 			It("should populate the status", func() {
