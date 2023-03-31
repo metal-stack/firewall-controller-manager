@@ -15,22 +15,22 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return fmt.Errorf("unable to get owned sets: %w", err)
 	}
 
-	lastSet, err := controllers.MaxRevisionOf(ownedSets)
+	latestSet, err := controllers.MaxRevisionOf(ownedSets)
 	if err != nil {
 		return err
 	}
 
 	r.Target.Status.TargetReplicas = r.Target.Spec.Replicas
 
-	if lastSet != nil {
-		revision, err := controllers.Revision(lastSet)
+	if latestSet != nil {
+		revision, err := controllers.Revision(latestSet)
 		if err != nil {
 			return err
 		}
 		r.Target.Status.ObservedRevision = revision
-		r.Target.Status.ProgressingReplicas = lastSet.Status.ProgressingReplicas
-		r.Target.Status.UnhealthyReplicas = lastSet.Status.UnhealthyReplicas
-		r.Target.Status.ReadyReplicas = lastSet.Status.ReadyReplicas
+		r.Target.Status.ProgressingReplicas = latestSet.Status.ProgressingReplicas
+		r.Target.Status.UnhealthyReplicas = latestSet.Status.UnhealthyReplicas
+		r.Target.Status.ReadyReplicas = latestSet.Status.ReadyReplicas
 	}
 
 	if r.Target.Status.ReadyReplicas >= r.Target.Spec.Replicas {

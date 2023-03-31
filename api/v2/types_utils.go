@@ -1,8 +1,11 @@
 package v2
 
 import (
+	"strconv"
+
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -133,4 +136,11 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	}
 
 	return o && !n
+}
+
+// IsAnnotationTrue returns true if the given object has an annotation with a given
+// key and the value of this annotation is a true boolean.
+func IsAnnotationTrue(o client.Object, key string) bool {
+	enabled, err := strconv.ParseBool(o.GetAnnotations()[key])
+	return err == nil && enabled
 }
