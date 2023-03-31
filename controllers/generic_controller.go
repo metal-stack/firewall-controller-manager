@@ -136,7 +136,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Info("updating status")
 			refetched := g.reconciler.New()
 
-			statusErr := g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
+			statusErr = g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
 			if statusErr != nil {
 				log.Error(statusErr, "unable to fetch resource before status update")
 				return
