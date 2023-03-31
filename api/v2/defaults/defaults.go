@@ -15,6 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+const (
+	DefaultFirewallReconcileInterval = "10s"
+)
+
 type (
 	firewallDefaulter struct {
 		c   *config.ControllerConfig
@@ -163,7 +167,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 
 func defaultFirewallSpec(f *v2.FirewallSpec) {
 	if f.Interval == "" {
-		f.Interval = "10s"
+		f.Interval = DefaultFirewallReconcileInterval
 	}
 }
 

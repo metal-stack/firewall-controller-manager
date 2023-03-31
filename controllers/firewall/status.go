@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -31,7 +30,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1Fir
 		errs = append(errs, err)
 	}
 
-	if enabled, err := strconv.ParseBool(r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
+	if v2.IsAnnotationTrue(r.Target, v2.FirewallNoControllerConnectionAnnotation) {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
 		r.Target.Status.Conditions.Set(cond)
 	} else if r.Target.Status.ControllerStatus == nil {

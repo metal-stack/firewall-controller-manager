@@ -5,6 +5,7 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -140,6 +141,7 @@ var _ = Context("integration test", Ordered, func() {
 						ControllerVersion:       "v2.0.0",
 						NftablesExporterURL:     "http://exporter.tar.gz",
 						NftablesExporterVersion: "v1.0.0",
+						Interval:                defaults.DefaultFirewallReconcileInterval,
 					},
 				},
 			},
@@ -272,7 +274,6 @@ var _ = Context("integration test", Ordered, func() {
 
 			It("should inherit the spec from the set", func() {
 				wantSpec := set.Spec.Template.Spec.DeepCopy()
-				wantSpec.Interval = "10s"
 				Expect(&fw.Spec).To(BeComparableTo(wantSpec))
 			})
 
@@ -358,7 +359,6 @@ var _ = Context("integration test", Ordered, func() {
 
 			It("should inherit the spec from the deployement", func() {
 				wantSpec := deployment.Spec.Template.Spec.DeepCopy()
-				wantSpec.Interval = "10s"
 				Expect(&set.Spec.Template.Spec).To(BeComparableTo(wantSpec))
 			})
 
@@ -514,7 +514,6 @@ var _ = Context("integration test", Ordered, func() {
 
 			It("should inherit the spec from the set", func() {
 				wantSpec := set.Spec.Template.Spec.DeepCopy()
-				wantSpec.Interval = "10s"
 				Expect(&fw.Spec).To(BeComparableTo(wantSpec))
 			})
 
@@ -639,7 +638,6 @@ var _ = Context("integration test", Ordered, func() {
 			It("should inherit the spec from the deployement", func() {
 				wantSpec := deployment.Spec.Template.Spec.DeepCopy()
 				wantSpec.Size = "n2-medium-x86"
-				wantSpec.Interval = "10s"
 				Expect(&set.Spec.Template.Spec).To(BeComparableTo(wantSpec))
 			})
 
