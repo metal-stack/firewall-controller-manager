@@ -13,10 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-const (
-	FirewallMaxDistance = 8
-)
-
 type firewallValidator struct{}
 
 func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *firewallValidator] {
@@ -26,8 +22,8 @@ func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *fire
 func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if f.Distance < 0 || f.Distance > FirewallMaxDistance {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("distance"), f.Distance, fmt.Sprintf("distance must be between 0 and %d", f.Distance)))
+	if f.Distance < v2.FirewallShortestDistance || f.Distance > v2.FirewallLongestDistance {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("distance"), f.Distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
 	}
 
 	allErrs = append(allErrs, validateFirewallAnnotations(f)...)
@@ -107,6 +103,10 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 
 func (v *firewallValidator) ValidateUpdate(log logr.Logger, fOld, fNew *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
+
+	if fNew.Distance < v2.FirewallShortestDistance || fNew.Distance > v2.FirewallLongestDistance {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("distance"), fNew.Distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
+	}
 
 	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
 	allErrs = append(allErrs, v.validateSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)

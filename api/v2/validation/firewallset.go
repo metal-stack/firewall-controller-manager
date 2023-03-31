@@ -32,8 +32,8 @@ func (v *firewallSetValidator) validateSpec(log logr.Logger, f *v2.FirewallSetSp
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
 	}
 
-	if f.Distance < 0 || f.Distance > FirewallMaxDistance {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("distance"), f.Distance, fmt.Sprintf("distance must be between 0 and %d", f.Distance)))
+	if f.Distance < v2.FirewallShortestDistance || f.Distance > v2.FirewallLongestDistance {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("distance"), f.Distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
 	}
 
 	if f.Selector == nil {

@@ -14,7 +14,8 @@ const (
 	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
 
 	FirewallShortestDistance         = FirewallDistance(0)
-	FirewallRollingUpdateSetDistance = FirewallDistance(2)
+	FirewallRollingUpdateSetDistance = FirewallDistance(3)
+	FirewallLongestDistance          = FirewallDistance(8)
 )
 
 func FirewallSetTag(setName string) string {
