@@ -162,7 +162,10 @@ func SetFirewallStatus(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		fw.Status.Conditions.Set(cond)
 	}
 
-	if fw.Distance == connection.ActualDistance {
+	if !mon.ControllerStatus.DistanceSupported {
+		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "NotChecking", "Controller does not support distance reconciliation.")
+		fw.Status.Conditions.Set(cond)
+	} else if fw.Distance == connection.ActualDistance {
 		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "Configured", fmt.Sprintf("Controller has configured the specified distance %d.", fw.Distance))
 		fw.Status.Conditions.Set(cond)
 	} else {

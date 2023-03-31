@@ -59,6 +59,7 @@ type ControllerStatus struct {
 	NftablesExporterVersion string           `json:"nftablesExporterVersion,omitempty"`
 	Updated                 metav1.Time      `json:"lastRun,omitempty"`
 	Distance                FirewallDistance `json:"distance,omitempty"`
+	DistanceSupported       bool             `json:"distanceSupported,omitempty"`
 }
 
 // FirewallStats contains firewall statistics

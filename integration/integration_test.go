@@ -257,8 +257,9 @@ var _ = Context("integration test", Ordered, func() {
 				// simulating a firewall-controller updating the resource
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				mon.ControllerStatus = &v2.ControllerStatus{
-					Updated:  metav1.NewTime(time.Now()),
-					Distance: v2.FirewallShortestDistance,
+					Updated:           metav1.NewTime(time.Now()),
+					Distance:          v2.FirewallShortestDistance,
+					DistanceSupported: true,
 				}
 				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
 			})
@@ -781,8 +782,9 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				// simulating a firewall-controller updating the resource
 				mon.ControllerStatus = &v2.ControllerStatus{
-					Updated:  metav1.NewTime(time.Now()),
-					Distance: v2.FirewallRollingUpdateSetDistance,
+					Updated:           metav1.NewTime(time.Now()),
+					Distance:          v2.FirewallRollingUpdateSetDistance,
+					DistanceSupported: true,
 				}
 				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
 			})
