@@ -22,12 +22,9 @@ func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *fire
 func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if f.Distance < v2.FirewallShortestDistance || f.Distance > v2.FirewallLongestDistance {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("distance"), f.Distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
-	}
-
 	allErrs = append(allErrs, validateFirewallAnnotations(f)...)
 	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateDistance(f.Distance, field.NewPath("distance"))...)
 
 	return allErrs
 }
@@ -104,12 +101,9 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 func (v *firewallValidator) ValidateUpdate(log logr.Logger, fOld, fNew *v2.Firewall) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if fNew.Distance < v2.FirewallShortestDistance || fNew.Distance > v2.FirewallLongestDistance {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("distance"), fNew.Distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
-	}
-
 	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
 	allErrs = append(allErrs, v.validateSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateDistance(fNew.Distance, field.NewPath("distance"))...)
 
 	return allErrs
 }
@@ -140,6 +134,16 @@ func validateFirewallAnnotations(f *v2.Firewall) field.ErrorList {
 		if err != nil {
 			allErrs = append(allErrs, field.TypeInvalid(field.NewPath("metadata").Child("annotations"), v, fmt.Sprintf("value of %q must be parsable as int", v2.FirewallWeightAnnotation)))
 		}
+	}
+
+	return allErrs
+}
+
+func validateDistance(distance v2.FirewallDistance, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if distance < v2.FirewallShortestDistance || distance > v2.FirewallLongestDistance {
+		allErrs = append(allErrs, field.Invalid(fldPath, distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
 	}
 
 	return allErrs

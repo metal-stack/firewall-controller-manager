@@ -63,16 +63,16 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return err
 	}
 
-	// we are done with the update, give the set the shortest distance if not already set
+	// we are done with the update, give the set the shortest distance if this is not already the case
 	if current.Status.ReadyReplicas == current.Spec.Replicas && current.Spec.Distance != v2.FirewallShortestDistance {
 		current.Spec.Distance = v2.FirewallShortestDistance
 
 		err := c.c.GetSeedClient().Update(r.Ctx, current)
 		if err != nil {
-			return fmt.Errorf("unable to swap latest set distance to 0: %w", err)
+			return fmt.Errorf("unable to swap latest set distance to %d: %w", v2.FirewallShortestDistance, err)
 		}
 
-		r.Log.Info("swapped latest set to distance to 0")
+		r.Log.Info("swapped latest set to shortest distance", "distance", v2.FirewallShortestDistance)
 	}
 
 	return nil
