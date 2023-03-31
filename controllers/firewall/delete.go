@@ -18,7 +18,7 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 		return fmt.Errorf("unable to delete firewall monitor: %w", err)
 	}
 
-	fws, err := c.findAssociatedFirewalls(r.Ctx, r.Target)
+	fws, err := c.firewallCache.Get(r.Ctx, r.Target)
 	if err != nil {
 		return controllers.RequeueAfter(10*time.Second, err.Error())
 	}
