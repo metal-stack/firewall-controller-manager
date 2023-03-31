@@ -16,9 +16,9 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	}
 
 	if newSetRequired {
-		r.Log.Info("significant changes detected in the spec, creating new firewall set")
+		r.Log.Info("significant changes detected in the spec, creating new firewall set", "distance", v2.FirewallRollingUpdateSetDistance)
 
-		newSet, err := c.createNextFirewallSet(r, current)
+		newSet, err := c.createNextFirewallSet(r, current, v2.FirewallRollingUpdateSetDistance)
 		if err != nil {
 			return err
 		}

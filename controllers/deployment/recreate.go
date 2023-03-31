@@ -22,7 +22,7 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 			return err
 		}
 
-		newSet, err := c.createNextFirewallSet(r, current)
+		newSet, err := c.createNextFirewallSet(r, current, v2.FirewallShortestDistance)
 		if err != nil {
 			return err
 		}

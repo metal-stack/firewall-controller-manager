@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: firewallmonitors.firewall.metal-stack.io
 spec:
@@ -88,6 +88,20 @@ spec:
             properties:
               controllerVersion:
                 type: string
+              distance:
+                description: FirewallDistance defines the as-path length of firewalls,
+                  influencing how strong they attract network traffic for routing
+                  traffic in and out of the cluster. This is of particular interest
+                  during rolling firewall updates, i.e. when there is more than a
+                  single firewall running in front of the cluster. During a rolling
+                  update, new firewalls will start with a longer distance such that
+                  traffic is only attracted by the existing firewalls ("firewall staging").
+                  When the new firewall has connected successfully to the firewall
+                  monitor, the deployment controller throws away the old firewalls
+                  and the new will firewall takes over the routing. The deployment
+                  controller will then shorten the distance of the new firewall. This
+                  approach reduces downtime of the effective user traffic of the cluster.
+                type: integer
               lastRun:
                 format: date-time
                 type: string

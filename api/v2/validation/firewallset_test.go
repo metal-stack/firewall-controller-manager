@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +23,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			Selector: map[string]string{
 				"purpose": "shoot-firewall",
 			},
+			Distance: 0,
 			Template: v2.FirewallTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -29,7 +31,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 					},
 				},
 				Spec: v2.FirewallSpec{
-					Interval:                "10s",
+					Interval:                defaults.DefaultFirewallReconcileInterval,
 					ControllerURL:           "https://metal-stack.io/controller.img",
 					ControllerVersion:       "v",
 					NftablesExporterURL:     "http://exporter.tar.gz",
@@ -133,6 +135,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 				"purpose": "shoot-firewall",
 				"a":       "b",
 			},
+			Distance: 0,
 			Template: v2.FirewallTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -141,7 +144,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					},
 				},
 				Spec: v2.FirewallSpec{
-					Interval:                "10s",
+					Interval:                defaults.DefaultFirewallReconcileInterval,
 					ControllerURL:           "https://metal-stack.io/controller.img",
 					ControllerVersion:       "v",
 					NftablesExporterURL:     "http://exporter.tar.gz",

@@ -28,6 +28,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 	for _, fw := range ownedFirewalls {
 		fw.Spec = r.Target.Spec.Template.Spec
+		fw.Distance = r.Target.Spec.Distance
 
 		err := c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
 		if err != nil {
@@ -122,6 +123,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	fw := &v2.Firewall{
 		ObjectMeta: *meta,
 		Spec:       r.Target.Spec.Template.Spec,
+		Distance:   r.Target.Spec.Distance,
 	}
 
 	err = c.c.GetSeedClient().Create(r.Ctx, fw, &client.CreateOptions{})

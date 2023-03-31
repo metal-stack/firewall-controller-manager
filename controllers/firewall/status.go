@@ -1,65 +1,66 @@
 package firewall
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/models"
-	"github.com/metal-stack/metal-lib/pkg/cache"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
+func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse, mon *v2.FirewallMonitor) error {
 	var errs []error
 
-	machineStatus, err := getMachineStatus(m)
-	if err == nil {
-		r.Target.Status.MachineStatus = machineStatus
-	} else {
+	err := setMachineStatus(r.Target, f)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
-	firewallNetworks, err := getFirewallNetworks(r.Ctx, c.networkCache, m)
-	if err == nil {
-		r.Target.Status.FirewallNetworks = firewallNetworks
-	} else {
+	err = c.setFirewallNetworks(r, f)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
-	if enabled, err := strconv.ParseBool(r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
-		r.Target.Status.Conditions.Set(cond)
-	} else if r.Target.Status.ControllerStatus == nil {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
-		r.Target.Status.Conditions.Set(cond)
-	}
+	SetFirewallStatus(r.Target, mon)
 
 	r.Target.Status.ShootAccess = c.c.GetShootAccess()
 
 	return errors.Join(errs...)
 }
 
-func getMachineStatus(m *models.V1FirewallResponse) (*v2.MachineStatus, error) {
+func setMachineStatus(fw *v2.Firewall, f *models.V1FirewallResponse) error {
+	if f == nil {
+		return nil
+	}
+
+	result, err := getMachineStatus(f)
+	if err != nil {
+		return err
+	}
+
+	fw.Status.MachineStatus = result
+
+	return nil
+}
+
+func getMachineStatus(f *models.V1FirewallResponse) (*v2.MachineStatus, error) {
+	if f.ID == nil || f.Allocation == nil || f.Allocation.Created == nil || f.Liveliness == nil {
+		return nil, fmt.Errorf("firewall entity from metal-api is missing essential fields")
+	}
+
 	result := &v2.MachineStatus{}
+	result.MachineID = *f.ID
+	result.AllocationTimestamp = metav1.NewTime(time.Time(*f.Allocation.Created))
+	result.Liveliness = *f.Liveliness
 
-	if m.ID == nil || m.Allocation == nil || m.Allocation.Created == nil || m.Liveliness == nil {
-		return nil, fmt.Errorf("firewall entity is missing essential fields")
+	if f.Events != nil && f.Events.CrashLoop != nil {
+		result.CrashLoop = *f.Events.CrashLoop
 	}
-
-	result.MachineID = *m.ID
-	result.AllocationTimestamp = metav1.NewTime(time.Time(*m.Allocation.Created))
-	result.Liveliness = *m.Liveliness
-
-	if m.Events != nil && m.Events.CrashLoop != nil {
-		result.CrashLoop = *m.Events.CrashLoop
-	}
-	if m.Events != nil && len(m.Events.Log) > 0 && m.Events.Log[0].Event != nil {
-		log := m.Events.Log[0]
+	if f.Events != nil && len(f.Events.Log) > 0 && f.Events.Log[0].Event != nil {
+		log := f.Events.Log[0]
 
 		result.LastEvent = &v2.MachineLastEvent{
 			Event:     *log.Event,
@@ -71,7 +72,7 @@ func getMachineStatus(m *models.V1FirewallResponse) (*v2.MachineStatus, error) {
 	return result, nil
 }
 
-func getFirewallNetworks(ctx context.Context, cache *cache.Cache[string, *models.V1NetworkResponse], m *models.V1FirewallResponse) ([]v2.FirewallNetwork, error) {
+func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse) error {
 	// check whether network prefixes were updated in metal-api
 	// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
 	// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
@@ -79,20 +80,25 @@ func getFirewallNetworks(ctx context.Context, cache *cache.Cache[string, *models
 	// we replace the prefixes from the snapshot with the actual prefixes that are currently attached to the network.
 	// this allows dynamic prefix reconfiguration of the firewall.
 
-	if m.Allocation == nil {
-		return nil, fmt.Errorf("firewall entity is missing essential fields")
+	if f == nil {
+		return nil
+	}
+
+	if f.Allocation == nil {
+		return fmt.Errorf("firewall entity is missing essential fields")
 	}
 
 	var result []v2.FirewallNetwork
-	for _, n := range m.Allocation.Networks {
+
+	for _, n := range f.Allocation.Networks {
 		n := n
 		if n.Networkid == nil {
 			continue
 		}
 
-		nw, err := cache.Get(ctx, *n.Networkid)
+		nw, err := c.networkCache.Get(r.Ctx, *n.Networkid)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		result = append(result, v2.FirewallNetwork{
@@ -107,5 +113,60 @@ func getFirewallNetworks(ctx context.Context, cache *cache.Cache[string, *models
 		})
 	}
 
-	return result, nil
+	r.Target.Status.FirewallNetworks = result
+
+	return nil
+}
+
+func SetFirewallStatus(fw *v2.Firewall, mon *v2.FirewallMonitor) {
+	if v2.IsAnnotationTrue(fw, v2.FirewallNoControllerConnectionAnnotation) {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
+		fw.Status.Conditions.Set(cond)
+
+		cond = v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "NotChecking", "Not checking distance due to firewall annotation.")
+		fw.Status.Conditions.Set(cond)
+
+		return
+	}
+
+	if mon == nil {
+		return
+	}
+
+	if mon.ControllerStatus == nil {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
+		fw.Status.Conditions.Set(cond)
+
+		cond = v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
+		fw.Status.Conditions.Set(cond)
+
+		return
+	}
+
+	connection := &v2.ControllerConnection{
+		ActualVersion:  mon.ControllerStatus.ControllerVersion,
+		Updated:        mon.ControllerStatus.Updated,
+		ActualDistance: mon.ControllerStatus.Distance,
+	}
+
+	fw.Status.ControllerStatus = connection
+
+	if connection.Updated.Time.IsZero() {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
+		fw.Status.Conditions.Set(cond)
+	} else if time.Since(connection.Updated.Time) > 5*time.Minute {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
+		fw.Status.Conditions.Set(cond)
+	} else {
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.Updated.Time.String()))
+		fw.Status.Conditions.Set(cond)
+	}
+
+	if fw.Distance == connection.ActualDistance {
+		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "Configured", fmt.Sprintf("Controller has configured the specified distance %d.", fw.Distance))
+		fw.Status.Conditions.Set(cond)
+	} else {
+		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionFalse, "NotConfigured", fmt.Sprintf("Controller has configured distance %d, but %d is specified.", connection.ActualDistance, fw.Distance))
+		fw.Status.Conditions.Set(cond)
+	}
 }

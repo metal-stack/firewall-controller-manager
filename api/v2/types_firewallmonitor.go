@@ -53,11 +53,12 @@ type FirewallMonitor struct {
 }
 
 type ControllerStatus struct {
-	Message                 string         `json:"message,omitempty"`
-	FirewallStats           *FirewallStats `json:"stats,omitempty"`
-	ControllerVersion       string         `json:"controllerVersion,omitempty"`
-	NftablesExporterVersion string         `json:"nftablesExporterVersion,omitempty"`
-	Updated                 metav1.Time    `json:"lastRun,omitempty"`
+	Message                 string           `json:"message,omitempty"`
+	FirewallStats           *FirewallStats   `json:"stats,omitempty"`
+	ControllerVersion       string           `json:"controllerVersion,omitempty"`
+	NftablesExporterVersion string           `json:"nftablesExporterVersion,omitempty"`
+	Updated                 metav1.Time      `json:"lastRun,omitempty"`
+	Distance                FirewallDistance `json:"distance,omitempty"`
 }
 
 // FirewallStats contains firewall statistics

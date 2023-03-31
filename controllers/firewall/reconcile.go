@@ -15,22 +15,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// Reconciler must always return either a error or requeue to ensure that it detects if a firewall get lost etc.
+// Reconciler must always return either an error or requeue to ensure that it detects if a firewall get lost etc.
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	var f *models.V1FirewallResponse
 	defer func() {
-		_, err := c.ensureFirewallMonitor(r)
+		mon, err := c.ensureFirewallMonitor(r)
 		if err != nil {
 			r.Log.Error(err, "unable to deploy firewall monitor")
 			// not returning, we can still try to update the status
 		}
 
-		if f == nil {
-			r.Log.Error(fmt.Errorf("not owning a firewall"), "controller is not owning a firewall")
-			return
-		}
-
-		if err := c.setStatus(r, f); err != nil {
+		if err := c.setStatus(r, f, mon); err != nil {
 			r.Log.Error(err, "unable to set firewall status")
 		}
 	}()

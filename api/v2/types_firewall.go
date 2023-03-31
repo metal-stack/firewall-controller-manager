@@ -47,6 +47,10 @@ type Firewall struct {
 	Spec FirewallSpec `json:"spec"`
 	// Status contains current status information on the firewall.
 	Status FirewallStatus `json:"status,omitempty"`
+
+	// Distance defines the as-path length of a firewall.
+	// This field is typically orchestrated by the deployment controller.
+	Distance FirewallDistance `json:"distance"`
 }
 
 // FirewallSpec defines parameters for the firewall creation along with configuration for the firewall-controller.
@@ -100,6 +104,7 @@ type FirewallSpec struct {
 
 	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
+
 	// DNSServerAddress specifies DNS server address used by DNS proxy
 	DNSServerAddress string `json:"dnsServerAddress,omitempty"`
 	// DNSPort specifies port to which DNS proxy should be bound
@@ -172,6 +177,8 @@ const (
 	FirewallControllerConnected ConditionType = "Connected"
 	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
+	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
+	FirewallDistanceConfigured ConditionType = "Distance"
 )
 
 // ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.
@@ -222,6 +229,8 @@ type ControllerConnection struct {
 	ActualVersion string `json:"actualVersion,omitempty"`
 	// Updated is a timestamp when the controller has last reconciled the firewall resource.
 	Updated metav1.Time `json:"lastRun,omitempty"`
+	// ActualDistance is the actual distance as reflected by the firewall-controller.
+	ActualDistance FirewallDistance `json:"actualDistance,omitempty"`
 }
 
 // FirewallNetwork holds refined information about a network that the firewall is connected to.

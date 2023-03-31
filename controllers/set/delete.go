@@ -78,7 +78,7 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 }
 
 // deletePhysicalOrphans checks in the backend if there are firewall entities that belong to the controller
-// event though there is no corresponding firewall resource managed by this controller.
+// even though there is no corresponding firewall resource managed by this controller.
 //
 // such firewalls will be deleted in the backend.
 func (c *controller) deletePhysicalOrphans(r *controllers.Ctx[*v2.FirewallSet]) error {
