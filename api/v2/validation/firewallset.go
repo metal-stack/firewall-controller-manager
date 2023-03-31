@@ -1,6 +1,8 @@
 package validation
 
 import (
+	"fmt"
+
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -28,6 +30,10 @@ func (v *firewallSetValidator) validateSpec(log logr.Logger, f *v2.FirewallSetSp
 
 	if f.Replicas < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
+	}
+
+	if f.Distance < 0 || f.Distance > FirewallMaxDistance {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("distance"), f.Distance, fmt.Sprintf("distance must be between 0 and %d", f.Distance)))
 	}
 
 	if f.Selector == nil {
