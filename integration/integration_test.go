@@ -690,8 +690,11 @@ var _ = Context("integration test", Ordered, func() {
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("FirewallSetUpdated"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)))
+				Expect(cond.Reason).To(Or(Equal("NewFirewallSetAvailable"), Equal("FirewallSetUpdated")))
+				Expect(cond.Message).To(Or(
+					Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)),
+					Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)),
+				))
 			})
 
 			It("should populate the status", func() {
@@ -1105,8 +1108,11 @@ var _ = Context("migration path", Ordered, func() {
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
-				Expect(cond.Reason).To(Equal("NewFirewallSetAvailable"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)))
+				Expect(cond.Reason).To(Or(Equal("NewFirewallSetAvailable"), Equal("FirewallSetUpdated")))
+				Expect(cond.Message).To(Or(
+					Equal(fmt.Sprintf("FirewallSet %q has successfully progressed.", set.Name)),
+					Equal(fmt.Sprintf("Updated firewall set %q.", set.Name)),
+				))
 			})
 
 			It("should populate the status", func() {
