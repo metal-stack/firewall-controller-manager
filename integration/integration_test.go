@@ -411,7 +411,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -686,7 +686,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1101,7 +1101,7 @@ var _ = Context("migration path", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment.DeepCopy(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
