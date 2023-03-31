@@ -52,7 +52,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
-	if enabled, err := strconv.ParseBool(fw.Annotations[v2.FirewallNoControllerConnectionAnnotation]); err == nil && enabled {
+	if v2.IsAnnotationTrue(fw, v2.FirewallNoControllerConnectionAnnotation) {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
 		fw.Status.Conditions.Set(cond)
 	} else {

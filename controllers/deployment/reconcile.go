@@ -144,22 +144,18 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	return nil
 }
 
-func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], lastSet *v2.FirewallSet) (bool, error) {
-	v, ok := lastSet.Annotations[v2.RollSetAnnotation]
-	if ok {
-		rollSet, err := strconv.ParseBool(v)
-		if err == nil && rollSet {
-			r.Log.Info("set roll initiated by annotation")
-			return true, nil
-		}
+func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet) (bool, error) {
+	if v2.IsAnnotationTrue(latestSet, v2.RollSetAnnotation) {
+		r.Log.Info("set roll initiated by annotation")
+		return true, nil
 	}
 
 	var (
 		newS = &r.Target.Spec.Template.Spec
-		oldS = &lastSet.Spec.Template.Spec
+		oldS = &latestSet.Spec.Template.Spec
 	)
 
-	ok = sizeHasChanged(newS, oldS)
+	ok := sizeHasChanged(newS, oldS)
 	if ok {
 		r.Log.Info("firewall size has changed", "size", newS.Size)
 		return ok, nil
