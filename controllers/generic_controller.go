@@ -129,22 +129,24 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	var statusErr error
+
 	if g.hasStatus {
 		defer func() {
 			log.Info("updating status")
 			refetched := g.reconciler.New()
 
-			err := g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
-			if err != nil {
-				log.Error(err, "unable to fetch resource before status update")
+			statusErr := g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
+			if statusErr != nil {
+				log.Error(statusErr, "unable to fetch resource before status update")
 				return
 			}
 
 			g.reconciler.SetStatus(o, refetched)
 
-			err = g.c.Status().Update(ctx, refetched)
-			if err != nil {
-				log.Error(err, "status could not be updated")
+			statusErr = g.c.Status().Update(ctx, refetched)
+			if statusErr != nil {
+				log.Error(statusErr, "status could not be updated")
 			}
 			return
 		}()
@@ -163,7 +165,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, statusErr
 }
 
 type ItemGetter[O client.ObjectList, E metav1.Object] func(O) []E
