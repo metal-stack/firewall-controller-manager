@@ -214,13 +214,13 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 				cancel()
 				if err != nil {
 					log.Error(err, "unable to read token secret")
-					break
+					continue
 				}
 
 				err = os.WriteFile(s.s.tokenPath, []byte(token), 0600)
 				if err != nil {
 					log.Error(err, "unable to update token file")
-					break
+					continue
 				}
 
 				log.Info("updated token file successfully, next update in 5 minutes")
