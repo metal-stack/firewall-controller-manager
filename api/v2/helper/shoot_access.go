@@ -186,7 +186,7 @@ func NewShootAccessTokenUpdater(s *ShootAccessHelper, tokenDir string) (*ShootAc
 func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop context.Context) error {
 	log.Info("updating token file", "path", s.s.tokenPath)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(stop, 3*time.Second)
 	_, token, err := s.s.ReadTokenSecret(ctx)
 	cancel()
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 			case <-ticker.C:
 				log.Info("updating token file", "path", s.s.tokenPath)
 
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				ctx, cancel := context.WithTimeout(stop, 3*time.Second)
 				_, token, err := s.s.ReadTokenSecret(ctx)
 				cancel()
 				if err != nil {
