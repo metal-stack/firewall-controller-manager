@@ -273,37 +273,39 @@ func (f *FirewallList) GetItems() []*Firewall {
 	return result
 }
 
-// SortFirewallsDeletion sorts the given firewall slice for deletion.
+// SortFirewallsByImportance sorts the given firewall slice by important,
+// e.g. for scale down.
+//
 // It considers certain criteria which firewalls should be kept longest and
 // which one's can be deleted first. The precedence is:
 //
-// - Weight annotation (defaults to 0 if no annotation is present)
-// - Connected firewalls
-// - Ready firewalls
-// - Created Firealls
-// - Younger Firewalls
+// - Weight annotation (prefer higher weight, defaults to 0 if no annotation is present)
+// - Firewall lifecycle phase (connected > ready > created, prefer shorter distance when equal)
+// - Firewall age (prefer younger firewalls)
 //
 // The firewalls at the beginning of the slice should be kept as long as possible.
 // The firewalls at the end of the slice should be removed first.
 //
 // The firewalls can be popped off from the slice in a deletion loop.
-func SortFirewallsDeletion(fws []*Firewall) {
-	weight := func(fw *Firewall) (weight int) {
-		a, ok := fw.Annotations[FirewallWeightAnnotation]
-		if !ok {
+func SortFirewallsByImportance(fws []*Firewall) {
+	var (
+		conditionTypes = []ConditionType{FirewallControllerConnected, FirewallReady, FirewallCreated}
+
+		weight = func(fw *Firewall) (weight int) {
+			a, ok := fw.Annotations[FirewallWeightAnnotation]
+			if !ok {
+				return
+			}
+
+			parsed, err := strconv.ParseInt(a, 10, 32)
+			if err != nil {
+				return
+			}
+
+			weight = int(parsed)
 			return
 		}
-
-		parsed, err := strconv.ParseInt(a, 10, 32)
-		if err != nil {
-			return
-		}
-
-		weight = int(parsed)
-		return
-	}
-
-	conditionTypes := []ConditionType{FirewallControllerConnected, FirewallReady, FirewallCreated}
+	)
 
 	sort.Slice(fws, func(i, j int) bool {
 		a := fws[i]
@@ -328,9 +330,18 @@ func SortFirewallsDeletion(fws []*Firewall) {
 			if !aTrue && bTrue {
 				return false
 			}
+			if aTrue && bTrue {
+				// prefer shorter distances because these are potentially "active"
+				if a.Distance < b.Distance {
+					return true
+				}
+				if a.Distance > b.Distance {
+					return false
+				}
+			}
 		}
 
-		// prefer younger firewalls
+		// prefer younger firewalls (these potentially run on a more up-to-date operating system image)
 		return !a.CreationTimestamp.Before(&b.CreationTimestamp)
 	})
 }
