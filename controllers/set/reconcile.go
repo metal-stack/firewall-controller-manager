@@ -115,7 +115,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		return err
 	}
 
-	return c.deletePhysicalOrphans(r)
+	return nil
 }
 
 func pop[E any](slice []E) (E, []E) {
