@@ -13,13 +13,10 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
-	metalfirewall "github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/models"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/mock"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -90,12 +87,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	_, metalClient := metalclient.NewMetalMockClient(testingT, &metalclient.MetalMockFns{
-		Firewall: func(m *mock.Mock) {
-			// muting the orphan controller
-			m.On("FindFirewalls", mock.Anything, mock.Anything).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{}}, nil)
-		},
-	})
+	_, metalClient := metalclient.NewMetalMockClient(testingT, &metalclient.MetalMockFns{})
 
 	cc, err := controllerconfig.New(&controllerconfig.NewControllerConfig{
 		SeedClient:        k8sClient,
