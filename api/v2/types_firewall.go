@@ -36,6 +36,7 @@ const (
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".status.machineStatus.machineID"
 // +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.lastEvent.event"
+// +kubebuilder:printcolumn:name="Distance",type="string",priority=1,JSONPath=".distance"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".status.machineStatus.allocationTimestamp"
 // +kubebuilder:printcolumn:name="Spec Version",type="string",priority=1,JSONPath=".spec.controllerVersion"
 // +kubebuilder:printcolumn:name="Actual Version",type="string",priority=1,JSONPath=".status.controllerStatus.actualVersion"

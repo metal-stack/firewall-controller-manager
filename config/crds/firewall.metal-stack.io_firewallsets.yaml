@@ -30,6 +30,10 @@ spec:
     - jsonPath: .status.unhealthyReplicas
       name: Unhealthy
       type: integer
+    - jsonPath: .spec.distance
+      name: Distance
+      priority: 1
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -278,4 +282,7 @@ spec:
     served: true
     storage: true
     subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.readyReplicas
       status: {}

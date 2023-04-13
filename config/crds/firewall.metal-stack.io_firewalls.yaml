@@ -27,6 +27,10 @@ spec:
     - jsonPath: .status.machineStatus.lastEvent.event
       name: Last Event
       type: string
+    - jsonPath: .distance
+      name: Distance
+      priority: 1
+      type: string
     - jsonPath: .status.machineStatus.allocationTimestamp
       name: Age
       type: date
