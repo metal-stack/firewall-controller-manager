@@ -47,6 +47,7 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 				},
 			},
 		},
+		Distance: 0,
 	}
 
 	tests := []struct {
@@ -141,6 +142,7 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 						},
 					},
 				},
+				Distance: 0,
 			},
 			oldF: &v2.Firewall{
 				ObjectMeta: metav1.ObjectMeta{
@@ -171,6 +173,7 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 						},
 					},
 				},
+				Distance: 0,
 			},
 			wantErr: nil,
 		},

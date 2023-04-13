@@ -230,7 +230,9 @@ var _ = Context("integration test", Ordered, func() {
 				// simulating a firewall-controller updating the resource
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				mon.ControllerStatus = &v2.ControllerStatus{
-					Updated: metav1.NewTime(time.Now()),
+					Updated:           metav1.NewTime(time.Now()),
+					Distance:          v2.FirewallShortestDistance,
+					DistanceSupported: true,
 				}
 				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
 			})
@@ -314,6 +316,17 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
 				Expect(cond.Reason).To(Equal("Connected"))
 				Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.Updated.Time.String())))
+			})
+
+			It("should have configured the distance", func() {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+					return fd.Status.Conditions
+				}, v2.FirewallDistanceConfigured, v2.ConditionTrue, 15*time.Second)
+
+				Expect(cond.LastTransitionTime).NotTo(BeZero())
+				Expect(cond.LastUpdateTime).NotTo(BeZero())
+				Expect(cond.Reason).To(Equal("Configured"))
+				Expect(cond.Message).To(Equal(fmt.Sprintf("Controller has configured the specified distance %d.", v2.FirewallShortestDistance)))
 			})
 		})
 
@@ -463,7 +476,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 		})
 
-		Context("the firewall resource", func() {
+		Context("the new firewall resource", func() {
 			It("should be named after the namespace (it's the shoot name in the end)", func() {
 				Expect(fw.Name).To(HavePrefix(namespaceName + "-firewall-"))
 			})
@@ -519,6 +532,17 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
 				Expect(cond.Reason).To(Equal("NotReady"))
 				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is not ready.", *installingFirewall.Allocation.Name)))
+			})
+
+			It("should not yet have a distance configured", func() {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+					return fd.Status.Conditions
+				}, v2.FirewallDistanceConfigured, v2.ConditionFalse, 15*time.Second)
+
+				Expect(cond.LastTransitionTime).NotTo(BeZero())
+				Expect(cond.LastUpdateTime).NotTo(BeZero())
+				Expect(cond.Reason).To(Equal("NotConnected"))
+				Expect(cond.Message).To(Equal("Controller has not yet connected."))
 			})
 
 			It("should have the monitor condition true", func() {
@@ -582,7 +606,7 @@ var _ = Context("integration test", Ordered, func() {
 			})
 		})
 
-		Context("the firewall set resource", func() {
+		Context("the new firewall set resource", func() {
 			It("should be named after the deployment", func() {
 				Expect(set.Name).To(HavePrefix(deployment.Name + "-"))
 			})
@@ -595,10 +619,14 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(set.Spec.Replicas).To(Equal(1))
 			})
 
-			It("should inherit the spec from the deployement", func() {
+			It("should inherit the spec from the deployment", func() {
 				wantSpec := deployment.Spec.Template.Spec.DeepCopy()
-				wantSpec.Size = "n2-medium-x86"
+				wantSpec.Size = "n2-medium-x86" // this is the change that triggered the rolling update
 				Expect(&set.Spec.Template.Spec).To(BeComparableTo(wantSpec))
+			})
+
+			It("should start with a higher distance", func() {
+				Expect(set.Spec.Distance).To(Equal(v2.FirewallRollingUpdateSetDistance))
 			})
 
 			It("should have the deployment as an owner", func() {
@@ -684,7 +712,7 @@ var _ = Context("integration test", Ordered, func() {
 			readyFirewall = firewall2("Phoned Home", "is phoning home")
 		)
 
-		When("the firewall gets ready and the firewall-controller connects", func() {
+		When("the firewall gets ready and the firewall-controller connects", Ordered, func() {
 			It("should allow an update of the firewall monitor", func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Machine: func(m *mock.Mock) {
@@ -702,9 +730,22 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
 				// simulating a firewall-controller updating the resource
 				mon.ControllerStatus = &v2.ControllerStatus{
-					Updated: metav1.NewTime(time.Now()),
+					Updated:           metav1.NewTime(time.Now()),
+					Distance:          v2.FirewallRollingUpdateSetDistance,
+					DistanceSupported: true,
 				}
 				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
+			})
+
+			It("the firewall should reflect the distance during a rolling update", func() {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+					return fd.Status.Conditions
+				}, v2.FirewallDistanceConfigured, v2.ConditionTrue, 15*time.Second)
+
+				Expect(cond.LastTransitionTime).NotTo(BeZero())
+				Expect(cond.LastUpdateTime).NotTo(BeZero())
+				Expect(cond.Reason).To(Equal("Configured"))
+				Expect(cond.Message).To(Equal(fmt.Sprintf("Controller has configured the specified distance %d.", v2.FirewallRollingUpdateSetDistance)))
 			})
 		})
 
@@ -736,6 +777,14 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
 					return fw.Status.ControllerStatus
 				}, 15*time.Second, interval).Should(Not(BeNil()), "controller connection was not synced to firewall resource")
+			})
+
+			It("the firewall set should be updated to shortest distance as the update has succeeded", func() {
+				Eventually(func() v2.FirewallDistance {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
+					return set.Spec.Distance
+				}).Within(5 * time.Second).ProbeEvery(200 * time.Millisecond).Should(Equal(v2.FirewallShortestDistance))
+				Expect(set.Spec.Distance).To(Equal(v2.FirewallShortestDistance))
 			})
 		})
 	})

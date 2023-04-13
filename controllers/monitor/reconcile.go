@@ -9,6 +9,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,33 +53,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
-	if v2.IsAnnotationTrue(fw, v2.FirewallNoControllerConnectionAnnotation) {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
-		fw.Status.Conditions.Set(cond)
-	} else {
-		if r.Target.ControllerStatus == nil {
-			cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
-			fw.Status.Conditions.Set(cond)
-		} else {
-			connection := &v2.ControllerConnection{
-				ActualVersion: r.Target.ControllerStatus.ControllerVersion,
-				Updated:       r.Target.ControllerStatus.Updated,
-			}
-
-			fw.Status.ControllerStatus = connection
-
-			if connection.Updated.Time.IsZero() {
-				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
-				fw.Status.Conditions.Set(cond)
-			} else if time.Since(connection.Updated.Time) > 5*time.Minute {
-				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
-				fw.Status.Conditions.Set(cond)
-			} else {
-				cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.Updated.Time.String()))
-				fw.Status.Conditions.Set(cond)
-			}
-		}
-	}
+	firewall.SetFirewallStatus(fw, r.Target)
 
 	err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
 	if err != nil {

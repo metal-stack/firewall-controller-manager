@@ -12,6 +12,14 @@ import (
 const (
 	// FirewallControllerSetAnnotation is a tag added to the firewall entity indicating to which set a firewall belongs to.
 	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
+
+	FirewallShortestDistance         = FirewallDistance(0)
+	FirewallRollingUpdateSetDistance = FirewallDistance(3)
+	FirewallLongestDistance          = FirewallDistance(8)
+
+	// FirewallMaxReplicas defines the maximum amount of firewall replicas to be defined.
+	// It does not make sense to allow large values here as it wastes a lot of machines.
+	FirewallMaxReplicas = 4
 )
 
 func FirewallSetTag(setName string) string {
@@ -27,10 +35,12 @@ func FirewallManagedByTag() string {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=fwset
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.readyReplicas
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.spec.replicas`
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Progressing",type=integer,JSONPath=`.status.progressingReplicas`
 // +kubebuilder:printcolumn:name="Unhealthy",type=integer,JSONPath=`.status.unhealthyReplicas`
+// +kubebuilder:printcolumn:name="Distance",type="string",priority=1,JSONPath=".spec.distance"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type FirewallSet struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -53,7 +63,23 @@ type FirewallSetSpec struct {
 	Selector map[string]string `json:"selector,omitempty"`
 	// Template is the firewall spec used for creating the firewalls.
 	Template FirewallTemplateSpec `json:"template"`
+	// Distance defines the as-path length of the firewalls.
+	// This field is typically orchestrated by the deployment controller.
+	Distance FirewallDistance `json:"distance"`
 }
+
+// FirewallDistance defines the as-path length of firewalls, influencing how strong they attract
+// network traffic for routing traffic in and out of the cluster.
+// This is of particular interest during rolling firewall updates, i.e. when there is
+// more than a single firewall running in front of the cluster.
+// During a rolling update, new firewalls start with a longer distance such that
+// traffic is only attracted by the existing firewalls ("firewall staging").
+// When the new firewall has connected successfully to the firewall monitor, the deployment
+// controller throws away the old firewalls and the new firewall takes over the routing.
+// The deployment controller will then shorten the distance of the new firewall.
+// This approach reduces service interruption of the external user traffic of the cluster
+// (for firewall-controller versions that support this feature).
+type FirewallDistance uint8
 
 type FirewallSetStatus struct {
 	// TargetReplicas is the amount of firewall replicas targeted to be running.

@@ -36,6 +36,7 @@ const (
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Machine ID",type="string",JSONPath=".status.machineStatus.machineID"
 // +kubebuilder:printcolumn:name="Last Event",type="string",JSONPath=".status.machineStatus.lastEvent.event"
+// +kubebuilder:printcolumn:name="Distance",type="string",priority=1,JSONPath=".distance"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".status.machineStatus.allocationTimestamp"
 // +kubebuilder:printcolumn:name="Spec Version",type="string",priority=1,JSONPath=".spec.controllerVersion"
 // +kubebuilder:printcolumn:name="Actual Version",type="string",priority=1,JSONPath=".status.controllerStatus.actualVersion"
@@ -47,6 +48,10 @@ type Firewall struct {
 	Spec FirewallSpec `json:"spec"`
 	// Status contains current status information on the firewall.
 	Status FirewallStatus `json:"status,omitempty"`
+
+	// Distance defines the as-path length of a firewall.
+	// This field is typically orchestrated by the deployment controller.
+	Distance FirewallDistance `json:"distance"`
 }
 
 // FirewallSpec defines parameters for the firewall creation along with configuration for the firewall-controller.
@@ -100,6 +105,7 @@ type FirewallSpec struct {
 
 	// LogAcceptedConnections if set to true, also log accepted connections in the droptailer log.
 	LogAcceptedConnections bool `json:"logAcceptedConnections,omitempty"`
+
 	// DNSServerAddress specifies DNS server address used by DNS proxy
 	DNSServerAddress string `json:"dnsServerAddress,omitempty"`
 	// DNSPort specifies port to which DNS proxy should be bound
@@ -172,6 +178,8 @@ const (
 	FirewallControllerConnected ConditionType = "Connected"
 	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
+	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
+	FirewallDistanceConfigured ConditionType = "Distance"
 )
 
 // ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.
@@ -222,6 +230,8 @@ type ControllerConnection struct {
 	ActualVersion string `json:"actualVersion,omitempty"`
 	// Updated is a timestamp when the controller has last reconciled the firewall resource.
 	Updated metav1.Time `json:"lastRun,omitempty"`
+	// ActualDistance is the actual distance as reflected by the firewall-controller.
+	ActualDistance FirewallDistance `json:"actualDistance,omitempty"`
 }
 
 // FirewallNetwork holds refined information about a network that the firewall is connected to.
@@ -264,37 +274,39 @@ func (f *FirewallList) GetItems() []*Firewall {
 	return result
 }
 
-// SortFirewallsDeletion sorts the given firewall slice for deletion.
+// SortFirewallsByImportance sorts the given firewall slice by importance,
+// e.g. for scale down.
+//
 // It considers certain criteria which firewalls should be kept longest and
 // which one's can be deleted first. The precedence is:
 //
-// - Weight annotation (defaults to 0 if no annotation is present)
-// - Connected firewalls
-// - Ready firewalls
-// - Created Firealls
-// - Younger Firewalls
+// - Weight annotation (prefer higher weight, defaults to 0 if no annotation is present)
+// - Firewall lifecycle phase (connected > ready > created, prefer shorter distance when equal)
+// - Firewall age (prefer younger firewalls)
 //
 // The firewalls at the beginning of the slice should be kept as long as possible.
 // The firewalls at the end of the slice should be removed first.
 //
 // The firewalls can be popped off from the slice in a deletion loop.
-func SortFirewallsDeletion(fws []*Firewall) {
-	weight := func(fw *Firewall) (weight int) {
-		a, ok := fw.Annotations[FirewallWeightAnnotation]
-		if !ok {
+func SortFirewallsByImportance(fws []*Firewall) {
+	var (
+		conditionTypes = []ConditionType{FirewallControllerConnected, FirewallReady, FirewallCreated}
+
+		weight = func(fw *Firewall) (weight int) {
+			a, ok := fw.Annotations[FirewallWeightAnnotation]
+			if !ok {
+				return
+			}
+
+			parsed, err := strconv.ParseInt(a, 10, 32)
+			if err != nil {
+				return
+			}
+
+			weight = int(parsed)
 			return
 		}
-
-		parsed, err := strconv.ParseInt(a, 10, 32)
-		if err != nil {
-			return
-		}
-
-		weight = int(parsed)
-		return
-	}
-
-	conditionTypes := []ConditionType{FirewallControllerConnected, FirewallReady, FirewallCreated}
+	)
 
 	sort.Slice(fws, func(i, j int) bool {
 		a := fws[i]
@@ -319,9 +331,18 @@ func SortFirewallsDeletion(fws []*Firewall) {
 			if !aTrue && bTrue {
 				return false
 			}
+			if aTrue && bTrue {
+				// prefer shorter distances because these are potentially "active"
+				if a.Distance < b.Distance {
+					return true
+				}
+				if a.Distance > b.Distance {
+					return false
+				}
+			}
 		}
 
-		// prefer younger firewalls
+		// prefer younger firewalls (these potentially run on a more up-to-date operating system image)
 		return !a.CreationTimestamp.Before(&b.CreationTimestamp)
 	})
 }
