@@ -26,13 +26,48 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 	ownedFirewalls = append(ownedFirewalls, adoptions...)
 
-	for _, fw := range ownedFirewalls {
+	// we sort for distance orchestration and for scale down deletion
+	// - the most important firewall will get the shortest distance to attract all the traffic
+	// - the least important at the end of the slice can be popped off for deletion on scale down
+	v2.SortFirewallsByImportance(ownedFirewalls)
+
+	for i, fw := range ownedFirewalls {
 		fw.Spec = r.Target.Spec.Template.Spec
+
+		// stagger firewall replicas to achieve active/standby behavior
+		//
+		// we give the most important firewall the shortest distance within a set
+		// this firewall attracts the traffic within the replica set
+		//
+		// the second most important firewall gets a longer distance
+		// such that it takes over the traffic in case the first replica dies
+		// (first-level backup)
+		//
+		// the rest of the firewalls get an even higher distance
+		// (third-level backup)
+		// one of them moves up on next set sync after deletion of the "active" replica
+		var distance v2.FirewallDistance
+		switch i {
+		case 0:
+			distance = r.Target.Spec.Distance + 0
+		case 1:
+			distance = r.Target.Spec.Distance + 1
+		default:
+			distance = r.Target.Spec.Distance + 2
+		}
+
+		if distance > v2.FirewallLongestDistance {
+			distance = v2.FirewallLongestDistance
+		}
+
+		fw.Distance = distance
 
 		err := c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error updating firewall spec: %w", err)
 		}
+
+		r.Log.Info("updated/synced firewall", "name", fw.Name, "distance", distance)
 	}
 
 	currentAmount := len(ownedFirewalls)
@@ -56,9 +91,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 	if currentAmount > r.Target.Spec.Replicas {
 		r.Log.Info("scale down", "current", currentAmount, "want", r.Target.Spec.Replicas)
-
-		// puts the least important at the end of the slice, we will then pop them off for deletion
-		v2.SortFirewallsDeletion(ownedFirewalls)
 
 		for i := r.Target.Spec.Replicas; i < currentAmount; i++ {
 			var fw *v2.Firewall
@@ -122,6 +154,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 	fw := &v2.Firewall{
 		ObjectMeta: *meta,
 		Spec:       r.Target.Spec.Template.Spec,
+		Distance:   r.Target.Spec.Distance,
 	}
 
 	err = c.c.GetSeedClient().Create(r.Ctx, fw, &client.CreateOptions{})

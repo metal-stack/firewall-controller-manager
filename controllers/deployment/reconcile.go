@@ -37,7 +37,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 	if current == nil {
 		r.Log.Info("no firewall set is present, creating a new one")
 
-		_, err := c.createFirewallSet(r, 0)
+		_, err := c.createFirewallSet(r, v2.FirewallShortestDistance, 0)
 		if err != nil {
 			return err
 		}
@@ -63,19 +63,31 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return err
 	}
 
+	// we are done with the update, give the set the shortest distance if this is not already the case
+	if current.Status.ReadyReplicas == current.Spec.Replicas && current.Spec.Distance != v2.FirewallShortestDistance {
+		current.Spec.Distance = v2.FirewallShortestDistance
+
+		err := c.c.GetSeedClient().Update(r.Ctx, current)
+		if err != nil {
+			return fmt.Errorf("unable to swap latest set distance to %d: %w", v2.FirewallShortestDistance, err)
+		}
+
+		r.Log.Info("swapped latest set to shortest distance", "distance", v2.FirewallShortestDistance)
+	}
+
 	return nil
 }
 
-func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], current *v2.FirewallSet) (*v2.FirewallSet, error) {
+func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], current *v2.FirewallSet, distance v2.FirewallDistance) (*v2.FirewallSet, error) {
 	revision, err := controllers.NextRevision(current)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.createFirewallSet(r, revision)
+	return c.createFirewallSet(r, distance, revision)
 }
 
-func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], revision int) (*v2.FirewallSet, error) {
+func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], distance v2.FirewallDistance, revision int) (*v2.FirewallSet, error) {
 	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.c.GetSafetyBackoff() {
 		// this is just for safety reasons to prevent mass-allocations
 		r.Log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
@@ -104,6 +116,7 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		Spec: v2.FirewallSetSpec{
 			Replicas: r.Target.Spec.Replicas,
 			Template: r.Target.Spec.Template,
+			Distance: distance,
 		},
 	}
 

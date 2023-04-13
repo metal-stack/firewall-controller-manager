@@ -23,6 +23,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			Selector: map[string]string{
 				"purpose": "shoot-firewall",
 			},
+			Distance: 0,
 			Template: v2.FirewallTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -109,6 +110,18 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "no more than max allowed replicas",
+			mutateFn: func(f *v2.FirewallSet) *v2.FirewallSet {
+				f.Spec.Replicas = 200
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall" is invalid: spec.replicas: Invalid value: 200: no more than 4 firewall replicas are allowed`,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -134,6 +147,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 				"purpose": "shoot-firewall",
 				"a":       "b",
 			},
+			Distance: 0,
 			Template: v2.FirewallTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
