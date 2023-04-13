@@ -31,17 +31,16 @@ spec:
       name: Distance
       priority: 1
       type: string
-    - jsonPath: .status.machineStatus.allocationTimestamp
-      name: Age
-      type: date
+    - jsonPath: .status.controllerStatus.actualVersion
+      name: Version
+      type: string
     - jsonPath: .spec.controllerVersion
       name: Spec Version
       priority: 1
       type: string
-    - jsonPath: .status.controllerStatus.actualVersion
-      name: Actual Version
-      priority: 1
-      type: string
+    - jsonPath: .status.machineStatus.allocationTimestamp
+      name: Age
+      type: date
     name: v2
     schema:
       openAPIV3Schema:
