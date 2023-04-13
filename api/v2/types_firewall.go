@@ -274,7 +274,7 @@ func (f *FirewallList) GetItems() []*Firewall {
 	return result
 }
 
-// SortFirewallsByImportance sorts the given firewall slice by important,
+// SortFirewallsByImportance sorts the given firewall slice by importance,
 // e.g. for scale down.
 //
 // It considers certain criteria which firewalls should be kept longest and
