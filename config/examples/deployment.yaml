@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firewall-controller-manager
+  namespace: default
+  labels:
+    app: firewall-controller-manager
+spec:
+  selector:
+    matchLabels:
+      app: firewall-controller-manager
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: firewall-controller-manager
+    spec:
+      serviceAccountName: firewall-controller-manager
+      containers:
+      - name: firewall-controller-manager
+        image: ghcr.io/metal-stack/firewall-controller-manager:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - -cert-dir=/certs
+          - -log-level=info
+          - -seed-api-url=seed-url
+          - -cluster-id=example-cluster
+          - -enable-leader-election
+          - -metal-api-url=http://metal-api.metal-control-plane.svc.cluster.local:8080/metal
+          - -namespace=default
+          - -shoot-kubeconfig-secret-name=generic-token-kubeconfig
+          - -shoot-token-secret-name=shoot-access-firewall-controller-manager
+          - -ssh-key-secret-name=ssh-secret
+          - -shoot-token-path=/token
+        env:
+          - name: METAL_AUTH_HMAC
+            value: metal-admin
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: "/certs"
+          readOnly: true
+        - name: token-dir
+          mountPath: "/token"
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: firewall-controller-manager
+      - name: token-dir
+        emptyDir: {}

@@ -15,6 +15,7 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -133,35 +134,43 @@ func main() {
 		l.Fatalw("unable to create shoot helper", "error", err)
 	}
 
-	// we do not mount the shoot client kubeconfig + token secret into the container
-	// through projected token mount as the other controllers deployed by Gardener.
-	//
-	// the reasoning for this is:
-	//
-	//   - we have to pass on the shoot access to the firewall-controller, too
-	//   - the firewall-controller is not a member of the Kubernetes cluster and
-	//     pushing files onto the firewall is not possible
-	//   - therefore, we defined flags for the shoot access generic kubeconfig and token
-	//     secret for this controller and expose the access secrets through the firewall
-	//     status resource, which can be read by the firewall-controller
-	//   - the firewall-controller can then create a client from these secrets but
-	//     it has to contiuously update the token file because the token will expire
-	//   - we can re-use the same approach for this controller as well and do not have
-	//     to do any additional mounts for the deployment of the controller
-	//
-	updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
-	if err != nil {
-		l.Fatalw("unable to create shoot access token updater", "error", err)
-	}
+	var shootConfig *rest.Config
 
-	err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
-	if err != nil {
-		l.Fatalw("unable to start token updater", "error", err)
-	}
+	if shootApiURL != "" {
+		// we do not mount the shoot client kubeconfig + token secret into the container
+		// through projected token mount as the other controllers deployed by Gardener.
+		//
+		// the reasoning for this is:
+		//
+		//   - we have to pass on the shoot access to the firewall-controller, too
+		//   - the firewall-controller is not a member of the Kubernetes cluster and
+		//     pushing files onto the firewall is not possible
+		//   - therefore, we defined flags for the shoot access generic kubeconfig and token
+		//     secret for this controller and expose the access secrets through the firewall
+		//     status resource, which can be read by the firewall-controller
+		//   - the firewall-controller can then create a client from these secrets but
+		//     it has to contiuously update the token file because the token will expire
+		//   - we can re-use the same approach for this controller as well and do not have
+		//     to do any additional mounts for the deployment of the controller
+		//
+		updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
+		if err != nil {
+			l.Fatalw("unable to create shoot access token updater", "error", err)
+		}
 
-	shootConfig, err := shootAccessHelper.RESTConfig(stop)
-	if err != nil {
-		l.Fatalw("unable to create shoot config", "error", err)
+		err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
+		if err != nil {
+			l.Fatalw("unable to start token updater", "error", err)
+		}
+
+		shootConfig, err = shootAccessHelper.RESTConfig(stop)
+		if err != nil {
+			l.Fatalw("unable to create shoot config", "error", err)
+		}
+	} else {
+		l.Infow("running in single-cluster mode")
+
+		shootConfig = seedMgr.GetConfig()
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{

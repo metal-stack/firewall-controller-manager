@@ -27,9 +27,11 @@ func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig *rest.Config, 
 		return fmt.Errorf("unable to ensure seed rbac: %w", err)
 	}
 
-	err = ensureShootRBAC(ctx, shootAccessHelper, shootNamespace, deploy)
-	if err != nil {
-		return fmt.Errorf("unable to ensure shoot rbac: %w", err)
+	if shootAccess.APIServerURL != "" {
+		err = ensureShootRBAC(ctx, shootAccessHelper, shootNamespace, deploy)
+		if err != nil {
+			return fmt.Errorf("unable to ensure shoot rbac: %w", err)
+		}
 	}
 
 	return nil

@@ -1,0 +1,23 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+
+secretGenerator:
+  - name: firewall-controller-manager
+    files:
+      - examples/certs/tls.crt
+      - examples/certs/tls.key
+
+resources:
+  - crds/firewall.metal-stack.io_firewalldeployments.yaml
+  - crds/firewall.metal-stack.io_firewallmonitors.yaml
+  - crds/firewall.metal-stack.io_firewalls.yaml
+  - crds/firewall.metal-stack.io_firewallsets.yaml
+  - webhooks/manifests.yaml
+  - examples/rbac.yaml
+  - examples/deployment.yaml
+  - examples/service.yaml
+
+patchesStrategicMerge:
+- examples/kustomize/patch-webhooks.yaml

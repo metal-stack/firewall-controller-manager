@@ -111,7 +111,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 
 	defaultFirewallSpec(&f.Spec.Template.Spec)
 
-	if f.Spec.Template.Spec.Userdata == "" {
+	if f.Spec.Template.Spec.Userdata == "" && r.c.GetShootAPIServerURL() != "" {
 		err := helper.EnsureFirewallControllerRBAC(ctx, r.c.GetSeedConfig(), f, r.c.GetShootNamespace(), r.c.GetShootAccess(), r.c.GetShootAccessHelper())
 		if err != nil {
 			return err
