@@ -37,6 +37,9 @@ func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.Firewall
 	if f.Replicas < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, "replicas cannot be a negative number"))
 	}
+	if f.Replicas > v2.FirewallMaxReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), f.Replicas, fmt.Sprintf("no more than %d firewall replicas are allowed", v2.FirewallMaxReplicas)))
+	}
 
 	if f.Selector == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), f.Selector, "selector should not be nil"))

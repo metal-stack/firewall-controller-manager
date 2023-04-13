@@ -16,6 +16,10 @@ const (
 	FirewallShortestDistance         = FirewallDistance(0)
 	FirewallRollingUpdateSetDistance = FirewallDistance(3)
 	FirewallLongestDistance          = FirewallDistance(8)
+
+	// FirewallMaxReplicas defines the maximum amount of firewall replicas to be defined.
+	// It does not make sense to allow large values here as it wastes a lot of machines.
+	FirewallMaxReplicas = 4
 )
 
 func FirewallSetTag(setName string) string {
@@ -75,7 +79,7 @@ type FirewallSetSpec struct {
 // The deployment controller will then shorten the distance of the new firewall.
 // This approach reduces service interruption of the external user traffic of the cluster
 // (for firewall-controller versions that support this feature).
-type FirewallDistance int
+type FirewallDistance uint8
 
 type FirewallSetStatus struct {
 	// TargetReplicas is the amount of firewall replicas targeted to be running.

@@ -33,7 +33,7 @@ func Test_SortFirewallsByImportance(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "lowest weight", Annotations: map[string]string{FirewallWeightAnnotation: "-100"}},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected shortest distance", CreationTimestamp: metav1.NewTime(now.Add(-20 * time.Minute))}, Distance: -1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected shortest distance", CreationTimestamp: metav1.NewTime(now.Add(-20 * time.Minute))}, Distance: FirewallShortestDistance, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "middle", CreationTimestamp: metav1.NewTime(now)},
@@ -42,7 +42,7 @@ func Test_SortFirewallsByImportance(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "created"}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallCreated, ConditionTrue, "Created", "")}},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Distance: FirewallShortestDistance + 1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "ready younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
@@ -54,7 +54,7 @@ func Test_SortFirewallsByImportance(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "no information"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected older", CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected older", CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute))}, Distance: FirewallShortestDistance + 1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 			},
 			want: []*Firewall{
@@ -62,13 +62,13 @@ func Test_SortFirewallsByImportance(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "highest weight", Annotations: map[string]string{FirewallWeightAnnotation: "100"}},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected shortest distance", CreationTimestamp: metav1.NewTime(now.Add(-20 * time.Minute))}, Distance: -1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected shortest distance", CreationTimestamp: metav1.NewTime(now.Add(-20 * time.Minute))}, Distance: FirewallShortestDistance, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Distance: FirewallShortestDistance + 1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "connected older", CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
+					ObjectMeta: metav1.ObjectMeta{Name: "connected older", CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute))}, Distance: FirewallShortestDistance + 1, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallControllerConnected, ConditionTrue, "Connected", ""), NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "ready younger", CreationTimestamp: metav1.NewTime(now.Add(5 * time.Minute))}, Status: FirewallStatus{Conditions: Conditions{NewCondition(FirewallReady, ConditionTrue, "Ready", "")}},
