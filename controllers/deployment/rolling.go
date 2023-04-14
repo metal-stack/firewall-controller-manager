@@ -9,8 +9,8 @@ import (
 )
 
 // rollingUpdateStrategy first creates a new set and deletes the old one's when the new one becomes ready
-func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet, current *v2.FirewallSet) error {
-	newSetRequired, err := c.isNewSetRequired(r, current)
+func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet, latestSet *v2.FirewallSet) error {
+	newSetRequired, err := c.isNewSetRequired(r, latestSet)
 	if err != nil {
 		return err
 	}
@@ -18,7 +18,9 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 	if newSetRequired {
 		r.Log.Info("significant changes detected in the spec, creating new firewall set", "distance", v2.FirewallRollingUpdateSetDistance)
 
-		newSet, err := c.createNextFirewallSet(r, current, v2.FirewallRollingUpdateSetDistance)
+		newSet, err := c.createNextFirewallSet(r, latestSet, &setOverrides{
+			distance: v2.FirewallRollingUpdateSetDistance.Pointer(),
+		})
 		if err != nil {
 			return err
 		}
@@ -30,28 +32,28 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	err = c.syncFirewallSet(r, current)
+	err = c.syncFirewallSet(r, latestSet)
 	if err != nil {
 		return fmt.Errorf("unable to update firewall set: %w", err)
 	}
 
-	if current.Status.ReadyReplicas != current.Spec.Replicas {
+	if latestSet.Status.ReadyReplicas != latestSet.Spec.Replicas {
 		r.Log.Info("set replicas are not yet ready")
 
-		if time.Since(current.CreationTimestamp.Time) > c.c.GetProgressDeadline() {
-			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", current.Name))
+		if time.Since(latestSet.CreationTimestamp.Time) > c.c.GetProgressDeadline() {
+			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", latestSet.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}
 
 		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", current.Name))
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", latestSet.Name))
 	r.Target.Status.Conditions.Set(cond)
 
 	r.Log.Info("ensuring old sets are cleaned up")
 
-	oldSets := controllers.Except(ownedSets, current)
+	oldSets := controllers.Except(ownedSets, latestSet)
 
 	return c.deleteFirewallSets(r, oldSets...)
 }

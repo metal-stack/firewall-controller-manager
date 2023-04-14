@@ -8,8 +8,8 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/machine"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
@@ -41,7 +41,9 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 
 		resp, err := c.c.GetMetal().Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(r.Ctx), nil)
 		if err != nil {
-			return fmt.Errorf("firewall delete error: %w", err)
+			r.Log.Error(err, "firewall deletion failed")
+
+			return controllers.RequeueAfter(5*time.Second, "firewall deletion failed, retrying")
 		}
 
 		r.Log.Info("deleted firewall", "firewall-name", f.Name, "id", *resp.Payload.ID)
@@ -62,8 +64,11 @@ func (c *controller) deleteFirewallMonitor(ctx context.Context, fw *v2.Firewall)
 
 	err := c.c.GetShootClient().Delete(ctx, mon)
 	if err != nil {
-		return client.IgnoreNotFound(err)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	return nil
+	return controllers.RequeueAfter(1*time.Second, "waiting for firewall monitor to be deleted, requeuing")
 }

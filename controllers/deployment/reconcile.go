@@ -29,15 +29,15 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return fmt.Errorf("unable to get owned sets: %w", err)
 	}
 
-	current, err := controllers.MaxRevisionOf(ownedSets)
+	latestSet, err := controllers.MaxRevisionOf(ownedSets)
 	if err != nil {
 		return err
 	}
 
-	if current == nil {
+	if latestSet == nil {
 		r.Log.Info("no firewall set is present, creating a new one")
 
-		_, err := c.createFirewallSet(r, v2.FirewallShortestDistance, 0)
+		_, err := c.createFirewallSet(r, 0, nil)
 		if err != nil {
 			return err
 		}
@@ -47,9 +47,9 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 
 	switch s := r.Target.Spec.Strategy; s {
 	case v2.StrategyRecreate:
-		err = c.recreateStrategy(r, ownedSets, current)
+		err = c.recreateStrategy(r, ownedSets, latestSet)
 	case v2.StrategyRollingUpdate:
-		err = c.rollingUpdateStrategy(r, ownedSets, current)
+		err = c.rollingUpdateStrategy(r, ownedSets, latestSet)
 	default:
 		err = fmt.Errorf("unknown deployment strategy: %s", s)
 	}
@@ -64,10 +64,10 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 	}
 
 	// we are done with the update, give the set the shortest distance if this is not already the case
-	if current.Status.ReadyReplicas == current.Spec.Replicas && current.Spec.Distance != v2.FirewallShortestDistance {
-		current.Spec.Distance = v2.FirewallShortestDistance
+	if latestSet.Status.ReadyReplicas == latestSet.Spec.Replicas && latestSet.Spec.Distance != v2.FirewallShortestDistance {
+		latestSet.Spec.Distance = v2.FirewallShortestDistance
 
-		err := c.c.GetSeedClient().Update(r.Ctx, current)
+		err := c.c.GetSeedClient().Update(r.Ctx, latestSet)
 		if err != nil {
 			return fmt.Errorf("unable to swap latest set distance to %d: %w", v2.FirewallShortestDistance, err)
 		}
@@ -78,16 +78,23 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 	return nil
 }
 
-func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], current *v2.FirewallSet, distance v2.FirewallDistance) (*v2.FirewallSet, error) {
-	revision, err := controllers.NextRevision(current)
+func (c *controller) createNextFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], set *v2.FirewallSet, ows *setOverrides) (*v2.FirewallSet, error) {
+	revision, err := controllers.NextRevision(set)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.createFirewallSet(r, distance, revision)
+	return c.createFirewallSet(r, revision, ows)
 }
 
-func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], distance v2.FirewallDistance, revision int) (*v2.FirewallSet, error) {
+type setOverrides struct {
+	// override default distance (shortest distance)
+	distance *v2.FirewallDistance
+	// override default replicas (inherited from set spec)
+	replicas *int
+}
+
+func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], revision int, ows *setOverrides) (*v2.FirewallSet, error) {
 	if lastCreation, ok := c.lastSetCreation[r.Target.Name]; ok && time.Since(lastCreation) < c.c.GetSafetyBackoff() {
 		// this is just for safety reasons to prevent mass-allocations
 		r.Log.Info("backing off from firewall set creation as last creation is only seconds ago", "ago", time.Since(lastCreation).String())
@@ -99,7 +106,18 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s-%s", r.Target.Name, uuid.String()[:5])
+	var (
+		name     = fmt.Sprintf("%s-%s", r.Target.Name, uuid.String()[:5])
+		distance = v2.FirewallShortestDistance
+		replicas = r.Target.Spec.Replicas
+	)
+
+	if ows != nil && ows.distance != nil {
+		distance = *ows.distance
+	}
+	if ows != nil && ows.replicas != nil {
+		replicas = *ows.replicas
+	}
 
 	set := &v2.FirewallSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -114,7 +132,7 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 			Labels: r.Target.Labels,
 		},
 		Spec: v2.FirewallSetSpec{
-			Replicas: r.Target.Spec.Replicas,
+			Replicas: replicas,
 			Template: r.Target.Spec.Template,
 			Distance: distance,
 		},
