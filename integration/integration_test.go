@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	interval = 250 * time.Millisecond
+	interval = 200 * time.Millisecond
 
 	namespace = &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
