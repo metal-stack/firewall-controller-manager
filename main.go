@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
@@ -32,6 +35,19 @@ const (
 	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
 )
 
+func healthCheckFunc(log *zap.SugaredLogger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
+	return func(req *http.Request) error {
+		log.Info("health check called")
+
+		fws := &v2.FirewallList{}
+		err := seedClient.List(req.Context(), fws, controllerclient.InNamespace(namespace))
+		if err != nil {
+			return fmt.Errorf("unable to list firewalls in namespace %s", namespace)
+		}
+		return nil
+	}
+}
+
 func main() {
 	var (
 		scheme   = helper.MustNewFirewallScheme()
@@ -39,6 +55,7 @@ func main() {
 
 		logLevel                string
 		metricsAddr             string
+		healthAddr              string
 		enableLeaderElection    bool
 		shootKubeconfigSecret   string
 		shootTokenSecret        string
@@ -59,6 +76,7 @@ func main() {
 
 	flag.StringVar(&logLevel, "log-level", "info", "the log level of the controller")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "the address the metric endpoint binds to")
+	flag.StringVar(&healthAddr, "health-addr", ":8081", "the address the health endpoint binds to")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager")
@@ -71,7 +89,7 @@ func main() {
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
 	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
-	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server")
+	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server, if not provided falls back to single-cluster mode")
 	flag.StringVar(&seedApiURL, "seed-api-url", "", "url of the seed api server")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
@@ -107,6 +125,7 @@ func main() {
 	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
+		HealthProbeBindAddress:  healthAddr,
 		Port:                    9443,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
@@ -128,38 +147,62 @@ func main() {
 		l.Fatalw("unable to create seed client", "error", err)
 	}
 
-	shootAccessHelper := helper.NewShootAccessHelper(seedClient, shootAccess)
-	if err != nil {
-		l.Fatalw("unable to create shoot helper", "error", err)
+	if err := seedMgr.AddHealthzCheck("health", healthCheckFunc(l.Named("health"), seedClient, namespace)); err != nil {
+		l.Fatalw("unable to set up health check", "error", err)
+	}
+	if err := seedMgr.AddReadyzCheck("check", healthCheckFunc(l.Named("ready"), seedMgr.GetClient(), namespace)); err != nil {
+		l.Fatalw("unable to set up ready check", "error", err)
 	}
 
-	// we do not mount the shoot client kubeconfig + token secret into the container
-	// through projected token mount as the other controllers deployed by Gardener.
-	//
-	// the reasoning for this is:
-	//
-	//   - we have to pass on the shoot access to the firewall-controller, too
-	//   - the firewall-controller is not a member of the Kubernetes cluster and
-	//     pushing files onto the firewall is not possible
-	//   - therefore, we defined flags for the shoot access generic kubeconfig and token
-	//     secret for this controller and expose the access secrets through the firewall
-	//     status resource, which can be read by the firewall-controller
-	//   - the firewall-controller can then create a client from these secrets but
-	//     it has to contiuously update the token file because the token will expire
-	//   - we can re-use the same approach for this controller as well and do not have
-	//     to do any additional mounts for the deployment of the controller
-	//
-	updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
-	if err != nil {
-		l.Fatalw("unable to create shoot access token updater", "error", err)
+	var shootAccessHelper *helper.ShootAccessHelper
+
+	if shootApiURL == "" {
+		shootApiURL = seedMgr.GetConfig().Host
+		shootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
+		if err != nil {
+			l.Fatalw("unable to create shoot helper", "error", err)
+		}
+		l.Infow("running in single-cluster mode")
+	} else {
+		shootAccessHelper = helper.NewShootAccessHelper(seedClient, shootAccess)
+		if err != nil {
+			l.Fatalw("unable to create shoot helper", "error", err)
+		}
+		l.Infow("running in split-cluster mode (seed and shoot client)")
 	}
 
-	err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
-	if err != nil {
-		l.Fatalw("unable to start token updater", "error", err)
+	if shootTokenPath != "" {
+		// we do not mount the shoot client kubeconfig + token secret into the container
+		// through projected token mount as the other controllers deployed by Gardener.
+		//
+		// the reasoning for this is:
+		//
+		//   - we have to pass on the shoot access to the firewall-controller, too
+		//   - the firewall-controller is not a member of the Kubernetes cluster and
+		//     pushing files onto the firewall is not possible
+		//   - therefore, we defined flags for the shoot access generic kubeconfig and token
+		//     secret for this controller and expose the access secrets through the firewall
+		//     status resource, which can be read by the firewall-controller
+		//   - the firewall-controller can then create a client from these secrets but
+		//     it has to contiuously update the token file because the token will expire
+		//   - we can re-use the same approach for this controller as well and do not have
+		//     to do any additional mounts for the deployment of the controller
+		//
+		updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
+		if err != nil {
+			l.Fatalw("unable to create shoot access token updater", "error", err)
+		}
+
+		err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
+		if err != nil {
+			l.Fatalw("unable to start token updater", "error", err)
+		}
 	}
 
-	shootConfig, err := shootAccessHelper.RESTConfig(stop)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	shootConfig, err := shootAccessHelper.RESTConfig(ctx)
 	if err != nil {
 		l.Fatalw("unable to create shoot config", "error", err)
 	}
