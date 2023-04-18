@@ -51,11 +51,7 @@ spec:
         - name: webhook-certs
           mountPath: "/certs"
           readOnly: true
-        - name: token-dir
-          mountPath: "/token"
       volumes:
       - name: webhook-certs
         secret:
           secretName: firewall-controller-manager
-      - name: token-dir
-        emptyDir: {}
