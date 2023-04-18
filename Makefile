@@ -43,8 +43,8 @@ deploy: generate fmt vet manifests manager
 	kubectl apply -k config
 	docker build -f Dockerfile.dev -t fcm .
 	kind --name metal-control-plane load docker-image fcm:latest
-	kubectl patch deployment -n default firewall-controller-manager --patch='{"spec":{"template":{"spec":{"containers":[{"name": "firewall-controller-manager","imagePullPolicy":"IfNotPresent","image":"fcm:latest"}]}}}}'
-	kubectl delete pod -n default -l app=firewall-controller-manager
+	kubectl patch deployment -n firewall firewall-controller-manager --patch='{"spec":{"template":{"spec":{"containers":[{"name": "firewall-controller-manager","imagePullPolicy":"IfNotPresent","image":"fcm:latest"}]}}}}'
+	kubectl delete pod -n firewall -l app=firewall-controller-manager
 
 # Install CRDs into a cluster
 install: manifests

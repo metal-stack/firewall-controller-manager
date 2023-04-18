@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: firewall-controller-manager
-  namespace: default
+  namespace: firewall
   labels:
     app: firewall-controller-manager
 spec:
@@ -40,7 +40,7 @@ spec:
           - -cluster-id=example-cluster
           - -enable-leader-election
           - -metal-api-url=http://metal-api.metal-control-plane.svc.cluster.local:8080/metal
-          - -namespace=default
+          - -namespace=firewall
           - -shoot-kubeconfig-secret-name=generic-token-kubeconfig
           - -shoot-token-secret-name=shoot-access-firewall-controller-manager
           - -ssh-key-secret-name=ssh-secret

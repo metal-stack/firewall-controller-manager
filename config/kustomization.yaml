@@ -1,7 +1,7 @@
 ---
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: default
+namespace: firewall
 
 secretGenerator:
   - name: firewall-controller-manager
@@ -14,6 +14,7 @@ resources:
   - crds/firewall.metal-stack.io_firewallmonitors.yaml
   - crds/firewall.metal-stack.io_firewalls.yaml
   - crds/firewall.metal-stack.io_firewallsets.yaml
+  - examples/namespace.yaml
   - webhooks/manifests.yaml
   - examples/rbac.yaml
   - examples/deployment.yaml

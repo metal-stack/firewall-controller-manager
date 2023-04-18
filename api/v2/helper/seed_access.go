@@ -206,7 +206,7 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 			},
 		}
 
-		_, err := controllerutil.CreateOrUpdate(ctx, shoot, serviceAccount, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, shoot, serviceAccountSecret, func() error {
 			serviceAccountSecret.Annotations = map[string]string{
 				"kubernetes.io/service-account.name": serviceAccount.Name,
 			}

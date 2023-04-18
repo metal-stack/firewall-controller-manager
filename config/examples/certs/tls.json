@@ -2,7 +2,7 @@
   "CN": "localhost",
   "hosts": [
     "localhost",
-    "firewall-controller-manager.default.svc"
+    "firewall-controller-manager.firewall.svc"
   ],
   "key": {
     "algo": "ecdsa",

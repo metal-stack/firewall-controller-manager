@@ -89,7 +89,7 @@ func main() {
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
 	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
-	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server")
+	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server, if not provided falls back to single-cluster mode")
 	flag.StringVar(&seedApiURL, "seed-api-url", "", "url of the seed api server")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
@@ -157,6 +157,7 @@ func main() {
 	var shootAccessHelper *helper.ShootAccessHelper
 
 	if shootApiURL == "" {
+		shootApiURL = seedMgr.GetConfig().Host
 		shootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
 		if err != nil {
 			l.Fatalw("unable to create shoot helper", "error", err)

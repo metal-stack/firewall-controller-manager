@@ -114,6 +114,9 @@ func (c *NewControllerConfig) validate() error {
 	if c.ShootNamespace == "" {
 		return fmt.Errorf("shoot namespace must be specified")
 	}
+	if c.ShootAPIServerURL == "" {
+		return fmt.Errorf("shoot api server url must be specified")
+	}
 
 	if c.ShootAccess == nil {
 		return fmt.Errorf("shoot access must be specified")

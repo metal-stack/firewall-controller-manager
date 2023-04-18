@@ -131,7 +131,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			ForShoot:     true,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating raw shoot kubeconfig: %w", err)
 		}
 
 		seedKubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
@@ -142,7 +142,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			Deployment:   f,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating raw seed kubeconfig: %w", err)
 		}
 
 		userdata, err := renderUserdata(shootKubeconfig, seedKubeconfig)
