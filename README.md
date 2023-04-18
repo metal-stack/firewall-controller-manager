@@ -4,7 +4,7 @@
 
 The firewall-controller-manager (FCM) is a collection of controllers which are responsible for managing the lifecycle of firewalls in a [Gardener](https://gardener.cloud/) shoot cluster for the metal-stack provider.
 
-The FCM is deployed into the shoot namespace of a seed cluster. This is done by the [gardener-extension-provider-metal](https://github.com/metal-stack/gardener-extension-provider-metal/).
+The FCM is typically deployed into the shoot namespace of a seed cluster. This is done by the [gardener-extension-provider-metal](https://github.com/metal-stack/gardener-extension-provider-metal/).
 
 The design of the FCM is roughly inspired by Gardener's [machine-controller-manager](https://github.com/gardener/machine-controller-manager) and Kubernetes' built-in resources `Deployment`, `ReplicaSet` and `Pod`.
 
@@ -38,7 +38,7 @@ Creates and deletes the physical firewall machine from the spec at the [metal-ap
 A user can initiate rolling the latest firewall set by annotating a monitor in the following way:
 
 ```bash
-$ kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
+kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
 ```
 
 ## Development

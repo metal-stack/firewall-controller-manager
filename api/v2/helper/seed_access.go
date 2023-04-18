@@ -188,7 +188,7 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 		Scheme: scheme,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to create seed client: %w", err)
+		return fmt.Errorf("unable to create shoot client: %w", err)
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, shoot, serviceAccount, func() error {

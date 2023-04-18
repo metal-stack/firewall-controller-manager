@@ -111,7 +111,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 
 	defaultFirewallSpec(&f.Spec.Template.Spec)
 
-	if f.Spec.Template.Spec.Userdata == "" && r.c.GetShootAPIServerURL() != "" {
+	if f.Spec.Template.Spec.Userdata == "" {
 		shootConfig, err := r.c.GetShootAccessHelper().RESTConfig(ctx)
 		if err != nil {
 			return err
