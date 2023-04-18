@@ -21,6 +21,18 @@ spec:
       - name: firewall-controller-manager
         image: ghcr.io/metal-stack/firewall-controller-manager:latest
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
         args:
           - -cert-dir=/certs
           - -log-level=info

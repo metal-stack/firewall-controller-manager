@@ -4,10 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
@@ -33,6 +35,19 @@ const (
 	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
 )
 
+func healthCheckFunc(log *zap.SugaredLogger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
+	return func(req *http.Request) error {
+		log.Info("health check called")
+
+		fws := &v2.FirewallList{}
+		err := seedClient.List(req.Context(), fws, controllerclient.InNamespace(namespace))
+		if err != nil {
+			return fmt.Errorf("unable to list firewalls in namespace %s", namespace)
+		}
+		return nil
+	}
+}
+
 func main() {
 	var (
 		scheme   = helper.MustNewFirewallScheme()
@@ -40,6 +55,7 @@ func main() {
 
 		logLevel                string
 		metricsAddr             string
+		healthAddr              string
 		enableLeaderElection    bool
 		shootKubeconfigSecret   string
 		shootTokenSecret        string
@@ -60,6 +76,7 @@ func main() {
 
 	flag.StringVar(&logLevel, "log-level", "info", "the log level of the controller")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":2112", "the address the metric endpoint binds to")
+	flag.StringVar(&healthAddr, "health-addr", ":8081", "the address the health endpoint binds to")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager")
@@ -108,6 +125,7 @@ func main() {
 	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
+		HealthProbeBindAddress:  healthAddr,
 		Port:                    9443,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
@@ -127,6 +145,13 @@ func main() {
 	})
 	if err != nil {
 		l.Fatalw("unable to create seed client", "error", err)
+	}
+
+	if err := seedMgr.AddHealthzCheck("health", healthCheckFunc(l.Named("health"), seedClient, namespace)); err != nil {
+		l.Fatalw("unable to set up health check", "error", err)
+	}
+	if err := seedMgr.AddReadyzCheck("check", healthCheckFunc(l.Named("ready"), seedMgr.GetClient(), namespace)); err != nil {
+		l.Fatalw("unable to set up ready check", "error", err)
 	}
 
 	var shootAccessHelper *helper.ShootAccessHelper
