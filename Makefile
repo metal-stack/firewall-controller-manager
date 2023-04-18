@@ -38,9 +38,13 @@ manager: generate fmt vet
 						 -o bin/firewall-controller-manager main.go
 	strip bin/firewall-controller-manager
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
-	go run ./main.go --cluster-id=abcd --cluster-api-url=https://api.abcd:443 --cert-dir config/examples/certs --metal-api-url http://api.172.17.0.1.nip.io:8080/metal
+# Run against the mini-lab
+deploy: generate fmt vet manifests manager
+	kubectl apply -k config
+	docker build -f Dockerfile.dev -t fcm .
+	kind --name metal-control-plane load docker-image fcm:latest
+	kubectl patch deployment -n firewall firewall-controller-manager --patch='{"spec":{"template":{"spec":{"containers":[{"name": "firewall-controller-manager","imagePullPolicy":"IfNotPresent","image":"fcm:latest"}]}}}}'
+	kubectl delete pod -n firewall -l app=firewall-controller-manager
 
 # Install CRDs into a cluster
 install: manifests
@@ -49,11 +53,6 @@ install: manifests
 # Uninstall CRDs from a cluster
 uninstall: manifests
 	kustomize build config/crds | kubectl delete -f -
-
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
-	cd config/manager && kustomize edit set image controller=${IMG}
-	kustomize build config | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen

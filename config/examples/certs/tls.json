@@ -1,7 +1,8 @@
 {
   "CN": "localhost",
   "hosts": [
-    "localhost"
+    "localhost",
+    "firewall-controller-manager.firewall.svc"
   ],
   "key": {
     "algo": "ecdsa",

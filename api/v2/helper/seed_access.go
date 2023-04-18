@@ -21,13 +21,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.FirewallDeployment, shootNamespace string, shootAccess *v2.ShootAccess, shootAccessHelper *ShootAccessHelper) error {
+func EnsureFirewallControllerRBAC(ctx context.Context, seedConfig, shootConfig *rest.Config, deploy *v2.FirewallDeployment, shootNamespace string, shootAccess *v2.ShootAccess) error {
 	err := ensureSeedRBAC(ctx, seedConfig, deploy, shootAccess)
 	if err != nil {
 		return fmt.Errorf("unable to ensure seed rbac: %w", err)
 	}
 
-	err = ensureShootRBAC(ctx, shootAccessHelper, shootNamespace, deploy)
+	err = ensureShootRBAC(ctx, shootConfig, shootNamespace, deploy)
 	if err != nil {
 		return fmt.Errorf("unable to ensure shoot rbac: %w", err)
 	}
@@ -158,7 +158,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 	return nil
 }
 
-func ensureShootRBAC(ctx context.Context, shootAccessHelper *ShootAccessHelper, shootNamespace string, deploy *v2.FirewallDeployment) error {
+func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespace string, deploy *v2.FirewallDeployment) error {
 	var (
 		name           = shootAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
@@ -179,12 +179,14 @@ func ensureShootRBAC(ctx context.Context, shootAccessHelper *ShootAccessHelper, 
 		}
 	)
 
-	k8sVersion, err := shootAccessHelper.K8sVersion(ctx)
+	k8sVersion, err := determineK8sVersion(shootConfig)
 	if err != nil {
 		return fmt.Errorf("unable to determine shoot k8s version: %w", err)
 	}
 
-	shoot, err := shootAccessHelper.Client(ctx)
+	shoot, err := controllerclient.New(shootConfig, controllerclient.Options{
+		Scheme: scheme,
+	})
 	if err != nil {
 		return fmt.Errorf("unable to create shoot client: %w", err)
 	}
@@ -204,7 +206,7 @@ func ensureShootRBAC(ctx context.Context, shootAccessHelper *ShootAccessHelper, 
 			},
 		}
 
-		_, err := controllerutil.CreateOrUpdate(ctx, shoot, serviceAccount, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, shoot, serviceAccountSecret, func() error {
 			serviceAccountSecret.Annotations = map[string]string{
 				"kubernetes.io/service-account.name": serviceAccount.Name,
 			}

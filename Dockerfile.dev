@@ -1,0 +1,4 @@
+FROM alpine:3.17
+COPY bin/firewall-controller-manager /firewall-controller-manager
+USER 65534
+ENTRYPOINT ["/firewall-controller-manager"]

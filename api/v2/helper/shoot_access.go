@@ -7,7 +7,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -16,8 +15,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/golang-jwt/jwt/v4"
 
 	"k8s.io/client-go/tools/clientcmd"
 	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
@@ -28,8 +25,12 @@ type ShootAccessHelper struct {
 	seed      client.Client
 	access    *v2.ShootAccess
 	tokenPath string
+
+	shootConfig *rest.Config
 }
 
+// NewShootAccessHelper provides shoot access functions based on shoot access secrets,
+// i.e. Gardener's generic kubeconfig and token secret.
 func NewShootAccessHelper(seed client.Client, access *v2.ShootAccess) *ShootAccessHelper {
 	return &ShootAccessHelper{
 		seed:   seed,
@@ -37,7 +38,51 @@ func NewShootAccessHelper(seed client.Client, access *v2.ShootAccess) *ShootAcce
 	}
 }
 
+// NewSingleClusterModeHelper provides shoot access functions when running in a single-mode
+// cluster, i.e. the shoot client equals the seed client.
+func NewSingleClusterModeHelper(shootConfig *rest.Config) *ShootAccessHelper {
+	return &ShootAccessHelper{
+		shootConfig: shootConfig,
+	}
+}
+
 func (s *ShootAccessHelper) Config(ctx context.Context) (*configv1.Config, error) {
+	if s.shootConfig != nil {
+		return &configv1.Config{
+			Kind:       "Config",
+			APIVersion: "v1",
+			Clusters: []configv1.NamedCluster{
+				{
+					Name: "default-cluster",
+					Cluster: configv1.Cluster{
+						Server:                   s.shootConfig.Host,
+						CertificateAuthorityData: s.shootConfig.CAData,
+					},
+				},
+			},
+			Contexts: []configv1.NamedContext{
+				{
+					Name: "default-context",
+					Context: configv1.Context{
+						Cluster:   "default-cluster",
+						Namespace: "default",
+						AuthInfo:  "default",
+					},
+				},
+			},
+			CurrentContext: "default-context",
+			AuthInfos: []configv1.NamedAuthInfo{
+				{
+					Name: "default",
+					AuthInfo: configv1.AuthInfo{
+						Token:     s.shootConfig.BearerToken,
+						TokenFile: s.shootConfig.BearerTokenFile,
+					},
+				},
+			},
+		}, nil
+	}
+
 	kubeconfigTemplate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.access.GenericKubeconfigSecretName,
@@ -90,6 +135,10 @@ func (s *ShootAccessHelper) Raw(ctx context.Context) ([]byte, error) {
 }
 
 func (s *ShootAccessHelper) RESTConfig(ctx context.Context) (*rest.Config, error) {
+	if s.shootConfig != nil {
+		return s.shootConfig, nil
+	}
+
 	raw, err := s.Raw(ctx)
 	if err != nil {
 		return nil, err
@@ -104,9 +153,18 @@ func (s *ShootAccessHelper) RESTConfig(ctx context.Context) (*rest.Config, error
 }
 
 func (s *ShootAccessHelper) Client(ctx context.Context) (client.Client, error) {
-	config, err := s.RESTConfig(ctx)
-	if err != nil {
-		return nil, err
+	var (
+		config *rest.Config
+		err    error
+	)
+
+	if s.shootConfig != nil {
+		config = s.shootConfig
+	} else {
+		config, err = s.RESTConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	client, err := controllerclient.New(config, controllerclient.Options{
@@ -119,21 +177,7 @@ func (s *ShootAccessHelper) Client(ctx context.Context) (client.Client, error) {
 	return client, err
 }
 
-func (s *ShootAccessHelper) K8sVersion(ctx context.Context) (*semver.Version, error) {
-	config, err := s.RESTConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	v, err := determineK8sVersion(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return v, err
-}
-
-func (s *ShootAccessHelper) ReadTokenSecret(ctx context.Context) (*time.Time, string, error) {
+func (s *ShootAccessHelper) readTokenSecret(ctx context.Context) (string, error) {
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.access.TokenSecretName,
@@ -143,22 +187,12 @@ func (s *ShootAccessHelper) ReadTokenSecret(ctx context.Context) (*time.Time, st
 
 	err := s.seed.Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret)
 	if err != nil {
-		return nil, "", fmt.Errorf("unable to read token secret: %w", err)
+		return "", fmt.Errorf("unable to read token secret: %w", err)
 	}
 
 	token := string(tokenSecret.Data["token"])
 
-	claims := &jwt.RegisteredClaims{}
-	_, _, err = new(jwt.Parser).ParseUnverified(token, claims)
-	if err != nil {
-		return nil, "", fmt.Errorf("shoot access token is not parsable: %w", err)
-	}
-
-	if claims.ExpiresAt != nil {
-		return &claims.ExpiresAt.Time, token, nil
-	}
-
-	return nil, token, nil
+	return token, nil
 }
 
 type ShootAccessTokenUpdater struct {
@@ -187,7 +221,7 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 	log.Info("updating token file", "path", s.s.tokenPath)
 
 	ctx, cancel := context.WithTimeout(stop, 3*time.Second)
-	_, token, err := s.s.ReadTokenSecret(ctx)
+	token, err := s.s.readTokenSecret(ctx)
 	cancel()
 	if err != nil {
 		return fmt.Errorf("unable to read token secret: %w", err)
@@ -210,7 +244,7 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 				log.Info("updating token file", "path", s.s.tokenPath)
 
 				ctx, cancel := context.WithTimeout(stop, 3*time.Second)
-				_, token, err := s.s.ReadTokenSecret(ctx)
+				token, err := s.s.readTokenSecret(ctx)
 				cancel()
 				if err != nil {
 					log.Error(err, "unable to read token secret")

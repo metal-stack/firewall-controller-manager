@@ -106,12 +106,12 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	defaultFirewallSpec(&f.Spec.Template.Spec)
 
 	if f.Spec.Template.Spec.Userdata == "" {
-		err := helper.EnsureFirewallControllerRBAC(ctx, r.c.GetSeedConfig(), f, r.c.GetShootNamespace(), r.c.GetShootAccess(), r.c.GetShootAccessHelper())
+		shootConfig, err := r.c.GetShootAccessHelper().RESTConfig(ctx)
 		if err != nil {
 			return err
 		}
 
-		shootConfig, err := r.c.GetShootAccessHelper().RESTConfig(ctx)
+		err = helper.EnsureFirewallControllerRBAC(ctx, r.c.GetSeedConfig(), shootConfig, f, r.c.GetShootNamespace(), r.c.GetShootAccess())
 		if err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			ForShoot:     true,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating raw shoot kubeconfig: %w", err)
 		}
 
 		seedKubeconfig, err := helper.GetAccessKubeconfig(&helper.AccessConfig{
@@ -136,7 +136,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 			Deployment:   f,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating raw seed kubeconfig: %w", err)
 		}
 
 		userdata, err := renderUserdata(shootKubeconfig, seedKubeconfig)
