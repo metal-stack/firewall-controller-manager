@@ -31,7 +31,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	// - the least important at the end of the slice can be popped off for deletion on scale down
 	v2.SortFirewallsByImportance(ownedFirewalls)
 
-	for i, fw := range ownedFirewalls {
+	for i, ownedFw := range ownedFirewalls {
+		fw := &v2.Firewall{}
+		err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(ownedFw), fw)
+		if err != nil {
+			return fmt.Errorf("error fetching firewall: %w", err)
+		}
+
 		fw.Spec = r.Target.Spec.Template.Spec
 
 		// stagger firewall replicas to achieve active/standby behavior
@@ -62,7 +68,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 		fw.Distance = distance
 
-		err := c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
+		err = c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error updating firewall spec: %w", err)
 		}

@@ -53,7 +53,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
-	firewall.SetFirewallStatus(fw, r.Target)
+	firewall.SetFirewallStatusFromMonitor(fw, r.Target)
 
 	err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
 	if err != nil {

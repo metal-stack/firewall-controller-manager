@@ -19,15 +19,16 @@ import (
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	var f *models.V1FirewallResponse
 	defer func() {
+		if err := c.setStatus(r, f); err != nil {
+			r.Log.Error(err, "unable to set firewall status")
+		}
+
 		mon, err := c.ensureFirewallMonitor(r)
 		if err != nil {
 			r.Log.Error(err, "unable to deploy firewall monitor")
-			// not returning, we can still try to update the status
 		}
 
-		if err := c.setStatus(r, f, mon); err != nil {
-			r.Log.Error(err, "unable to set firewall status")
-		}
+		SetFirewallStatusFromMonitor(r.Target, mon)
 	}()
 
 	fws, err := c.firewallCache.Get(r.Ctx, r.Target)
