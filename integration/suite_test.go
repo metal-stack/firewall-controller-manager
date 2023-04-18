@@ -16,6 +16,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,6 +99,8 @@ var _ = BeforeSuite(func() {
 		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	metalClient, _ = metalclient.NewMetalMockClient(testingT, nil)
 
 	cc, err := controllerconfig.New(&controllerconfig.NewControllerConfig{
 		SeedClient:        k8sClient,

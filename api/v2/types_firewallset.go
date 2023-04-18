@@ -30,6 +30,10 @@ func FirewallManagedByTag() string {
 	return fmt.Sprintf("%s=%s", FirewallControllerManagedByAnnotation, FirewallControllerManager)
 }
 
+func (f FirewallDistance) Pointer() *FirewallDistance {
+	return &f
+}
+
 // FirewallSet contains the spec template of a firewall resource similar to a Kubernetes ReplicaSet and takes care that the desired amount of firewall replicas is running.
 //
 // +kubebuilder:object:root=true

@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse, mon *v2.FirewallMonitor) error {
+func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse) error {
 	var errs []error
 
 	err := setMachineStatus(r.Target, f)
@@ -23,8 +23,6 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1Fir
 	if err != nil {
 		errs = append(errs, err)
 	}
-
-	SetFirewallStatus(r.Target, mon)
 
 	r.Target.Status.ShootAccess = c.c.GetShootAccess()
 
@@ -118,7 +116,7 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 	return nil
 }
 
-func SetFirewallStatus(fw *v2.Firewall, mon *v2.FirewallMonitor) {
+func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 	if v2.IsAnnotationTrue(fw, v2.FirewallNoControllerConnectionAnnotation) {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
 		fw.Status.Conditions.Set(cond)

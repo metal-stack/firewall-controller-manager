@@ -79,9 +79,6 @@ func (r *firewallSetDefaulter) Default(ctx context.Context, obj runtime.Object) 
 
 	r.log.Info("defaulting firewallset resource", "name", f.GetName(), "namespace", f.GetNamespace())
 
-	if f.Spec.Replicas == 0 {
-		f.Spec.Replicas = 1
-	}
 	if f.Spec.Selector == nil {
 		f.Spec.Selector = f.Spec.Template.Labels
 	}
@@ -99,9 +96,6 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 
 	r.log.Info("defaulting firewalldeployment resource", "name", f.GetName(), "namespace", f.GetNamespace())
 
-	if f.Spec.Replicas == 0 {
-		f.Spec.Replicas = 1
-	}
 	if f.Spec.Strategy == "" {
 		f.Spec.Strategy = v2.StrategyRollingUpdate
 	}
