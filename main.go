@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -15,7 +16,6 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -129,14 +129,23 @@ func main() {
 		l.Fatalw("unable to create seed client", "error", err)
 	}
 
-	shootAccessHelper := helper.NewShootAccessHelper(seedClient, shootAccess)
-	if err != nil {
-		l.Fatalw("unable to create shoot helper", "error", err)
+	var shootAccessHelper *helper.ShootAccessHelper
+
+	if shootApiURL == "" {
+		shootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
+		if err != nil {
+			l.Fatalw("unable to create shoot helper", "error", err)
+		}
+		l.Infow("running in single-cluster mode")
+	} else {
+		shootAccessHelper = helper.NewShootAccessHelper(seedClient, shootAccess)
+		if err != nil {
+			l.Fatalw("unable to create shoot helper", "error", err)
+		}
+		l.Infow("running in split-cluster mode (seed and shoot client)")
 	}
 
-	var shootConfig *rest.Config
-
-	if shootApiURL != "" {
+	if shootTokenPath != "" {
 		// we do not mount the shoot client kubeconfig + token secret into the container
 		// through projected token mount as the other controllers deployed by Gardener.
 		//
@@ -162,15 +171,14 @@ func main() {
 		if err != nil {
 			l.Fatalw("unable to start token updater", "error", err)
 		}
+	}
 
-		shootConfig, err = shootAccessHelper.RESTConfig(stop)
-		if err != nil {
-			l.Fatalw("unable to create shoot config", "error", err)
-		}
-	} else {
-		l.Infow("running in single-cluster mode")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		shootConfig = seedMgr.GetConfig()
+	shootConfig, err := shootAccessHelper.RESTConfig(ctx)
+	if err != nil {
+		l.Fatalw("unable to create shoot config", "error", err)
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
