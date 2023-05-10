@@ -80,7 +80,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
-	if versionGreaterOrEqual125(k8sVersion) {
+	if versionGreaterOrEqual124(k8sVersion) {
 		serviceAccountSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -198,7 +198,7 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
-	if versionGreaterOrEqual125(k8sVersion) {
+	if versionGreaterOrEqual124(k8sVersion) {
 		serviceAccountSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -293,8 +293,8 @@ func determineK8sVersion(config *rest.Config) (*semver.Version, error) {
 	return k8sVersion, nil
 }
 
-func versionGreaterOrEqual125(v *semver.Version) bool {
-	constraint, err := semver.NewConstraint(">=v1.25.0")
+func versionGreaterOrEqual124(v *semver.Version) bool {
+	constraint, err := semver.NewConstraint(">=v1.24.0")
 	if err != nil {
 		return false
 	}
@@ -359,7 +359,7 @@ func GetAccessKubeconfig(c *AccessConfig) ([]byte, error) {
 		return nil, fmt.Errorf("unable to create client: %w", err)
 	}
 
-	if versionGreaterOrEqual125(k8sVersion) {
+	if versionGreaterOrEqual124(k8sVersion) {
 		saSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
