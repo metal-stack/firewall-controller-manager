@@ -9,6 +9,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -163,6 +164,8 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		Distance:   r.Target.Spec.Distance,
 	}
 
+	_ = controllerutil.AddFinalizer(fw, v2.FinalizerName)
+
 	err = c.c.GetSeedClient().Create(r.Ctx, fw, &client.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create firewall resource: %w", err)
@@ -204,6 +207,7 @@ func (c *controller) adoptFirewall(r *controllers.Ctx[*v2.FirewallSet], fw *v2.F
 	}
 
 	fw.OwnerReferences = append(fw.OwnerReferences, *metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")))
+	_ = controllerutil.AddFinalizer(fw, v2.FinalizerName)
 
 	err = c.c.GetSeedClient().Update(r.Ctx, fw)
 	if err != nil {

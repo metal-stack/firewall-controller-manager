@@ -23,7 +23,9 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	fw, err := c.updateFirewallStatus(r)
 	if err != nil {
 		r.Log.Error(err, "unable to update firewall status")
-		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")
+		// the update on the firewall resource is racing with the set controller update on the firewall resource
+		// we choose a small requeue period to enforce the update...
+		return controllers.RequeueAfter(3*time.Millisecond, "unable to update firewall status, retrying")
 	}
 
 	err = c.offerFirewallControllerMigrationSecret(r, fw)
@@ -48,6 +50,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 			Namespace: c.c.GetSeedNamespace(),
 		},
 	}
+
 	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 	if err != nil {
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)

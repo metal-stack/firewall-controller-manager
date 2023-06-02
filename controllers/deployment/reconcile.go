@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error {
@@ -137,6 +138,8 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 			Distance: distance,
 		},
 	}
+
+	_ = controllerutil.AddFinalizer(set, v2.FinalizerName)
 
 	err = c.c.GetSeedClient().Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {

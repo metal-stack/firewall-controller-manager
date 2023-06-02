@@ -123,8 +123,9 @@ var _ = Context("integration test", Ordered, func() {
 		deployment = func() *v2.FirewallDeployment {
 			return &v2.FirewallDeployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: namespaceName,
+					Name:       "test",
+					Namespace:  namespaceName,
+					Finalizers: []string{v2.FinalizerName},
 				},
 				Spec: v2.FirewallDeploymentSpec{
 					Replicas: 1,
@@ -1549,8 +1550,9 @@ var _ = Context("integration test", Ordered, func() {
 			deployment = func() *v2.FirewallDeployment {
 				return &v2.FirewallDeployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: namespaceName,
+						Name:       "test",
+						Namespace:  namespaceName,
+						Finalizers: []string{v2.FinalizerName},
 					},
 					Spec: v2.FirewallDeploymentSpec{
 						Replicas: 1,
