@@ -14,13 +14,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	fw, err := c.updateFirewallStatus(r)
+	err := c.updateFirewallStatus(r)
 	if err != nil {
 		r.Log.Error(err, "unable to update firewall status")
 		// the update on the firewall resource is racing with the set controller update on the firewall resource
@@ -28,7 +29,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 		return controllers.RequeueAfter(3*time.Millisecond, "unable to update firewall status, retrying")
 	}
 
-	err = c.offerFirewallControllerMigrationSecret(r, fw)
+	err = c.offerFirewallControllerMigrationSecret(r)
 	if err != nil {
 		r.Log.Error(err, "unable to offer firewall-controller migration secret")
 		return controllers.RequeueAfter(10*time.Second, "unable to offer firewall-controller migration secret, retrying")
@@ -43,7 +44,35 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	return controllers.RequeueAfter(2*time.Minute, "continue reconciling monitor")
 }
 
-func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
+func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) error {
+	fw := &v2.Firewall{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.Target.Name,
+			Namespace: c.c.GetSeedNamespace(),
+		},
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
+		if err != nil {
+			return fmt.Errorf("associated firewall of monitor not found: %w", err)
+		}
+
+		firewall.SetFirewallStatusFromMonitor(fw, r.Target)
+
+		err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
+		if err != nil {
+			return fmt.Errorf("unable to update firewall status: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// offerFirewallControllerMigrationSecret provides a secret that the firewall-controller can use to update from v1.x to v2.x
+//
+// this function can be removed when all firewall-controllers are running v2.x or newer.
+func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
@@ -53,23 +82,9 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 
 	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 	if err != nil {
-		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
+		return fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
-	firewall.SetFirewallStatusFromMonitor(fw, r.Target)
-
-	err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update firewall status: %w", err)
-	}
-
-	return fw, nil
-}
-
-// offerFirewallControllerMigrationSecret provides a secret that the firewall-controller can use to update from v1.x to v2.x
-//
-// this function can be removed when all firewall-controllers are running v2.x or newer.
-func (c *controller) offerFirewallControllerMigrationSecret(r *controllers.Ctx[*v2.FirewallMonitor], fw *v2.Firewall) error {
 	if metav1.GetControllerOf(fw) == nil {
 		// it can be that there is no set or deployment governing the firewall.
 		// in this case there may be no rbac resources deployed for seed access, so we cannot offer a migration secret.

@@ -8,6 +8,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -33,48 +34,55 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	v2.SortFirewallsByImportance(ownedFirewalls)
 
 	for i, ownedFw := range ownedFirewalls {
-		fw := &v2.Firewall{}
-		err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(ownedFw), fw)
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			fw := &v2.Firewall{}
+			err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(ownedFw), fw)
+			if err != nil {
+				return fmt.Errorf("error fetching firewall: %w", err)
+			}
+
+			fw.Spec = r.Target.Spec.Template.Spec
+
+			// stagger firewall replicas to achieve active/standby behavior
+			//
+			// we give the most important firewall the shortest distance within a set
+			// this firewall attracts the traffic within the replica set
+			//
+			// the second most important firewall gets a longer distance
+			// such that it takes over the traffic in case the first replica dies
+			// (first-level backup)
+			//
+			// the rest of the firewalls get an even higher distance
+			// (third-level backup)
+			// one of them moves up on next set sync after deletion of the "active" replica
+			var distance v2.FirewallDistance
+			switch i {
+			case 0:
+				distance = r.Target.Spec.Distance + 0
+			case 1:
+				distance = r.Target.Spec.Distance + 1
+			default:
+				distance = r.Target.Spec.Distance + 2
+			}
+
+			if distance > v2.FirewallLongestDistance {
+				distance = v2.FirewallLongestDistance
+			}
+
+			fw.Distance = distance
+
+			err = c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("error updating firewall spec: %w", err)
+			}
+
+			r.Log.Info("updated/synced firewall", "name", fw.Name, "distance", distance)
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("error fetching firewall: %w", err)
+			return err
 		}
-
-		fw.Spec = r.Target.Spec.Template.Spec
-
-		// stagger firewall replicas to achieve active/standby behavior
-		//
-		// we give the most important firewall the shortest distance within a set
-		// this firewall attracts the traffic within the replica set
-		//
-		// the second most important firewall gets a longer distance
-		// such that it takes over the traffic in case the first replica dies
-		// (first-level backup)
-		//
-		// the rest of the firewalls get an even higher distance
-		// (third-level backup)
-		// one of them moves up on next set sync after deletion of the "active" replica
-		var distance v2.FirewallDistance
-		switch i {
-		case 0:
-			distance = r.Target.Spec.Distance + 0
-		case 1:
-			distance = r.Target.Spec.Distance + 1
-		default:
-			distance = r.Target.Spec.Distance + 2
-		}
-
-		if distance > v2.FirewallLongestDistance {
-			distance = v2.FirewallLongestDistance
-		}
-
-		fw.Distance = distance
-
-		err = c.c.GetSeedClient().Update(r.Ctx, fw, &client.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("error updating firewall spec: %w", err)
-		}
-
-		r.Log.Info("updated/synced firewall", "name", fw.Name, "distance", distance)
 	}
 
 	currentAmount := len(ownedFirewalls)
