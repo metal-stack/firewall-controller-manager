@@ -270,7 +270,7 @@ func ensureTag(currentTags []string, key, value string) []string {
 }
 
 func (c *controller) syncSSHPubKey(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
-	sshPubKey, err := helper.GetSSHPublicKey(r.Ctx, c.c.GetSeedClient(), r.Target.Status.ShootAccess)
+	sshPubKey, err := helper.GetSSHPublicKey(r.Ctx, c.c.GetSeedClient(), c.c.GetShootAccess())
 	if err != nil {
 		return fmt.Errorf("unable to read ssh secret: %w", err)
 	}
