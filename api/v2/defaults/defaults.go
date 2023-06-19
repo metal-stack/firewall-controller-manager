@@ -8,10 +8,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -148,7 +145,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	}
 
 	if len(f.Spec.Template.Spec.SSHPublicKeys) == 0 {
-		key, err := r.getSSHPublicKey(ctx)
+		key, err := helper.GetSSHPublicKey(ctx, r.c.GetSeedClient(), r.c.GetShootAccess())
 		if err != nil {
 			return err
 		}
@@ -163,25 +160,4 @@ func defaultFirewallSpec(f *v2.FirewallSpec) {
 	if f.Interval == "" {
 		f.Interval = DefaultFirewallReconcileInterval
 	}
-}
-
-func (f *firewallDeploymentDefaulter) getSSHPublicKey(ctx context.Context) (string, error) {
-	sshSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.c.GetShootAccess().SSHKeySecretName,
-			Namespace: f.c.GetSeedNamespace(),
-		},
-	}
-
-	err := f.c.GetSeedClient().Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)
-	if err != nil {
-		return "", fmt.Errorf("ssh secret not found: %w", err)
-	}
-
-	sshPublicKey, ok := sshSecret.Data["id_rsa.pub"]
-	if !ok {
-		return "", fmt.Errorf("ssh secret does not contain a public key")
-	}
-
-	return string(sshPublicKey), nil
 }
