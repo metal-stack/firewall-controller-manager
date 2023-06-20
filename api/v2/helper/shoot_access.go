@@ -266,3 +266,7 @@ func (s *ShootAccessTokenUpdater) UpdateContinuously(log logr.Logger, stop conte
 
 	return nil
 }
+
+func (s *ShootAccessTokenUpdater) UpdateShootAccess(shootAccess *v2.ShootAccess) {
+	s.s.access = shootAccess
+}
