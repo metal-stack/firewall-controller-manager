@@ -148,7 +148,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	}
 
 	if len(f.Spec.Template.Spec.SSHPublicKeys) == 0 {
-		key, err := r.getSSHPublicKey(ctx)
+		key, err := getSSHPublicKey(ctx, r.c.GetSeedClient(), r.c.GetSSHKeySecretName(), r.c.GetSSHKeySecretNamespace())
 		if err != nil {
 			return err
 		}
@@ -165,15 +165,15 @@ func defaultFirewallSpec(f *v2.FirewallSpec) {
 	}
 }
 
-func (f *firewallDeploymentDefaulter) getSSHPublicKey(ctx context.Context) (string, error) {
+func getSSHPublicKey(ctx context.Context, seedClient client.Client, secretName, namespace string) (string, error) {
 	sshSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.c.GetShootAccess().SSHKeySecretName,
-			Namespace: f.c.GetSeedNamespace(),
+			Name:      secretName,
+			Namespace: namespace,
 		},
 	}
 
-	err := f.c.GetSeedClient().Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)
+	err := seedClient.Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)
 	if err != nil {
 		return "", fmt.Errorf("ssh secret not found: %w", err)
 	}

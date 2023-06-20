@@ -113,7 +113,6 @@ func main() {
 			TokenSecretName:             shootTokenSecret,
 			Namespace:                   namespace,
 			APIServerURL:                shootApiURL,
-			SSHKeySecretName:            sshKeySecret,
 		}
 	)
 
@@ -228,6 +227,8 @@ func main() {
 		ShootNamespace:        v2.FirewallShootNamespace,
 		ShootAPIServerURL:     shootApiURL,
 		ShootAccess:           shootAccess,
+		SSHKeySecretName:      sshKeySecret,
+		SSHKeySecretNamespace: namespace,
 		ShootAccessHelper:     shootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),

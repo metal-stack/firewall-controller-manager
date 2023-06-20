@@ -11,6 +11,7 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -72,6 +73,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			if err := c.syncTags(r, f); err != nil {
 				r.Log.Error(err, "error syncing firewall tags")
 				return controllers.RequeueAfter(10*time.Second, "error syncing firewall tags, backing off")
+			}
+
+			err := c.syncSSHPubKey(r, f)
+			if err != nil {
+				return controllers.RequeueAfter(10*time.Second, "error syncing firewall ssh keys, backing off")
 			}
 
 			// to make the controller always sync the status with the metal-api, we requeue
@@ -260,4 +266,26 @@ func ensureTag(currentTags []string, key, value string) []string {
 	}
 
 	return newTags
+}
+
+func (c *controller) syncSSHPubKey(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
+	if m.Allocation == nil {
+		return fmt.Errorf("firewall has no allocation in metal-api")
+	}
+
+	if slices.Equal(m.Allocation.SSHPubKeys, r.Target.Spec.SSHPublicKeys) {
+		return nil
+	}
+
+	_, err := c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
+		ID:         m.ID,
+		SSHPubKeys: r.Target.Spec.SSHPublicKeys,
+	}).WithContext(r.Ctx), nil)
+	if err != nil {
+		return fmt.Errorf("unable to update ssh public keys: %w", err)
+	}
+
+	r.Log.Info("updated changed ssh public keys")
+
+	return nil
 }
