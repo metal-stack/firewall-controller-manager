@@ -6,7 +6,6 @@ import (
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
-	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/firewall"
 	"github.com/metal-stack/metal-go/api/client/machine"
@@ -270,28 +269,23 @@ func ensureTag(currentTags []string, key, value string) []string {
 }
 
 func (c *controller) syncSSHPubKey(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
-	sshPubKey, err := helper.GetSSHPublicKey(r.Ctx, c.c.GetSeedClient(), c.c.GetShootAccess())
-	if err != nil {
-		return fmt.Errorf("unable to read ssh secret: %w", err)
-	}
-
 	if m.Allocation == nil {
 		return fmt.Errorf("firewall has no allocation in metal-api")
 	}
 
-	if slices.Contains(m.Allocation.SSHPubKeys, sshPubKey) {
+	if slices.Equal(m.Allocation.SSHPubKeys, r.Target.Spec.SSHPublicKeys) {
 		return nil
 	}
 
-	_, err = c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
+	_, err := c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
 		ID:         m.ID,
-		SSHPubKeys: []string{sshPubKey},
+		SSHPubKeys: r.Target.Spec.SSHPublicKeys,
 	}).WithContext(r.Ctx), nil)
 	if err != nil {
-		return fmt.Errorf("unable to update ssh public key: %w", err)
+		return fmt.Errorf("unable to update ssh public keys: %w", err)
 	}
 
-	r.Log.Info("updated ssh public keys that have changed")
+	r.Log.Info("updated changed ssh public keys")
 
 	return nil
 }

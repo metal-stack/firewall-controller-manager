@@ -12,26 +12,53 @@ import (
 )
 
 type NewControllerConfig struct {
-	SeedClient       client.Client
-	SeedConfig       *rest.Config
-	SeedNamespace    string
+	// SeedClient is used by the controllers to access the seed cluster.
+	SeedClient client.Client
+	// SeedConfig is the rest config used by the controllers to access the seed cluster.
+	SeedConfig *rest.Config
+	// SeedNamespace is the namespace within the seed cluster where the controllers act on.
+	SeedNamespace string
+	// SeedAPIServerURL is the endpoint of the seed cluster's api server. this is required
+	// in order for the firewall-controller to access the seed cluster.
 	SeedAPIServerURL string
 
-	ShootClient       client.Client
-	ShootConfig       *rest.Config
-	ShootNamespace    string
+	// ShootClient is used by the controllers to access the shoot cluster.
+	ShootClient client.Client
+	// ShootConfig is the rest config used by the controllers to access the shoot cluster.
+	ShootConfig *rest.Config
+	// ShootNamespace is the namespace within the shoot cluster where the controllers act on.
+	ShootNamespace string
+	// ShootAPIServerURL is the endpoint of the shoot cluster's api server. this is required
+	// in order for the firewall-controller to access the shoot cluster.
 	ShootAPIServerURL string
 
-	ShootAccess       *v2.ShootAccess
+	// ShootAccess contains information for the firewall-controller to access the shoot cluster.
+	// it is used by the firewall-controller to dynamically update rotating tokens for the accessing
+	// the shoot cluster.
+	ShootAccess *v2.ShootAccess
+	// ShootAccessHelper wraps the shoot access and provides useful methods for dealing with
+	// the shoot access secret rotation.
 	ShootAccessHelper *helper.ShootAccessHelper
 
-	Metal      metalgo.Client
+	// SSHKeySecretNamespace is the namespace that contains the ssh key secret in the seed cluster.
+	SSHKeySecretNamespace string
+	// SSHKeySecretName is the name of the ssh key secret in the seed cluster. it is used for
+	// defaulting the ssh public keys when creating a new firewall.
+	SSHKeySecretName string
+
+	// Metal is the metal client for accessing the metal-api.
+	Metal metalgo.Client
+	// ClusterTag is the tag used in the metal-api for new firewalls to associate them with the cluster.
 	ClusterTag string
 
-	SafetyBackoff         time.Duration
-	ProgressDeadline      time.Duration
+	// SafetyBackoff is used for guarding the metal-api when it comes to creating new firewalls.
+	SafetyBackoff time.Duration
+	// ProgressDeadline is used to indicate unhealthy firewall deployment when it does not finish progressing.
+	ProgressDeadline time.Duration
+	// FirewallHealthTimeout is used to indicate an unhealthy firewall when it does not become ready.
 	FirewallHealthTimeout time.Duration
-	CreateTimeout         time.Duration
+	// CreateTimeout is used in the firewall creation phase to recreate a firewall when it does not become ready.
+	CreateTimeout time.Duration
 }
 
 type ControllerConfig struct {
@@ -49,7 +76,9 @@ type ControllerConfig struct {
 	shootAccessHelper         *helper.ShootAccessHelper
 	shootKubeconfigSecretName string
 	shootTokenSecretName      string
-	sshKeySecretName          string
+
+	sshKeySecretNamespace string
+	sshKeySecretName      string
 
 	metal      metalgo.Client
 	clusterTag string
@@ -80,6 +109,8 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		shootNamespace:        c.ShootNamespace,
 		shootAPIServerURL:     c.ShootAPIServerURL,
 		shootAccess:           c.ShootAccess,
+		sshKeySecretNamespace: c.SSHKeySecretNamespace,
+		sshKeySecretName:      c.SSHKeySecretName,
 		shootAccessHelper:     helper,
 		metal:                 c.Metal,
 		clusterTag:            c.ClusterTag,
@@ -127,8 +158,12 @@ func (c *NewControllerConfig) validate() error {
 	if c.ShootAccess.TokenSecretName == "" {
 		return fmt.Errorf("shoot token secret name must be specified")
 	}
-	if c.ShootAccess.SSHKeySecretName == "" {
+
+	if c.SSHKeySecretName == "" {
 		return fmt.Errorf("shoot ssh key secret name must be specified")
+	}
+	if c.SSHKeySecretNamespace == "" {
+		return fmt.Errorf("shoot ssh key secret namespace must be specified")
 	}
 
 	if c.Metal == nil {
@@ -204,6 +239,10 @@ func (c *ControllerConfig) GetShootTokenSecretName() string {
 
 func (c *ControllerConfig) GetSSHKeySecretName() string {
 	return c.sshKeySecretName
+}
+
+func (c *ControllerConfig) GetSSHKeySecretNamespace() string {
+	return c.sshKeySecretNamespace
 }
 
 func (c *ControllerConfig) GetMetal() metalgo.Client {

@@ -107,9 +107,6 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 	if shootAccess.TokenSecretName != "" {
 		shootAccessSecretNames = append(shootAccessSecretNames, shootAccess.TokenSecretName)
 	}
-	if shootAccess.SSHKeySecretName != "" {
-		shootAccessSecretNames = append(shootAccessSecretNames, shootAccess.SSHKeySecretName)
-	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, seed, role, func() error {
 		role.Rules = []rbacv1.PolicyRule{

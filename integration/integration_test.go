@@ -597,7 +597,6 @@ var _ = Context("integration test", Ordered, func() {
 							TokenSecretName:             "token",
 							Namespace:                   namespaceName,
 							APIServerURL:                apiHost,
-							SSHKeySecretName:            sshSecret.Name,
 						}))
 					})
 				})
@@ -1374,7 +1373,6 @@ var _ = Context("integration test", Ordered, func() {
 							TokenSecretName:             "token",
 							Namespace:                   namespaceName,
 							APIServerURL:                apiHost,
-							SSHKeySecretName:            sshSecret.Name,
 						}))
 					})
 

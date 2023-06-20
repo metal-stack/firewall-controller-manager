@@ -145,7 +145,7 @@ func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.O
 	}
 
 	if len(f.Spec.Template.Spec.SSHPublicKeys) == 0 {
-		key, err := helper.GetSSHPublicKey(ctx, r.c.GetSeedClient(), r.c.GetShootAccess())
+		key, err := helper.GetSSHPublicKey(ctx, r.c.GetSeedClient(), r.c.GetSSHKeySecretName(), r.c.GetSSHKeySecretNamespace())
 		if err != nil {
 			return err
 		}
