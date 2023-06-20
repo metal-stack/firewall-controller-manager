@@ -49,6 +49,10 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 	}
 
 	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), mon, func() error {
+		if mon.Annotations == nil {
+			mon.Annotations = map[string]string{}
+		}
+		mon.Annotations[v2.FirewallSeedURLAnnotation] = c.c.GetSeedAPIServerURL()
 		mon.Size = r.Target.Spec.Size
 		mon.Image = r.Target.Spec.Image
 		mon.Partition = r.Target.Spec.Partition

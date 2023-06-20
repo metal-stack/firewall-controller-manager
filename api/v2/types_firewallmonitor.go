@@ -8,6 +8,11 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
+	// FirewallSeedURLAnnotation contains information on the location of the seed's api server endpoint. this is used
+	// for gardener shoot migrations, which will change the seed api server endpoint for the firewall-controller. the
+	// firewall-controller can use this annotation to update it's kubeconfig accordingly.
+	FirewallSeedURLAnnotation = "firewall.metal-stack.io/seed-api-url"
+
 	// FirewallShootNamespace is the name of the namespace to which the firewall monitor gets deployed and in which the firewall-controller operates
 	FirewallShootNamespace = "firewall"
 )
