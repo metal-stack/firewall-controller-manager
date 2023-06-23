@@ -51,10 +51,9 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 				if err != nil {
 					return nil, fmt.Errorf("firewall find error: %w", err)
 				}
-				if resp.Payload.Allocation == nil {
-					return nil, fmt.Errorf("firewall is not allocated anymore")
-				}
-				if *resp.Payload.Allocation.Project == fw.Spec.Project && *resp.Payload.Allocation.Hostname == fw.Name {
+				if resp.Payload.Allocation != nil &&
+					*resp.Payload.Allocation.Project == fw.Spec.Project &&
+					*resp.Payload.Allocation.Hostname == fw.Name {
 					return []*models.V1FirewallResponse{resp.Payload}, nil
 				}
 			}
