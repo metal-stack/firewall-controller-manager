@@ -168,6 +168,7 @@ var _ = Context("integration test", Ordered, func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Firewall: func(m *mock.Mock) {
 						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
+						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 					},
 					Network: func(m *mock.Mock) {
@@ -428,6 +429,7 @@ var _ = Context("integration test", Ordered, func() {
 					swapMetalClient(&metalclient.MetalMockFns{
 						Firewall: func(m *mock.Mock) {
 							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: installingFirewall}, nil).Maybe()
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: installingFirewall}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{installingFirewall}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
@@ -722,6 +724,7 @@ var _ = Context("integration test", Ordered, func() {
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 						},
 						Firewall: func(m *mock.Mock) {
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
@@ -804,6 +807,7 @@ var _ = Context("integration test", Ordered, func() {
 					swapMetalClient(&metalclient.MetalMockFns{
 						Firewall: func(m *mock.Mock) {
 							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
@@ -847,6 +851,7 @@ var _ = Context("integration test", Ordered, func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Firewall: func(m *mock.Mock) {
 						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
+						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 					},
 					Network: func(m *mock.Mock) {
@@ -1136,6 +1141,7 @@ var _ = Context("integration test", Ordered, func() {
 
 					swapMetalClient(&metalclient.MetalMockFns{
 						Firewall: func(m *mock.Mock) {
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
@@ -1171,6 +1177,7 @@ var _ = Context("integration test", Ordered, func() {
 						swapMetalClient(&metalclient.MetalMockFns{
 							Firewall: func(m *mock.Mock) {
 								m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: readyFirewall}, nil).Maybe()
+								m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
 								m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
 							},
 							Network: func(m *mock.Mock) {
@@ -1239,6 +1246,7 @@ var _ = Context("integration test", Ordered, func() {
 								m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 							},
 							Firewall: func(m *mock.Mock) {
+								m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
 								m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
 							},
 							Network: func(m *mock.Mock) {
@@ -1484,6 +1492,7 @@ var _ = Context("integration test", Ordered, func() {
 					swapMetalClient(&metalclient.MetalMockFns{
 						Firewall: func(m *mock.Mock) {
 							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
@@ -1583,6 +1592,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("the creation works", func() {
 				swapMetalClient(&metalclient.MetalMockFns{
 					Firewall: func(m *mock.Mock) {
+						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 					},
 					Network: func(m *mock.Mock) {
@@ -1787,6 +1797,7 @@ var _ = Context("integration test", Ordered, func() {
 					swapMetalClient(&metalclient.MetalMockFns{
 						Firewall: func(m *mock.Mock) {
 							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
+							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
 							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
 						},
 						Network: func(m *mock.Mock) {
