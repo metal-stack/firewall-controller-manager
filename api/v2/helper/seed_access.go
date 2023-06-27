@@ -80,7 +80,7 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
-	if versionGreaterOrEqual124(k8sVersion) && len(serviceAccount.Secrets) == 0 {
+	if versionGreaterOrEqual124(k8sVersion) {
 		serviceAccountSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -195,7 +195,7 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 		return fmt.Errorf("error ensuring service account: %w", err)
 	}
 
-	if versionGreaterOrEqual124(k8sVersion) && len(serviceAccount.Secrets) == 0 {
+	if versionGreaterOrEqual124(k8sVersion) {
 		serviceAccountSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
