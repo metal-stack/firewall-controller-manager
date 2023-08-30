@@ -2,6 +2,7 @@ package firewall
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
