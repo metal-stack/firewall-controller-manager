@@ -215,15 +215,13 @@ func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
 }
 
 func osImageHasChanged(ctx context.Context, m metalgo.Client, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
-	if newS.Image != oldS.Image {
-		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(newS.Image).WithContext(ctx), nil)
-		if err != nil {
-			return false, fmt.Errorf("latest firewall image not found:%s %w", newS.Image, err)
-		}
+	image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(newS.Image).WithContext(ctx), nil)
+	if err != nil {
+		return false, fmt.Errorf("latest firewall image not found:%s %w", newS.Image, err)
+	}
 
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != oldS.Image {
-			return true, nil
-		}
+	if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != oldS.Image {
+		return true, nil
 	}
 
 	return false, nil
