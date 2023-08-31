@@ -97,36 +97,31 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !o.GetDeletionTimestamp().IsZero() {
-		if controllerutil.ContainsFinalizer(o, v2.FinalizerName) {
-			log.Info("reconciling resource deletion flow")
-			err := g.reconciler.Delete(rctx)
-			if err != nil {
-				var requeueErr *requeueError
-				if errors.As(err, &requeueErr) {
-					log.Info(requeueErr.Error())
-					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
-				}
+		if !controllerutil.ContainsFinalizer(o, v2.FinalizerName) {
+			log.Info("resource has no finalizer anymore, nothing further to do for deletion")
+			return ctrl.Result{}, nil
+		}
 
-				log.Error(err, "error during deletion flow")
-				return ctrl.Result{}, err
+		log.Info("reconciling resource deletion flow")
+		err := g.reconciler.Delete(rctx)
+		if err != nil {
+			var requeueErr *requeueError
+			if errors.As(err, &requeueErr) {
+				log.Info(requeueErr.Error())
+				return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 			}
 
-			log.Info("deletion finished, removing finalizer")
-			controllerutil.RemoveFinalizer(o, v2.FinalizerName)
-			if err := g.c.Update(ctx, o); err != nil {
-				return ctrl.Result{}, err
-			}
+			log.Error(err, "error during deletion flow")
+			return ctrl.Result{}, err
+		}
+
+		log.Info("deletion finished, removing finalizer")
+		controllerutil.RemoveFinalizer(o, v2.FinalizerName)
+		if err := g.c.Update(ctx, o); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, nil
-	}
-
-	if !controllerutil.ContainsFinalizer(o, v2.FinalizerName) {
-		log.Info("adding finalizer")
-		controllerutil.AddFinalizer(o, v2.FinalizerName)
-		if err := g.c.Update(ctx, o); err != nil {
-			return ctrl.Result{}, fmt.Errorf("unable to add finalizer: %w", err)
-		}
 	}
 
 	var statusErr error

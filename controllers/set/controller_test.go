@@ -108,6 +108,10 @@ var _ = Context("firewall set controller", Ordered, func() {
 				if !fw.CreationTimestamp.Time.Before(newest.CreationTimestamp.Time) {
 					newest = &fw
 				}
+
+				// as there is no firewall controller running, we need to take out the finalizers
+				fw.Finalizers = nil
+				Expect(k8sClient.Update(ctx, &fw)).To(Succeed())
 			}
 
 			Expect(newest).NotTo(BeNil())
