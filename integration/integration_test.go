@@ -19,6 +19,7 @@ import (
 	testcommon "github.com/metal-stack/firewall-controller-manager/integration/common"
 
 	metalfirewall "github.com/metal-stack/metal-go/api/client/firewall"
+	"github.com/metal-stack/metal-go/api/client/image"
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/client/network"
 	"github.com/metal-stack/metal-go/api/models"
@@ -175,6 +176,9 @@ var _ = Context("integration test", Ordered, func() {
 					},
 					Machine: func(m *mock.Mock) {
 						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+					},
+					Image: func(m *mock.Mock) {
+						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 					},
 				})
 
@@ -436,6 +440,9 @@ var _ = Context("integration test", Ordered, func() {
 						},
 						Machine: func(m *mock.Mock) {
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 						},
 					})
 
@@ -729,6 +736,9 @@ var _ = Context("integration test", Ordered, func() {
 						Network: func(m *mock.Mock) {
 							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
 						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
+						},
 					})
 
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
@@ -816,6 +826,9 @@ var _ = Context("integration test", Ordered, func() {
 							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
+						},
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
@@ -858,6 +871,9 @@ var _ = Context("integration test", Ordered, func() {
 					},
 					Machine: func(m *mock.Mock) {
 						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+					},
+					Image: func(m *mock.Mock) {
+						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 					},
 				})
 
@@ -1150,6 +1166,9 @@ var _ = Context("integration test", Ordered, func() {
 							m.On("FreeMachine", mock.Anything, nil).Return(nil, &machine.FreeMachineDefault{Payload: httperrors.Conflict(fmt.Errorf("deletion blocked"))}).Maybe()
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
+						},
 					})
 
 					deploy.Spec.Template.Spec.Networks = []string{"internet", "mpls"}
@@ -1185,6 +1204,9 @@ var _ = Context("integration test", Ordered, func() {
 							Machine: func(m *mock.Mock) {
 								m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
 								m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+							},
+							Image: func(m *mock.Mock) {
+								m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 							},
 						})
 
@@ -1250,6 +1272,9 @@ var _ = Context("integration test", Ordered, func() {
 							},
 							Network: func(m *mock.Mock) {
 								m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
+							},
+							Image: func(m *mock.Mock) {
+								m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 							},
 						})
 
@@ -1501,6 +1526,9 @@ var _ = Context("integration test", Ordered, func() {
 							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
 						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
+						},
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
@@ -1598,6 +1626,9 @@ var _ = Context("integration test", Ordered, func() {
 					},
 					Machine: func(m *mock.Mock) {
 						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+					},
+					Image: func(m *mock.Mock) {
+						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 					},
 				})
 
@@ -1804,6 +1835,9 @@ var _ = Context("integration test", Ordered, func() {
 						Machine: func(m *mock.Mock) {
 							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
 							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+						},
+						Image: func(m *mock.Mock) {
+							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
 						},
 					})
 
