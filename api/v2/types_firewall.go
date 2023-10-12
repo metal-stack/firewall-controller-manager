@@ -13,7 +13,7 @@ const (
 	// to indicate that the firewall-controller does not connect to the firewall monitor. this way, the replica
 	// set will become healthy without a controller connection.
 	//
-	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
+	// this can be useful to silence a problem temporarily and was used in the past for migration of firewall-controller v1.
 	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
 	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
 	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
