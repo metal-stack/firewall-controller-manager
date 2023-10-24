@@ -174,8 +174,10 @@ const (
 	FirewallCreated ConditionType = "Created"
 	// FirewallReady indicates that the firewall is running and and according to the metal-api in a healthy, working state
 	FirewallReady ConditionType = "Ready"
-	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
+	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the shoot
 	FirewallControllerConnected ConditionType = "Connected"
+	// FirewallControllerSeedConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
+	FirewallControllerSeedConnected ConditionType = "SeedConnected"
 	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
@@ -226,8 +228,10 @@ type MachineLastEvent struct {
 type ControllerConnection struct {
 	// ActualVersion is the actual version running at the firewall-controller.
 	ActualVersion string `json:"actualVersion,omitempty"`
-	// Updated is a timestamp when the controller has last reconciled the firewall resource.
+	// Updated is a timestamp when the controller has last reconciled the shoot cluster.
 	Updated metav1.Time `json:"lastRun,omitempty"`
+	// SeedUpdated is a timestamp when the controller has last reconciled the firewall resource.
+	SeedUpdated metav1.Time `json:"lastRunAgainstSeed,omitempty"`
 	// ActualDistance is the actual distance as reflected by the firewall-controller.
 	ActualDistance FirewallDistance `json:"actualDistance,omitempty"`
 }

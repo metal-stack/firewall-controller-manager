@@ -121,6 +121,9 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "NotChecking", "Not checking controller connection due to firewall annotation.")
 		fw.Status.Conditions.Set(cond)
 
+		cond = v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionTrue, "NotChecking", "Not checking controller seed connection due to firewall annotation.")
+		fw.Status.Conditions.Set(cond)
+
 		cond = v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "NotChecking", "Not checking distance due to firewall annotation.")
 		fw.Status.Conditions.Set(cond)
 
@@ -144,22 +147,37 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 	connection := &v2.ControllerConnection{
 		ActualVersion:  mon.ControllerStatus.ControllerVersion,
 		Updated:        mon.ControllerStatus.Updated,
+		SeedUpdated:    mon.ControllerStatus.SeedUpdated,
 		ActualDistance: mon.ControllerStatus.Distance,
 	}
 
 	fw.Status.ControllerStatus = connection
 
+	// Check if the firewall-controller has reconciled the shoot
 	if connection.Updated.Time.IsZero() {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected.")
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to shoot.")
 		fw.Status.Conditions.Set(cond)
 	} else if time.Since(connection.Updated.Time) > 5*time.Minute {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s.", connection.Updated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to shoot.", connection.Updated.Time.String()))
 		fw.Status.Conditions.Set(cond)
 	} else {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.Updated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled shoot at %s.", connection.Updated.Time.String()))
 		fw.Status.Conditions.Set(cond)
 	}
 
+	// Check if the firewall-controller has reconciled the firewall
+	if connection.SeedUpdated.Time.IsZero() {
+		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to seed.")
+		fw.Status.Conditions.Set(cond)
+	} else if time.Since(connection.SeedUpdated.Time) > 5*time.Minute {
+		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to seed.", connection.SeedUpdated.Time.String()))
+		fw.Status.Conditions.Set(cond)
+	} else {
+		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.SeedUpdated.Time.String()))
+		fw.Status.Conditions.Set(cond)
+	}
+
+	// Check if the firewall-controller has reconciled the distance
 	if !mon.ControllerStatus.DistanceSupported {
 		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "NotChecking", "Controller does not support distance reconciliation.")
 		fw.Status.Conditions.Set(cond)
