@@ -109,13 +109,7 @@ func main() {
 	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
 
 	var (
-		stop        = ctrl.SetupSignalHandler()
-		shootAccess = &v2.ShootAccess{
-			GenericKubeconfigSecretName: shootKubeconfigSecret,
-			TokenSecretName:             shootTokenSecret,
-			Namespace:                   namespace,
-			APIServerURL:                shootApiURL,
-		}
+		stop = ctrl.SetupSignalHandler()
 	)
 
 	mclient, err := getMetalClient(metalURL)
@@ -155,23 +149,31 @@ func main() {
 		l.Fatalw("unable to set up ready check", "error", err)
 	}
 
-	var shootAccessHelper *helper.ShootAccessHelper
+	var (
+		externalShootAccess = &v2.ShootAccess{
+			GenericKubeconfigSecretName: shootKubeconfigSecret,
+			TokenSecretName:             shootTokenSecret,
+			Namespace:                   namespace,
+			APIServerURL:                shootApiURL,
+		}
+		internalShootAccess       = externalShootAccess.DeepCopy()
+		internalShootAccessHelper *helper.ShootAccessHelper
+	)
+
+	if internalShootApiURL != "" {
+		internalShootAccess.APIServerURL = internalShootApiURL
+	}
 
 	if shootApiURL == "" {
 		shootApiURL = seedMgr.GetConfig().Host
-		shootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
+
+		internalShootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
 		if err != nil {
 			l.Fatalw("unable to create shoot helper", "error", err)
 		}
 		l.Infow("running in single-cluster mode")
 	} else {
-		// from this controller we directly access the shoot apiserver through in-cluster IPs
-		localShootAccess := shootAccess.DeepCopy()
-		if internalShootApiURL != "" {
-			localShootAccess.APIServerURL = internalShootApiURL
-		}
-
-		shootAccessHelper = helper.NewShootAccessHelper(seedClient, localShootAccess)
+		internalShootAccessHelper = helper.NewShootAccessHelper(seedClient, internalShootAccess)
 		if err != nil {
 			l.Fatalw("unable to create shoot helper", "error", err)
 		}
@@ -195,7 +197,7 @@ func main() {
 		//   - we can re-use the same approach for this controller as well and do not have
 		//     to do any additional mounts for the deployment of the controller
 		//
-		updater, err := helper.NewShootAccessTokenUpdater(shootAccessHelper, shootTokenPath)
+		updater, err := helper.NewShootAccessTokenUpdater(internalShootAccessHelper, shootTokenPath)
 		if err != nil {
 			l.Fatalw("unable to create shoot access token updater", "error", err)
 		}
@@ -209,7 +211,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	shootConfig, err := shootAccessHelper.RESTConfig(ctx)
+	shootConfig, err := internalShootAccessHelper.RESTConfig(ctx)
 	if err != nil {
 		l.Fatalw("unable to create shoot config", "error", err)
 	}
@@ -234,10 +236,10 @@ func main() {
 		ShootConfig:           shootMgr.GetConfig(),
 		ShootNamespace:        v2.FirewallShootNamespace,
 		ShootAPIServerURL:     shootApiURL,
-		ShootAccess:           shootAccess,
+		ShootAccess:           externalShootAccess,
 		SSHKeySecretName:      sshKeySecret,
 		SSHKeySecretNamespace: namespace,
-		ShootAccessHelper:     shootAccessHelper,
+		ShootAccessHelper:     internalShootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
 		SafetyBackoff:         safetyBackoff,
