@@ -70,6 +70,7 @@ func main() {
 		progressDeadline        time.Duration
 		clusterID               string
 		shootApiURL             string
+		internalShootApiURL     string
 		seedApiURL              string
 		certDir                 string
 	)
@@ -90,6 +91,7 @@ func main() {
 	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server, if not provided falls back to single-cluster mode")
+	flag.StringVar(&internalShootApiURL, "internal-shoot-api-url", "", "url of the shoot api server used by this controller, not published in the shoot access status")
 	flag.StringVar(&seedApiURL, "seed-api-url", "", "url of the seed api server")
 	flag.StringVar(&certDir, "cert-dir", "", "the directory that contains the server key and certificate for the webhook server")
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
@@ -163,7 +165,13 @@ func main() {
 		}
 		l.Infow("running in single-cluster mode")
 	} else {
-		shootAccessHelper = helper.NewShootAccessHelper(seedClient, shootAccess)
+		// from this controller we directly access the shoot apiserver through in-cluster IPs
+		localShootAccess := shootAccess.DeepCopy()
+		if internalShootApiURL != "" {
+			localShootAccess.APIServerURL = internalShootApiURL
+		}
+
+		shootAccessHelper = helper.NewShootAccessHelper(seedClient, localShootAccess)
 		if err != nil {
 			l.Fatalw("unable to create shoot helper", "error", err)
 		}
