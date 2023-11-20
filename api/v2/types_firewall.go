@@ -110,6 +110,11 @@ type FirewallSpec struct {
 	DNSServerAddress string `json:"dnsServerAddress,omitempty"`
 	// DNSPort specifies port to which DNS proxy should be bound
 	DNSPort *uint `json:"dnsPort,omitempty"`
+
+	// AllowedExternalNetworks defines which networks are allowed to connect to, and allow incoming traffic from.
+	// By default, defined by an empty slice, all external networks are allowed.
+	// The node network is always allowed.
+	AllowedExternalNetworks []string `json:"allowedExternalNetworks,omitempty"`
 }
 
 // FirewallTemplateSpec describes the data a firewall should have when created from a template
