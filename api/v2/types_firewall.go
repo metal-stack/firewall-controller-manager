@@ -116,7 +116,7 @@ type FirewallSpec struct {
 	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
 	// NetworkAccessType defines how the cluster can reach external networks.
 	// +optional
-	NetworkAccessType NetworkAccessType
+	NetworkAccessType NetworkAccessType `json:"networkAccessType,omitempty"`
 }
 
 // AllowedNetworks is a list of networks which are allowed to connect in restricted or forbidden NetworkIsolated clusters.
