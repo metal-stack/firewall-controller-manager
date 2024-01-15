@@ -111,11 +111,43 @@ type FirewallSpec struct {
 	// DNSPort specifies port to which DNS proxy should be bound
 	DNSPort *uint `json:"dnsPort,omitempty"`
 
-	// AllowedExternalNetworks defines which networks are allowed to connect to, and allow incoming traffic from.
-	// By default, defined by an empty slice, all external networks are allowed.
+	// AllowedNetworks defines which networks are allowed to connect to, and allow incoming traffic from.
 	// The node network is always allowed.
-	AllowedExternalNetworks []string `json:"allowedExternalNetworks,omitempty"`
+	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
+	// NetworkAccessType defines how the cluster can reach external networks.
+	// +optional
+	NetworkAccessType NetworkAccessType
 }
+
+// AllowedNetworks is a list of networks which are allowed to connect in restricted or forbidden NetworkIsolated clusters.
+type AllowedNetworks struct {
+	// Ingress defines a list of networks which are allowed for incoming traffic like service type loadbalancer
+	Ingress []string `json:"ingress,omitempty"`
+	// Egress defines a list of networks which are allowed for outgoing traffic
+	Egress []string `json:"egress,omitempty"`
+}
+
+type (
+	// NetworkAccessType defines how a cluster is capable of accessing external networks
+	NetworkAccessType string
+)
+
+const (
+	// NetworkAccessBaseline allows the cluster to access external networks in a baseline manner
+	NetworkAccessBaseline = NetworkAccessType("baseline")
+	// NetworkAccessRestricted access to external networks is by default restricted to registries, dns and ntp to partition only destinations.
+	// Therefore registries, dns and ntp destinations must be specified in the cloud-profile accordingly-
+	// If this is not the case, restricting the access must not be possible.
+	// Image overrides for all images which are required to create such a shoot, must be specified. No other images are provided in the given registry.
+	// customers can define own rules to access external networks as in the baseline.
+	// Service type loadbalancers are also not restricted.
+	NetworkAccessRestricted = NetworkAccessType("restricted")
+	// NetworkAccessForbidden in this configuration a customer can no longer create rules to access external networks.
+	// which are outside of a given list of allowed networks. This is enforced by the firewall.
+	// Service type loadbalancers are also not possible to open a service ip which is not in the list of allowed networks.
+	// This is also enforced by the firewall.
+	NetworkAccessForbidden = NetworkAccessType("forbidden")
+)
 
 // FirewallTemplateSpec describes the data a firewall should have when created from a template
 type FirewallTemplateSpec struct {
