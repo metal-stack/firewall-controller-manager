@@ -112,18 +112,18 @@ type FirewallSpec struct {
 	DNSPort *uint `json:"dnsPort,omitempty"`
 
 	// AllowedNetworks defines which networks are allowed to connect to, and allow incoming traffic from.
+	// Is only enforced with NetworkAccessForbidden.
 	// The node network is always allowed.
 	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
 	// NetworkAccessType defines how the cluster can reach external networks.
-	// +optional
 	NetworkAccessType NetworkAccessType `json:"networkAccessType,omitempty"`
 }
 
-// AllowedNetworks is a list of networks which are allowed to connect in restricted or forbidden NetworkIsolated clusters.
+// AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is NetworkAccessForbidden.
 type AllowedNetworks struct {
-	// Ingress defines a list of networks which are allowed for incoming traffic like service type loadbalancer
+	// Ingress defines a list of cidrs which are allowed for incoming traffic like service type loadbalancer
 	Ingress []string `json:"ingress,omitempty"`
-	// Egress defines a list of networks which are allowed for outgoing traffic
+	// Egress defines a list of cidrs which are allowed for outgoing traffic
 	Egress []string `json:"egress,omitempty"`
 }
 

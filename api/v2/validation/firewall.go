@@ -148,3 +148,13 @@ func validateDistance(distance v2.FirewallDistance, fldPath *field.Path) field.E
 
 	return allErrs
 }
+
+func validateAllowNetworks(f *v2.FirewallSpec) field.ErrorList {
+	// FIXME implement
+	return nil
+}
+
+func validateNetworkAccessType(f *v2.FirewallSpec) field.ErrorList {
+	// FIXME implement
+	return nil
+}
