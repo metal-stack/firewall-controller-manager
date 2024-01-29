@@ -163,6 +163,9 @@ func defaultFirewallSpec(f *v2.FirewallSpec) {
 	if f.Interval == "" {
 		f.Interval = DefaultFirewallReconcileInterval
 	}
+	if f.NetworkAccessType == "" {
+		f.NetworkAccessType = v2.NetworkAccessBaseline
+	}
 }
 
 func getSSHPublicKey(ctx context.Context, seedClient client.Client, secretName, namespace string) (string, error) {

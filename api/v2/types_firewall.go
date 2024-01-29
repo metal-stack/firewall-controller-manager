@@ -111,24 +111,24 @@ type FirewallSpec struct {
 	// DNSPort specifies port to which DNS proxy should be bound
 	DNSPort *uint `json:"dnsPort,omitempty"`
 
-	// AllowedNetworks defines which networks are allowed to connect to, and allow incoming traffic from.
-	// Is only enforced with NetworkAccessForbidden.
+	// AllowedNetworks defines dedicated networks for which the firewall allows in- and outgoing traffic.
+	// The firewall-controller only enforces this setting in combination with NetworkAccessType set to forbidden.
 	// The node network is always allowed.
 	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
-	// NetworkAccessType defines how the cluster can reach external networks.
+	// NetworkAccessType defines firewall access restriction to external networks.
 	NetworkAccessType NetworkAccessType `json:"networkAccessType,omitempty"`
 }
 
-// AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is NetworkAccessForbidden.
+// AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is forbidden.
 type AllowedNetworks struct {
-	// Ingress defines a list of cidrs which are allowed for incoming traffic like service type loadbalancer
+	// Ingress defines a list of cidrs which are allowed for incoming traffic like service type loadbalancer.
 	Ingress []string `json:"ingress,omitempty"`
-	// Egress defines a list of cidrs which are allowed for outgoing traffic
+	// Egress defines a list of cidrs which are allowed for outgoing traffic.
 	Egress []string `json:"egress,omitempty"`
 }
 
 type (
-	// NetworkAccessType defines how a cluster is capable of accessing external networks
+	// NetworkAccessType defines how a cluster is capable of accessing external networks.
 	NetworkAccessType string
 )
 

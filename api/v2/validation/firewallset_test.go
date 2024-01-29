@@ -41,6 +41,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 					Project:                 "project-a",
 					Size:                    "size-a",
 					Networks:                []string{"internet"},
+					NetworkAccessType:       v2.NetworkAccessBaseline,
 					EgressRules: []v2.EgressRuleSNAT{
 						{
 							NetworkID: "network-a",
@@ -166,6 +167,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 					Project:                 "project-a",
 					Size:                    "size-a",
 					Networks:                []string{"internet"},
+					NetworkAccessType:       v2.NetworkAccessBaseline,
 					EgressRules: []v2.EgressRuleSNAT{
 						{
 							NetworkID: "network-a",
