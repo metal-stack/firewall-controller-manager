@@ -95,6 +95,20 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		allErrs = append(allErrs, r.check()...)
 	}
 
+	for _, cidr := range f.AllowedNetworks.Egress {
+		_, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("allowedNetworks").Child("egress"), cidr, fmt.Sprintf("given network must be a cidr: %v", err)))
+		}
+	}
+
+	for _, cidr := range f.AllowedNetworks.Ingress {
+		_, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("allowedNetworks").Child("ingress"), cidr, fmt.Sprintf("given network must be a cidr: %v", err)))
+		}
+	}
+
 	return allErrs
 }
 
