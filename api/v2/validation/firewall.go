@@ -40,7 +40,6 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		{path: fldPath.Child("project"), value: f.Project},
 		{path: fldPath.Child("size"), value: f.Size},
 		{path: fldPath.Child("networks"), value: f.Networks},
-		{path: fldPath.Child("networkAccessType"), value: f.NetworkAccessType},
 	}
 
 	allErrs = append(allErrs, r.check()...)
@@ -96,13 +95,6 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		allErrs = append(allErrs, r.check()...)
 	}
 
-	switch f.NetworkAccessType {
-	case v2.NetworkAccessBaseline, v2.NetworkAccessForbidden, v2.NetworkAccessRestricted:
-		// noop
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("networkAccessType"), f.NetworkAccessType, "network access type must be baseline, restriced or forbidden"))
-	}
-
 	for _, cidr := range f.AllowedNetworks.Egress {
 		_, err := netip.ParsePrefix(cidr)
 		if err != nil {
@@ -137,8 +129,6 @@ func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldP
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.DNSPort, fOld.DNSPort, fldPath.Child("dnsPort"))...)
-	// TODO: after all firewalls were updated to contain the network access type field, we can enable the following validation:
-	// allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.NetworkAccessType, fOld.NetworkAccessType, fldPath.Child("networkAccessType"))...)
 
 	return allErrs
 }

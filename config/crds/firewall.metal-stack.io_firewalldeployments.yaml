@@ -185,10 +185,6 @@ spec:
                         description: LogAcceptedConnections if set to true, also log
                           accepted connections in the droptailer log.
                         type: boolean
-                      networkAccessType:
-                        description: NetworkAccessType defines firewall access restriction
-                          to external networks.
-                        type: string
                       networks:
                         description: Networks are the networks to which this firewall
                           is connected. An update on this field requires the recreation
