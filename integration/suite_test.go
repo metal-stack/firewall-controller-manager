@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
+	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	controllerconfig "github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -54,10 +54,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	l, err := controllers.NewZapLogger("debug")
+	l, err := controllers.NewLogger("debug")
 	Expect(err).NotTo(HaveOccurred())
 
-	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
+	ctrl.SetLogger(logr.FromSlogHandler(l))
 
 	ctx, cancel = context.WithCancel(context.Background())
 

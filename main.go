@@ -4,12 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
+	"github.com/go-logr/logr"
 
 	metalgo "github.com/metal-stack/metal-go"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
@@ -35,7 +36,7 @@ const (
 	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
 )
 
-func healthCheckFunc(log *zap.SugaredLogger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
+func healthCheckFunc(log *slog.Logger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
 	return func(req *http.Request) error {
 		log.Info("health check called")
 
@@ -101,12 +102,14 @@ func main() {
 
 	flag.Parse()
 
-	l, err := controllers.NewZapLogger(logLevel)
+	slogHandler, err := controllers.NewLogger(logLevel)
 	if err != nil {
 		ctrl.Log.WithName("setup").Error(err, "unable to parse log level")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
+	l := slog.New(slogHandler)
+
+	ctrl.SetLogger(logr.FromSlogHandler(slogHandler))
 
 	var (
 		stop = ctrl.SetupSignalHandler()
@@ -114,7 +117,7 @@ func main() {
 
 	mclient, err := getMetalClient(metalURL)
 	if err != nil {
-		l.Fatalw("unable to create metal client", "error", err)
+		log.Fatalf("unable to create metal client %v", err)
 	}
 
 	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -130,7 +133,7 @@ func main() {
 		CertDir:                 certDir,
 	})
 	if err != nil {
-		l.Fatalw("unable to setup firewall-controller-manager", "error", err)
+		log.Fatalf("unable to setup firewall-controller-manager %v", err)
 	}
 
 	// cannot use seedMgr.GetClient() because it gets initialized at a later point in time
@@ -139,14 +142,14 @@ func main() {
 		Scheme: scheme,
 	})
 	if err != nil {
-		l.Fatalw("unable to create seed client", "error", err)
+		log.Fatalf("unable to create seed client %v", err)
 	}
 
-	if err := seedMgr.AddHealthzCheck("health", healthCheckFunc(l.Named("health"), seedClient, namespace)); err != nil {
-		l.Fatalw("unable to set up health check", "error", err)
+	if err := seedMgr.AddHealthzCheck("health", healthCheckFunc(l.WithGroup("health"), seedClient, namespace)); err != nil {
+		log.Fatalf("unable to set up health check %v", err)
 	}
-	if err := seedMgr.AddReadyzCheck("check", healthCheckFunc(l.Named("ready"), seedMgr.GetClient(), namespace)); err != nil {
-		l.Fatalw("unable to set up ready check", "error", err)
+	if err := seedMgr.AddReadyzCheck("check", healthCheckFunc(l.WithGroup("ready"), seedMgr.GetClient(), namespace)); err != nil {
+		log.Fatalf("unable to set up ready check %v", err)
 	}
 
 	var (
@@ -169,15 +172,15 @@ func main() {
 
 		internalShootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
 		if err != nil {
-			l.Fatalw("unable to create shoot helper", "error", err)
+			log.Fatalf("unable to create shoot helper %v", err)
 		}
-		l.Infow("running in single-cluster mode")
+		l.Info("running in single-cluster mode")
 	} else {
 		internalShootAccessHelper = helper.NewShootAccessHelper(seedClient, internalShootAccess)
 		if err != nil {
-			l.Fatalw("unable to create shoot helper", "error", err)
+			log.Fatalf("unable to create shoot helper %v", err)
 		}
-		l.Infow("running in split-cluster mode (seed and shoot client)")
+		l.Info("running in split-cluster mode (seed and shoot client)")
 	}
 
 	if shootTokenPath != "" {
@@ -199,12 +202,12 @@ func main() {
 		//
 		updater, err := helper.NewShootAccessTokenUpdater(internalShootAccessHelper, shootTokenPath)
 		if err != nil {
-			l.Fatalw("unable to create shoot access token updater", "error", err)
+			log.Fatalf("unable to create shoot access token updater %v", err)
 		}
 
 		err = updater.UpdateContinuously(ctrl.Log.WithName("token-updater"), stop)
 		if err != nil {
-			l.Fatalw("unable to start token updater", "error", err)
+			log.Fatalf("unable to start token updater %v", err)
 		}
 	}
 
@@ -213,7 +216,7 @@ func main() {
 
 	shootConfig, err := internalShootAccessHelper.RESTConfig(ctx)
 	if err != nil {
-		l.Fatalw("unable to create shoot config", "error", err)
+		log.Fatalf("unable to create shoot config %v", err)
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
@@ -224,7 +227,7 @@ func main() {
 		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
 	})
 	if err != nil {
-		l.Fatalw("unable to start firewall-controller-manager-monitor", "error", err)
+		log.Fatalf("unable to start firewall-controller-manager-monitor %v", err)
 	}
 
 	cc, err := config.New(&config.NewControllerConfig{
@@ -248,42 +251,42 @@ func main() {
 		CreateTimeout:         createTimeout,
 	})
 	if err != nil {
-		l.Fatalw("unable to create controller config", "error", err)
+		log.Fatalf("unable to create controller config %v", err)
 	}
 
 	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorderFor("firewall-deployment-controller"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "deployment")
+		log.Fatalf("unable to setup controller deployment %v", err)
 	}
 	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorderFor("firewall-set-controller"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "set")
+		log.Fatalf("unable to setup controller set %v", err)
 	}
 	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorderFor("firewall-controller"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "firewall")
+		log.Fatalf("unable to setup controller firewall %v", err)
 	}
 	if err := monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), shootMgr, cc); err != nil {
-		l.Fatalw("unable to setup controller", "error", err, "controller", "monitor")
+		log.Fatalf("unable to setup controller monitor %v", err)
 	}
 
 	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup webhook", "error", err, "controller", "deployment")
+		log.Fatalf("unable to setup webhook, controller deployment %v", err)
 	}
 	if err := set.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup webhook", "error", err, "controller", "set")
+		log.Fatalf("unable to setup webhook, controller set %v", err)
 	}
 	if err := firewall.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
-		l.Fatalw("unable to setup webhook", "error", err, "controller", "firewall")
+		log.Fatalf("unable to setup webhook, controller firewall %v", err)
 	}
 
 	go func() {
-		l.Infow("starting shoot controller", "version", v.V)
+		l.Info("starting shoot controller", "version", v.V)
 		if err := shootMgr.Start(stop); err != nil {
-			l.Fatalw("problem running shoot controller", "error", err)
+			log.Fatalf("problem running shoot controller %v", err)
 		}
 	}()
 
-	l.Infow("starting seed controller", "version", v.V)
+	l.Info("starting seed controller", "version", v.V)
 	if err := seedMgr.Start(stop); err != nil {
-		l.Fatalw("problem running seed controller", "error", err)
+		log.Fatalf("problem running seed controller %v", err)
 	}
 }
 
