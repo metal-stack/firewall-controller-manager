@@ -1,4 +1,4 @@
-FROM alpine:3.18
+FROM alpine:3.19
 COPY bin/firewall-controller-manager /firewall-controller-manager
 USER 65534
 ENTRYPOINT ["/firewall-controller-manager"]
