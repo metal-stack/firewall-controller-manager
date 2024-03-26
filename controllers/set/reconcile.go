@@ -20,7 +20,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 	if wasPresent {
 		// the update of the annotation removal triggers the next reconciliation
 		c.log.Info("removed reconcile annotation from resource")
-		return nil
+		return controllers.SkipStatusUpdate()
 	}
 
 	ownedFirewalls, orphaned, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), r.Target.Spec.Selector, r.Target, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {

@@ -26,7 +26,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	if wasPresent {
 		// the update of the annotation removal triggers the next reconciliation
 		c.log.Info("removed reconcile annotation from resource")
-		return nil
+		return controllers.SkipStatusUpdate()
 	}
 
 	var f *models.V1FirewallResponse

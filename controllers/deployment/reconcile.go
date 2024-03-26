@@ -25,7 +25,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 	if wasPresent {
 		// the update of the annotation removal triggers the next reconciliation
 		c.log.Info("removed reconcile annotation from resource")
-		return nil
+		return controllers.SkipStatusUpdate()
 	}
 
 	err = c.ensureFirewallControllerRBAC(r)

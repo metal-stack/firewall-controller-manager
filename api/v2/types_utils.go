@@ -117,6 +117,10 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) (bool, error) {
 	annotations := o.GetAnnotations()
 
+	if annotations == nil {
+		return false, nil
+	}
+
 	_, ok := annotations[key]
 	if !ok {
 		return false, nil

@@ -53,6 +53,16 @@ func RequeueAfter(d time.Duration, reason string) error {
 	return &requeueError{after: d, reason: reason}
 }
 
+type skipStatusUpdateError struct{}
+
+func (e *skipStatusUpdateError) Error() string {
+	return fmt.Sprintf("skipping resource status update")
+}
+
+func SkipStatusUpdate() error {
+	return &skipStatusUpdateError{}
+}
+
 func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) *GenericController[O] {
 	return &GenericController[O]{
 		l:          l,
@@ -129,10 +139,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	var statusErr error
+	var (
+		skipStatusUpdate = false
+		statusErr        error
+	)
 
 	if g.hasStatus {
 		defer func() {
+			if skipStatusUpdate {
+				return
+			}
+
 			log.Info("updating status")
 			refetched := g.reconciler.New()
 
@@ -148,6 +165,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
+
 			return
 		}()
 	}
@@ -156,13 +174,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	err := g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
-		if errors.As(err, &requeueErr) {
-			log.Info(requeueErr.Error())
-			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
-		}
 
-		log.Error(err, "error during reconcile")
-		return ctrl.Result{}, err
+		switch {
+		case errors.As(err, &requeueErr):
+			log.Error(requeueErr, "requeueing reconciliation due to an error")
+			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
+		case errors.Is(err, &skipStatusUpdateError{}):
+			return ctrl.Result{}, nil
+		default:
+			log.Error(err, "error during reconcile")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, statusErr
