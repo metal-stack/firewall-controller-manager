@@ -134,8 +134,7 @@ func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key
 	return true, nil
 }
 
-// SkipAnnotationRemoval returns a predicate when the firewall controller annotation
-// was cleaned up.
+// SkipAnnotationRemoval returns a predicate when the given annotation key was cleaned up.
 func SkipAnnotationRemoval(annotation string) predicate.Funcs {
 	return predicate.Funcs{
 		UpdateFunc: func(update event.UpdateEvent) bool {
