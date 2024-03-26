@@ -331,12 +331,9 @@ spec:
                       type: integer
                   required:
                   - asn
-                  - destinationPrefixes
-                  - ips
                   - nat
                   - networkID
                   - networkType
-                  - prefixes
                   - vrf
                   type: object
                 type: array
