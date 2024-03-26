@@ -168,6 +168,36 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	return o && !n
 }
 
+// SkipAnnotationAdded returns a predicate when the given annotation key was added.
+func SkipAnnotationAdded(annotation string) predicate.Funcs {
+	return predicate.Funcs{
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return !annotationWasAdded(update, annotation)
+		},
+	}
+}
+
+func annotationWasAdded(update event.UpdateEvent, annotation string) bool {
+	if cmp.Equal(update.ObjectOld.GetAnnotations(), update.ObjectNew.GetAnnotations()) {
+		return false
+	}
+
+	var (
+		_, o = update.ObjectOld.GetAnnotations()[annotation]
+		_, n = update.ObjectNew.GetAnnotations()[annotation]
+	)
+
+	if o {
+		return false
+	}
+
+	if !n {
+		return false
+	}
+
+	return !o && n
+}
+
 // IsAnnotationTrue returns true if the given object has an annotation with a given
 // key and the value of this annotation is a true boolean.
 func IsAnnotationTrue(o client.Object, key string) bool {
