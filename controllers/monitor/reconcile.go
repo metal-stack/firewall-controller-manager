@@ -16,18 +16,7 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	wasPresent, err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.ReconcileAnnotation)
-	if err != nil {
-		return err
-	}
-
-	if wasPresent {
-		// the update of the annotation removal triggers the next reconciliation
-		c.log.Info("removed reconcile annotation from resource")
-		return controllers.SkipStatusUpdate()
-	}
-
-	_, err = c.updateFirewallStatus(r)
+	_, err := c.updateFirewallStatus(r)
 	if err != nil {
 		r.Log.Error(err, "unable to update firewall status")
 		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")

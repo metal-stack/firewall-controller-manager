@@ -18,17 +18,6 @@ import (
 
 // Reconciler must always return either an error or requeue to ensure that it detects if a firewall get lost etc.
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
-	wasPresent, err := v2.RemoveAnnotation(r.Ctx, c.c.GetSeedClient(), r.Target, v2.ReconcileAnnotation)
-	if err != nil {
-		return err
-	}
-
-	if wasPresent {
-		// the update of the annotation removal triggers the next reconciliation
-		c.log.Info("removed reconcile annotation from resource")
-		return controllers.SkipStatusUpdate()
-	}
-
 	var f *models.V1FirewallResponse
 	defer func() {
 		if err := c.setStatus(r, f); err != nil {

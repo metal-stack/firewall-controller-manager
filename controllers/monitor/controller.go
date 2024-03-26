@@ -17,7 +17,7 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.FirewallMonitor](log, c.GetShootClient(), c.GetShootNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetShootClient(), c.GetShootNamespace(), &controller{
 		log: log,
 		c:   c,
 	}).WithoutStatus()

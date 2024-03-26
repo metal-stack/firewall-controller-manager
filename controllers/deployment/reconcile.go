@@ -13,22 +13,12 @@ import (
 	"github.com/metal-stack/metal-go/api/client/image"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error {
-	wasPresent, err := v2.RemoveAnnotation(r.Ctx, c.c.GetSeedClient(), r.Target, v2.ReconcileAnnotation)
-	if err != nil {
-		return err
-	}
-
-	if wasPresent {
-		// the update of the annotation removal triggers the next reconciliation
-		c.log.Info("removed reconcile annotation from resource")
-		return controllers.SkipStatusUpdate()
-	}
-
-	err = c.ensureFirewallControllerRBAC(r)
+	err := c.ensureFirewallControllerRBAC(r)
 	if err != nil {
 		return err
 	}
@@ -168,26 +158,33 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 }
 
 func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], set *v2.FirewallSet) error {
-	refetched := &v2.FirewallSet{}
-	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(set), refetched)
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		refetched := &v2.FirewallSet{}
+		err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(set), refetched)
+		if err != nil {
+			return fmt.Errorf("unable re-fetch firewall set: %w", err)
+		}
+
+		refetched.Spec.Replicas = r.Target.Spec.Replicas
+		refetched.Spec.Template = r.Target.Spec.Template
+
+		err = c.c.GetSeedClient().Update(r.Ctx, refetched)
+		if err != nil {
+			return fmt.Errorf("unable to update/sync firewall set: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("unable to update/sync firewall set: %w", err)
+		return err
 	}
 
-	refetched.Spec.Replicas = r.Target.Spec.Replicas
-	refetched.Spec.Template = r.Target.Spec.Template
+	r.Log.Info("updated firewall set", "set-name", set.Name)
 
-	err = c.c.GetSeedClient().Update(r.Ctx, refetched)
-	if err != nil {
-		return fmt.Errorf("unable to update/sync firewall set: %w", err)
-	}
-
-	r.Log.Info("updated firewall set", "set-name", refetched.Name)
-
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", refetched.Name))
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", set.Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(refetched, "Normal", "Update", "updated firewallset %s", refetched.Name)
+	c.recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
 
 	return nil
 }

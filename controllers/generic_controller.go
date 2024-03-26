@@ -53,16 +53,6 @@ func RequeueAfter(d time.Duration, reason string) error {
 	return &requeueError{after: d, reason: reason}
 }
 
-type skipStatusUpdateError struct{}
-
-func (e *skipStatusUpdateError) Error() string {
-	return fmt.Sprintf("skipping resource status update")
-}
-
-func SkipStatusUpdate() error {
-	return &skipStatusUpdateError{}
-}
-
 func NewGenericController[O client.Object](l logr.Logger, c client.Client, namespace string, reconciler Reconciler[O]) *GenericController[O] {
 	return &GenericController[O]{
 		l:          l,
@@ -139,17 +129,23 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	wasPresent, err := v2.RemoveAnnotation(ctx, g.c, o, v2.ReconcileAnnotation)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to remove reconcile annotation: %w", err)
+	}
+
+	if wasPresent {
+		// the update of the annotation removal triggers the next reconciliation
+		log.Info("removed reconcile annotation from resource")
+		return ctrl.Result{}, nil
+	}
+
 	var (
-		skipStatusUpdate = false
-		statusErr        error
+		statusErr error
 	)
 
 	if g.hasStatus {
 		defer func() {
-			if skipStatusUpdate {
-				return
-			}
-
 			log.Info("updating status")
 			refetched := g.reconciler.New()
 
@@ -171,7 +167,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	log.Info("reconciling resource")
-	err := g.reconciler.Reconcile(rctx)
+	err = g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
 
@@ -179,9 +175,6 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		case errors.As(err, &requeueErr):
 			log.Info(requeueErr.Error())
 			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
-		case errors.Is(err, &skipStatusUpdateError{}):
-			skipStatusUpdate = true
-			return ctrl.Result{}, nil
 		default:
 			log.Error(err, "error during reconcile")
 			return ctrl.Result{}, err

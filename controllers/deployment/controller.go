@@ -24,7 +24,7 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.FirewallDeployment](log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
 		c:               c,
 		log:             log,
 		recorder:        recorder,
