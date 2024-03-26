@@ -9,8 +9,7 @@ import (
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-go/api/client/image"
+	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -192,7 +191,7 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		return ok, nil
 	}
 
-	ok, err := osImageHasChanged(r.Ctx, c.c.GetMetal(), newS, oldS)
+	ok, err := c.osImageHasChanged(r.Ctx, newS, oldS)
 	if err != nil {
 		return false, err
 	}
@@ -214,16 +213,14 @@ func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
 	return newS.Size != oldS.Size
 }
 
-func osImageHasChanged(ctx context.Context, m metalgo.Client, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
-	if newS.Image != oldS.Image {
-		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(newS.Image).WithContext(ctx), nil)
-		if err != nil {
-			return false, fmt.Errorf("latest firewall image not found:%s %w", newS.Image, err)
-		}
+func (c *controller) osImageHasChanged(ctx context.Context, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
+	image, err := c.imageCache.Get(ctx, newS.Image)
+	if err != nil {
+		return false, err
+	}
 
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != oldS.Image {
-			return true, nil
-		}
+	if pointer.SafeDeref(image.ID) != oldS.Image {
+		return true, nil
 	}
 
 	return false, nil

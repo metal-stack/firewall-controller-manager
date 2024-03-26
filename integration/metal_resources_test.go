@@ -247,13 +247,12 @@ var (
 	imageExpiration = pointer.Pointer(strfmt.DateTime(testTime.Add(3 * 24 * time.Hour)))
 	image1          = &models.V1ImageResponse{
 		Classification: "supported",
-		Description:    "debian-description",
+		Description:    "firewall-image-description",
 		ExpirationDate: imageExpiration,
-		Features:       []string{"machine"},
-		ID:             pointer.Pointer("debian"),
-		Name:           "debian-name",
-		URL:            "debian-url",
-		Usedby:         []string{"456"},
+		Features:       []string{"firewall"},
+		ID:             pointer.Pointer("firewall-ubuntu-2.0"),
+		Name:           "firewall-image-name",
+		URL:            "firewall-image-url",
 	}
 	partition1 = &models.V1PartitionResponse{
 		Bootconfig: &models.V1PartitionBootConfiguration{
