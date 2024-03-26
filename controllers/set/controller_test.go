@@ -2,6 +2,7 @@ package set_test
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -119,7 +120,7 @@ var _ = Context("firewall set controller", Ordered, func() {
 
 			firewall := testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 				return l.GetItems()
-			}, 3*time.Second)
+			}, 5*time.Second)
 
 			Expect(firewall.Name).To(Equal(newest.Name), "older firewalls were kept")
 		})
@@ -144,6 +145,25 @@ var _ = Context("firewall set controller", Ordered, func() {
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
 			set.Spec.Replicas = -1
 			Expect(k8sClient.Update(ctx, set)).NotTo(Succeed())
+		})
+	})
+
+	Describe("reconcile annotation", Ordered, func() {
+		It("the annotation can be added", func() {
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
+			if set.Annotations == nil {
+				set.Annotations = map[string]string{}
+			}
+			set.Annotations[v2.ReconcileAnnotation] = strconv.FormatBool(true)
+			Expect(k8sClient.Update(ctx, set)).To(Succeed())
+		})
+
+		It("the annotation was cleaned up again", func() {
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
+				_, present := set.Annotations[v2.ReconcileAnnotation]
+				return present
+			}, "50ms").Should(BeFalse())
 		})
 	})
 })

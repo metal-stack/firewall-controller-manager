@@ -830,6 +830,10 @@ var _ = Context("integration test", Ordered, func() {
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
+
+					_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+						return l.GetItems()
+					}, 10*time.Second)
 				})
 			})
 
@@ -1537,6 +1541,10 @@ var _ = Context("integration test", Ordered, func() {
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
+
+					_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+						return l.GetItems()
+					}, 10*time.Second)
 				})
 			})
 
@@ -1797,7 +1805,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
+				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 30*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1841,6 +1849,10 @@ var _ = Context("integration test", Ordered, func() {
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
+
+					_ = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 0, &v2.FirewallDeploymentList{}, func(l *v2.FirewallDeploymentList) []*v2.FirewallDeployment {
+						return l.GetItems()
+					}, 10*time.Second)
 				})
 			})
 

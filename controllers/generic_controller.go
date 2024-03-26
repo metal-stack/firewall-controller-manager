@@ -18,9 +18,10 @@ import (
 
 type (
 	Ctx[O client.Object] struct {
-		Ctx    context.Context
-		Log    logr.Logger
-		Target O
+		Ctx           context.Context
+		Log           logr.Logger
+		Target        O
+		InMaintenance bool
 	}
 	Reconciler[O client.Object] interface {
 		// New returns a new object of O.
@@ -81,9 +82,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		o    = g.reconciler.New()
 		log  = g.logger(req)
 		rctx = &Ctx[O]{
-			Ctx:    ctx,
-			Log:    log,
-			Target: o,
+			Ctx:           ctx,
+			Log:           log,
+			Target:        o,
+			InMaintenance: false,
 		}
 	)
 
@@ -129,7 +131,20 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	var statusErr error
+	wasPresent, err := v2.RemoveAnnotation(ctx, g.c, o, v2.ReconcileAnnotation)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to remove reconcile annotation: %w", err)
+	}
+
+	if wasPresent {
+		// the update of the annotation removal triggers the next reconciliation
+		log.Info("removed reconcile annotation from resource")
+		return ctrl.Result{}, nil
+	}
+
+	var (
+		statusErr error
+	)
 
 	if g.hasStatus {
 		defer func() {
@@ -148,21 +163,40 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
+
 			return
 		}()
 	}
 
+	if v2.IsAnnotationTrue(o, v2.MaintenanceAnnotation) {
+		rctx.InMaintenance = true
+
+		defer func() {
+			refetched := g.reconciler.New()
+
+			_, err := v2.RemoveAnnotation(ctx, g.c, refetched, v2.MaintenanceAnnotation)
+			if err != nil {
+				log.Error(err, "unable to cleanup maintenance annotation")
+				return
+			}
+
+			log.Info("removed maintenance annotation")
+		}()
+	}
+
 	log.Info("reconciling resource")
-	err := g.reconciler.Reconcile(rctx)
+	err = g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
-		if errors.As(err, &requeueErr) {
+
+		switch {
+		case errors.As(err, &requeueErr):
 			log.Info(requeueErr.Error())
 			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
+		default:
+			log.Error(err, "error during reconcile")
+			return ctrl.Result{}, err
 		}
-
-		log.Error(err, "error during reconcile")
-		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, statusErr

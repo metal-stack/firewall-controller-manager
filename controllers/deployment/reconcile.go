@@ -13,6 +13,7 @@ import (
 	"github.com/metal-stack/metal-go/api/client/image"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -157,12 +158,25 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 }
 
 func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], set *v2.FirewallSet) error {
-	set.Spec.Replicas = r.Target.Spec.Replicas
-	set.Spec.Template = r.Target.Spec.Template
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		refetched := &v2.FirewallSet{}
+		err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(set), refetched)
+		if err != nil {
+			return fmt.Errorf("unable re-fetch firewall set: %w", err)
+		}
 
-	err := c.c.GetSeedClient().Update(r.Ctx, set)
+		refetched.Spec.Replicas = r.Target.Spec.Replicas
+		refetched.Spec.Template = r.Target.Spec.Template
+
+		err = c.c.GetSeedClient().Update(r.Ctx, refetched)
+		if err != nil {
+			return fmt.Errorf("unable to update/sync firewall set: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("unable to update/sync firewall set: %w", err)
+		return err
 	}
 
 	r.Log.Info("updated firewall set", "set-name", set.Name)

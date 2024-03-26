@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,8 +12,17 @@ import (
 )
 
 const (
-	FinalizerName      = "firewall.metal-stack.io/firewall-controller-manager"
-	RollSetAnnotation  = "firewall.metal-stack.io/roll-set"
+	// FinalizerName is the finalizer name used by this controller.
+	FinalizerName = "firewall.metal-stack.io/firewall-controller-manager"
+	// ReconcileAnnotation can be used to trigger a reconciliation of a resource managed by a controller.
+	// The value of the annotation does not matter, the controller will cleanup the annotation automatically and trigger a reconciliation of the resource.
+	ReconcileAnnotation = "firewall.metal-stack.io/reconcile"
+	// MaintenanceAnnotation can be used to trigger a maintenance reconciliation for which a controller might have special behavior.
+	// The value of the annotation does not matter, the controller will cleanup the annotation automatically.
+	MaintenanceAnnotation = "firewall.metal-stack.io/maintain"
+	// RollSetAnnotation can be used to trigger a rolling update of a firewall deployment.
+	RollSetAnnotation = "firewall.metal-stack.io/roll-set"
+	// RevisionAnnotation stores the revision number of a resource.
 	RevisionAnnotation = "firewall.metal-stack.io/revision"
 )
 
@@ -105,12 +115,43 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 	return newConditions
 }
 
-// SkipReconcileAnnotationRemoval returns a predicate when the firewall controller reconcile annotation
-// was cleaned up.
-func SkipRollSetAnnotationRemoval() predicate.Funcs {
+// RemoveAnnotation removes an annotation by a given key from an object if present by updating it with the given client.
+// It returns true when the annotation was present and removed and an error if the update process went wrong.
+func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) (bool, error) {
+	annotations := o.GetAnnotations()
+
+	if annotations == nil {
+		return false, nil
+	}
+
+	_, ok := annotations[key]
+	if !ok {
+		return false, nil
+	}
+
+	delete(annotations, key)
+
+	o.SetAnnotations(annotations)
+
+	err := c.Update(ctx, o)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// AnnotationRemovedPredicate returns a predicate when the given annotation key was removed.
+func AnnotationRemovedPredicate(annotation string) predicate.Funcs {
 	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
 		UpdateFunc: func(update event.UpdateEvent) bool {
-			return !annotationWasRemoved(update, RollSetAnnotation)
+			return annotationWasRemoved(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
 		},
 	}
 }
@@ -134,6 +175,42 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	}
 
 	return o && !n
+}
+
+// AnnotationAddedPredicate returns a predicate when the given annotation key was added.
+func AnnotationAddedPredicate(annotation string) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return annotationWasAdded(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
+		},
+	}
+}
+
+func annotationWasAdded(update event.UpdateEvent, annotation string) bool {
+	if cmp.Equal(update.ObjectOld.GetAnnotations(), update.ObjectNew.GetAnnotations()) {
+		return false
+	}
+
+	var (
+		_, o = update.ObjectOld.GetAnnotations()[annotation]
+		_, n = update.ObjectNew.GetAnnotations()[annotation]
+	)
+
+	if o {
+		return false
+	}
+
+	if !n {
+		return false
+	}
+
+	return !o && n
 }
 
 // IsAnnotationTrue returns true if the given object has an annotation with a given
