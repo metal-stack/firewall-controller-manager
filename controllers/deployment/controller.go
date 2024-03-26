@@ -35,10 +35,13 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		For(
 			&v2.FirewallDeployment{},
 			builder.WithPredicates(
-				predicate.Or(
-					predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
-					predicate.AnnotationChangedPredicate{},
-					predicate.LabelChangedPredicate{},
+				predicate.And(
+					predicate.Not(v2.AnnotationRemovedPredicate(v2.MaintenanceAnnotation)),
+					predicate.Or(
+						predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
+						predicate.AnnotationChangedPredicate{},
+						predicate.LabelChangedPredicate{},
+					),
 				),
 			),
 		).

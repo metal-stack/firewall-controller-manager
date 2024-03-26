@@ -18,9 +18,10 @@ import (
 
 type (
 	Ctx[O client.Object] struct {
-		Ctx    context.Context
-		Log    logr.Logger
-		Target O
+		Ctx           context.Context
+		Log           logr.Logger
+		Target        O
+		InMaintenance bool
 	}
 	Reconciler[O client.Object] interface {
 		// New returns a new object of O.
@@ -81,9 +82,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		o    = g.reconciler.New()
 		log  = g.logger(req)
 		rctx = &Ctx[O]{
-			Ctx:    ctx,
-			Log:    log,
-			Target: o,
+			Ctx:           ctx,
+			Log:           log,
+			Target:        o,
+			InMaintenance: false,
 		}
 	)
 
@@ -163,6 +165,22 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 
 			return
+		}()
+	}
+
+	if v2.IsAnnotationTrue(o, v2.MaintenanceAnnotation) {
+		rctx.InMaintenance = true
+
+		defer func() {
+			refetched := g.reconciler.New()
+
+			_, err := v2.RemoveAnnotation(ctx, g.c, refetched, v2.MaintenanceAnnotation)
+			if err != nil {
+				log.Error(err, "unable to cleanup maintenance annotation")
+				return
+			}
+
+			log.Info("removed maintenance annotation")
 		}()
 	}
 

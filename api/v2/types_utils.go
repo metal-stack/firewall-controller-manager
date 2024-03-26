@@ -17,6 +17,9 @@ const (
 	// ReconcileAnnotation can be used to trigger a reconciliation of a resource managed by a controller.
 	// The value of the annotation does not matter, the controller will cleanup the annotation automatically and trigger a reconciliation of the resource.
 	ReconcileAnnotation = "firewall.metal-stack.io/reconcile"
+	// MaintenanceAnnotation can be used to trigger a maintenance reconciliation for which a controller might have special behavior.
+	// The value of the annotation does not matter, the controller will cleanup the annotation automatically.
+	MaintenanceAnnotation = "firewall.metal-stack.io/maintain"
 	// RollSetAnnotation can be used to trigger a rolling update of a firewall deployment.
 	RollSetAnnotation = "firewall.metal-stack.io/roll-set"
 	// RevisionAnnotation stores the revision number of a resource.
@@ -141,8 +144,14 @@ func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key
 // AnnotationRemovedPredicate returns a predicate when the given annotation key was removed.
 func AnnotationRemovedPredicate(annotation string) predicate.Funcs {
 	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
 		UpdateFunc: func(update event.UpdateEvent) bool {
 			return annotationWasRemoved(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
 		},
 	}
 }
@@ -171,8 +180,14 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 // AnnotationAddedPredicate returns a predicate when the given annotation key was added.
 func AnnotationAddedPredicate(annotation string) predicate.Funcs {
 	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
 		UpdateFunc: func(update event.UpdateEvent) bool {
 			return annotationWasAdded(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
 		},
 	}
 }
