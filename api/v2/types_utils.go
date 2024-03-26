@@ -138,11 +138,11 @@ func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key
 	return true, nil
 }
 
-// SkipAnnotationRemoval returns a predicate when the given annotation key was cleaned up.
-func SkipAnnotationRemoval(annotation string) predicate.Funcs {
+// AnnotationRemovedPredicate returns a predicate when the given annotation key was removed.
+func AnnotationRemovedPredicate(annotation string) predicate.Funcs {
 	return predicate.Funcs{
 		UpdateFunc: func(update event.UpdateEvent) bool {
-			return !annotationWasRemoved(update, annotation)
+			return annotationWasRemoved(update, annotation)
 		},
 	}
 }
@@ -168,11 +168,11 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	return o && !n
 }
 
-// SkipAnnotationAdded returns a predicate when the given annotation key was added.
-func SkipAnnotationAdded(annotation string) predicate.Funcs {
+// AnnotationAddedPredicate returns a predicate when the given annotation key was added.
+func AnnotationAddedPredicate(annotation string) predicate.Funcs {
 	return predicate.Funcs{
 		UpdateFunc: func(update event.UpdateEvent) bool {
-			return !annotationWasAdded(update, annotation)
+			return annotationWasAdded(update, annotation)
 		},
 	}
 }

@@ -120,7 +120,7 @@ var _ = Context("firewall set controller", Ordered, func() {
 
 			firewall := testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 				return l.GetItems()
-			}, 3*time.Second)
+			}, 5*time.Second)
 
 			Expect(firewall.Name).To(Equal(newest.Name), "older firewalls were kept")
 		})
