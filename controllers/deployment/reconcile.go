@@ -168,20 +168,26 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 }
 
 func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment], set *v2.FirewallSet) error {
-	set.Spec.Replicas = r.Target.Spec.Replicas
-	set.Spec.Template = r.Target.Spec.Template
-
-	err := c.c.GetSeedClient().Update(r.Ctx, set)
+	refetched := &v2.FirewallSet{}
+	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(set), refetched)
 	if err != nil {
 		return fmt.Errorf("unable to update/sync firewall set: %w", err)
 	}
 
-	r.Log.Info("updated firewall set", "set-name", set.Name)
+	refetched.Spec.Replicas = r.Target.Spec.Replicas
+	refetched.Spec.Template = r.Target.Spec.Template
 
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", set.Name))
+	err = c.c.GetSeedClient().Update(r.Ctx, refetched)
+	if err != nil {
+		return fmt.Errorf("unable to update/sync firewall set: %w", err)
+	}
+
+	r.Log.Info("updated firewall set", "set-name", refetched.Name)
+
+	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", refetched.Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
+	c.recorder.Eventf(refetched, "Normal", "Update", "updated firewallset %s", refetched.Name)
 
 	return nil
 }
