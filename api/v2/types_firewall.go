@@ -255,9 +255,9 @@ type FirewallNetwork struct {
 	// Asn is the autonomous system number of this network.
 	ASN *int64 `json:"asn"`
 	// DestinationPrefixes are the destination prefixes of this network.
-	DestinationPrefixes []string `json:"destinationPrefixes"`
+	DestinationPrefixes []string `json:"destinationPrefixes,omitempty"`
 	// IPs are the ip addresses used in this network.
-	IPs []string `json:"ips"`
+	IPs []string `json:"ips,omitempty"`
 	// Nat specifies whether the outgoing traffic is natted or not.
 	Nat *bool `json:"nat"`
 	// NetworkID is the id of this network.
@@ -265,7 +265,7 @@ type FirewallNetwork struct {
 	// NetworkType is the type of this network.
 	NetworkType *string `json:"networkType"`
 	// Prefixes are the network prefixes of this network.
-	Prefixes []string `json:"prefixes"`
+	Prefixes []string `json:"prefixes,omitempty"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
 }

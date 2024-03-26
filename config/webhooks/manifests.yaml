@@ -2,7 +2,6 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -30,25 +29,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-firewall-metal-stack-io-v2-firewallset
-  failurePolicy: Fail
-  name: firewallset.metal-stack.io
-  rules:
-  - apiGroups:
-    - firewall.metal-stack.io
-    apiVersions:
-    - v2
-    operations:
-    - CREATE
-    resources:
-    - firewallsets
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-firewall-metal-stack-io-v2-firewalldeployment
   failurePolicy: Fail
   name: firewalldeployment.metal-stack.io
@@ -62,11 +42,29 @@ webhooks:
     resources:
     - firewalldeployments
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-firewall-metal-stack-io-v2-firewallset
+  failurePolicy: Fail
+  name: firewallset.metal-stack.io
+  rules:
+  - apiGroups:
+    - firewall.metal-stack.io
+    apiVersions:
+    - v2
+    operations:
+    - CREATE
+    resources:
+    - firewallsets
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -95,26 +93,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-firewall-metal-stack-io-v2-firewallset
-  failurePolicy: Fail
-  name: firewallset.metal-stack.io
-  rules:
-  - apiGroups:
-    - firewall.metal-stack.io
-    apiVersions:
-    - v2
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - firewallsets
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /validate-firewall-metal-stack-io-v2-firewalldeployment
   failurePolicy: Fail
   name: firewalldeployment.metal-stack.io
@@ -128,4 +106,24 @@ webhooks:
     - UPDATE
     resources:
     - firewalldeployments
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-firewall-metal-stack-io-v2-firewallset
+  failurePolicy: Fail
+  name: firewallset.metal-stack.io
+  rules:
+  - apiGroups:
+    - firewall.metal-stack.io
+    apiVersions:
+    - v2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - firewallsets
   sideEffects: None
