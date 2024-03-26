@@ -16,7 +16,18 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	_, err := c.updateFirewallStatus(r)
+	wasPresent, err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.ReconcileAnnotation)
+	if err != nil {
+		return err
+	}
+
+	if wasPresent {
+		// the update of the annotation removal triggers the next reconciliation
+		c.log.Info("removed reconcile annotation from resource")
+		return nil
+	}
+
+	_, err = c.updateFirewallStatus(r)
 	if err != nil {
 		r.Log.Error(err, "unable to update firewall status")
 		return controllers.RequeueAfter(3*time.Second, "unable to update firewall status, retrying")
@@ -54,52 +65,43 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 }
 
 func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	v, ok := r.Target.Annotations[v2.RollSetAnnotation]
-	if !ok {
-		return nil
-	}
+	rollSet := v2.IsAnnotationTrue(r.Target, v2.RollSetAnnotation)
 
-	r.Log.Info("resource was annotated", "annotation", v2.RollSetAnnotation, "value", v)
-
-	delete(r.Target.Annotations, v2.RollSetAnnotation)
-
-	err := c.c.GetShootClient().Update(r.Ctx, r.Target)
+	present, err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
 	if err != nil {
 		return err
 	}
 
-	r.Log.Info("cleaned up annotation")
-
-	rollSet, err := strconv.ParseBool(v)
-	if err != nil {
-		r.Log.Error(err, "unable to parse annotation value, ignoring")
+	if !present {
 		return nil
 	}
 
-	if rollSet {
-		r.Log.Info("initiating firewall set roll as requested by user annotation")
-
-		fw := &v2.Firewall{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.Target.Name,
-				Namespace: c.c.GetSeedNamespace(),
-			},
-		}
-
-		set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
-		if err != nil {
-			return client.IgnoreNotFound(err)
-		}
-
-		set.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
-
-		err = c.c.GetSeedClient().Update(r.Ctx, set)
-		if err != nil {
-			return fmt.Errorf("unable to annotate firewall set: %w", err)
-		}
-
-		r.Log.Info("firewall set annotated")
+	if !rollSet {
+		return nil
 	}
+
+	r.Log.Info("initiating firewall set roll as requested by user annotation")
+
+	fw := &v2.Firewall{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.Target.Name,
+			Namespace: c.c.GetSeedNamespace(),
+		},
+	}
+
+	set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	set.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
+
+	err = c.c.GetSeedClient().Update(r.Ctx, set)
+	if err != nil {
+		return fmt.Errorf("unable to annotate firewall set: %w", err)
+	}
+
+	r.Log.Info("firewall set annotated")
 
 	return nil
 }

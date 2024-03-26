@@ -25,7 +25,7 @@ func SetupWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerCon
 		For(&v2.FirewallMonitor{}).
 		Named("FirewallMonitor").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetShootNamespace()))).
-		WithEventFilter(v2.SkipRollSetAnnotationRemoval()).
+		WithEventFilter(v2.SkipAnnotationRemoval(v2.RollSetAnnotation)).
 		Complete(g)
 }
 

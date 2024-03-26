@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,8 +12,14 @@ import (
 )
 
 const (
-	FinalizerName      = "firewall.metal-stack.io/firewall-controller-manager"
-	RollSetAnnotation  = "firewall.metal-stack.io/roll-set"
+	// FinalizerName is the finalizer name used by this controller.
+	FinalizerName = "firewall.metal-stack.io/firewall-controller-manager"
+	// ReconcileAnnotation can be used to trigger a reconciliation of a resource managed by a controller.
+	// The value of the annotation does not matter, the controller will cleanup the annotation automatically and trigger a reconciliation of the resource.
+	ReconcileAnnotation = "firewall.metal-stack.io/reconcile"
+	// RollSetAnnotation can be used to trigger a rolling update of a firewall deployment.
+	RollSetAnnotation = "firewall.metal-stack.io/roll-set"
+	// RevisionAnnotation stores the revision number of a resource.
 	RevisionAnnotation = "firewall.metal-stack.io/revision"
 )
 
@@ -105,12 +112,34 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 	return newConditions
 }
 
-// SkipReconcileAnnotationRemoval returns a predicate when the firewall controller reconcile annotation
+// RemoveAnnotation removes an annotation by a given key from an object if present by updating it with the given client.
+// It returns true when the annotation was present and removed and an error if the update process went wrong.
+func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) (bool, error) {
+	annotations := o.GetAnnotations()
+
+	_, ok := annotations[key]
+	if !ok {
+		return false, nil
+	}
+
+	delete(annotations, key)
+
+	o.SetAnnotations(annotations)
+
+	err := c.Update(ctx, o)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// SkipAnnotationRemoval returns a predicate when the firewall controller annotation
 // was cleaned up.
-func SkipRollSetAnnotationRemoval() predicate.Funcs {
+func SkipAnnotationRemoval(annotation string) predicate.Funcs {
 	return predicate.Funcs{
 		UpdateFunc: func(update event.UpdateEvent) bool {
-			return !annotationWasRemoved(update, RollSetAnnotation)
+			return !annotationWasRemoved(update, annotation)
 		},
 	}
 }

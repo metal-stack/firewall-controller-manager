@@ -17,7 +17,18 @@ import (
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error {
-	err := c.ensureFirewallControllerRBAC(r)
+	wasPresent, err := v2.RemoveAnnotation(r.Ctx, c.c.GetSeedClient(), r.Target, v2.ReconcileAnnotation)
+	if err != nil {
+		return err
+	}
+
+	if wasPresent {
+		// the update of the annotation removal triggers the next reconciliation
+		c.log.Info("removed reconcile annotation from resource")
+		return nil
+	}
+
+	err = c.ensureFirewallControllerRBAC(r)
 	if err != nil {
 		return err
 	}
