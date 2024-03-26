@@ -46,7 +46,10 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		Owns(
 			&v2.FirewallSet{},
 			builder.WithPredicates(
-				v2.SkipAnnotationAdded(v2.ReconcileAnnotation),
+				predicate.Or(
+					v2.SkipAnnotationAdded(v2.ReconcileAnnotation),
+					v2.SkipAnnotationRemoval(v2.ReconcileAnnotation),
+				),
 			),
 		).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
