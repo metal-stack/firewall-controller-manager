@@ -37,7 +37,9 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			),
 		).
 		Named("FirewallSet").
-		Owns(&v2.Firewall{}).
+		Owns(&v2.Firewall{}, builder.WithPredicates(
+			v2.SkipAnnotationRemoval(v2.ReconcileAnnotation),
+		)).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
 		Complete(g)
 }

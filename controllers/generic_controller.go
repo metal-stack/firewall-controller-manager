@@ -177,7 +177,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		switch {
 		case errors.As(err, &requeueErr):
-			log.Error(requeueErr, "requeueing reconciliation due to an error")
+			log.Info(requeueErr.Error())
 			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 		case errors.Is(err, &skipStatusUpdateError{}):
 			return ctrl.Result{}, nil
