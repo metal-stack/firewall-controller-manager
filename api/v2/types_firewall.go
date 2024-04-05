@@ -9,18 +9,6 @@ import (
 )
 
 const (
-	// FirewallNoControllerConnectionAnnotation can be used as an annotation to the firewall resource in order
-	// to indicate that the firewall-controller does not connect to the firewall monitor. this way, the replica
-	// set will become healthy without a controller connection.
-	//
-	// this can be useful to silence a problem temporarily and was used in the past for migration of firewall-controller v1.
-	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
-	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
-	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
-	// FirewallWeightAnnotation is considered when deciding which firewall is thrown away on scale down.
-	// Value must be parsable as an integer. Firewalls with higher weight are kept longer.
-	// Defaults to 0 if no annotation is present. Negative values are allowed.
-	FirewallWeightAnnotation = "firewall.metal-stack.io/weight"
 	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.
 	FirewallControllerManager = "firewall-controller-manager"
 )
@@ -327,7 +315,7 @@ func SortFirewallsByImportance(fws []*Firewall) {
 		a := fws[i]
 		b := fws[j]
 
-		// prefer heigher weight
+		// prefer higher weight
 		if weight(a) > weight(b) {
 			return true
 		}

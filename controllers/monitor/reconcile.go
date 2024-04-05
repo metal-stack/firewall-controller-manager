@@ -59,11 +59,6 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 		return nil
 	}
 
-	err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
-	if err != nil {
-		return err
-	}
-
 	r.Log.Info("initiating firewall set roll as requested by user annotation")
 
 	fw := &v2.Firewall{
@@ -78,14 +73,15 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 		return client.IgnoreNotFound(err)
 	}
 
-	set.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
-
-	err = c.c.GetSeedClient().Update(r.Ctx, set)
+	err = v2.AddAnnotation(r.Ctx, c.c.GetSeedClient(), set, v2.RollSetAnnotation, strconv.FormatBool(true))
 	if err != nil {
 		return fmt.Errorf("unable to annotate firewall set: %w", err)
 	}
 
-	r.Log.Info("firewall set annotated")
+	err = v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
+	if err != nil {
+		return fmt.Errorf("unable to cleanup firewall monitor roll-set annotation: %w", err)
+	}
 
 	return nil
 }
