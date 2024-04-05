@@ -55,18 +55,13 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 
 func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 	rollSet := v2.IsAnnotationTrue(r.Target, v2.RollSetAnnotation)
-
-	present, err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
-	if err != nil {
-		return err
-	}
-
-	if !present {
-		return nil
-	}
-
 	if !rollSet {
 		return nil
+	}
+
+	err := v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
+	if err != nil {
+		return err
 	}
 
 	r.Log.Info("initiating firewall set roll as requested by user annotation")

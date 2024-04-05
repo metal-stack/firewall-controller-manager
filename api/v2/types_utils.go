@@ -21,6 +21,7 @@ const (
 	// The value of the annotation does not matter, the controller will cleanup the annotation automatically.
 	MaintenanceAnnotation = "firewall.metal-stack.io/maintain"
 	// RollSetAnnotation can be used to trigger a rolling update of a firewall deployment.
+	// The value of the annotation needs to be true otherwise the controller will ignore it.
 	RollSetAnnotation = "firewall.metal-stack.io/roll-set"
 	// RevisionAnnotation stores the revision number of a resource.
 	RevisionAnnotation = "firewall.metal-stack.io/revision"
@@ -115,6 +116,13 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 	return newConditions
 }
 
+// IsAnnotationPresent returns true if the given object has an annotation with a given
+// key, the value of this annotation does not matter.
+func IsAnnotationPresent(o client.Object, key string) bool {
+	_, ok := o.GetAnnotations()[key]
+	return ok
+}
+
 // IsAnnotationTrue returns true if the given object has an annotation with a given
 // key and the value of this annotation is a true boolean.
 func IsAnnotationTrue(o client.Object, key string) bool {
@@ -130,17 +138,16 @@ func IsAnnotationFalse(o client.Object, key string) bool {
 }
 
 // RemoveAnnotation removes an annotation by a given key from an object if present by updating it with the given client.
-// It returns true when the annotation was present and removed and an error if the update process went wrong.
-func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) (bool, error) {
+func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) error {
 	annotations := o.GetAnnotations()
 
 	if annotations == nil {
-		return false, nil
+		return nil
 	}
 
 	_, ok := annotations[key]
 	if !ok {
-		return false, nil
+		return nil
 	}
 
 	delete(annotations, key)
@@ -149,10 +156,10 @@ func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key
 
 	err := c.Update(ctx, o)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {

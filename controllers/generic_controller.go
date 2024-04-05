@@ -131,7 +131,8 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	if wasPresent, err := v2.RemoveAnnotation(ctx, g.c, o, v2.ReconcileAnnotation); wasPresent {
+	if v2.IsAnnotationPresent(o, v2.ReconcileAnnotation) {
+		err := v2.RemoveAnnotation(ctx, g.c, o, v2.ReconcileAnnotation)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to remove reconcile annotation: %w", err)
 		}
@@ -146,17 +147,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if g.hasStatus {
 		defer func() {
 			log.Info("updating status")
-			refetched := g.reconciler.New()
+			newO := g.reconciler.New()
 
-			statusErr = g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
+			statusErr = g.c.Get(ctx, req.NamespacedName, newO, &client.GetOptions{})
 			if statusErr != nil {
 				log.Error(statusErr, "unable to fetch resource before status update")
 				return
 			}
 
-			g.reconciler.SetStatus(o, refetched)
+			g.reconciler.SetStatus(o, newO)
 
-			statusErr = g.c.Status().Update(ctx, refetched)
+			statusErr = g.c.Status().Update(ctx, newO)
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
@@ -165,15 +166,21 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}()
 	}
 
-	if v2.IsAnnotationTrue(o, v2.MaintenanceAnnotation) {
+	if v2.IsAnnotationPresent(o, v2.MaintenanceAnnotation) {
 		log.Info("reconciling in maintenance mode")
 
 		rctx.InMaintenance = true
 
 		defer func() {
-			refetched := g.reconciler.New()
+			newO := g.reconciler.New()
 
-			_, err := v2.RemoveAnnotation(ctx, g.c, refetched, v2.MaintenanceAnnotation)
+			err := g.c.Get(ctx, req.NamespacedName, newO, &client.GetOptions{})
+			if err != nil {
+				log.Error(err, "unable to fetch resource before maintenance annotation removal")
+				return
+			}
+
+			err = v2.RemoveAnnotation(ctx, g.c, newO, v2.MaintenanceAnnotation)
 			if err != nil {
 				log.Error(err, "unable to cleanup maintenance annotation")
 				return
@@ -184,6 +191,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	log.Info("reconciling resource")
+
 	err := g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
