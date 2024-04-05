@@ -115,6 +115,20 @@ func (cs Conditions) filterOutCondition(t ConditionType) Conditions {
 	return newConditions
 }
 
+// IsAnnotationTrue returns true if the given object has an annotation with a given
+// key and the value of this annotation is a true boolean.
+func IsAnnotationTrue(o client.Object, key string) bool {
+	enabled, err := strconv.ParseBool(o.GetAnnotations()[key])
+	return err == nil && enabled
+}
+
+// IsAnnotationFalse returns true if the given object has an annotation with a given
+// key and the value of this annotation is a false boolean.
+func IsAnnotationFalse(o client.Object, key string) bool {
+	enabled, err := strconv.ParseBool(o.GetAnnotations()[key])
+	return err == nil && !enabled
+}
+
 // RemoveAnnotation removes an annotation by a given key from an object if present by updating it with the given client.
 // It returns true when the annotation was present and removed and an error if the update process went wrong.
 func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key string) (bool, error) {
@@ -141,21 +155,6 @@ func RemoveAnnotation(ctx context.Context, c client.Client, o client.Object, key
 	return true, nil
 }
 
-// AnnotationRemovedPredicate returns a predicate when the given annotation key was removed.
-func AnnotationRemovedPredicate(annotation string) predicate.Funcs {
-	return predicate.Funcs{
-		CreateFunc: func(ce event.CreateEvent) bool {
-			return false
-		},
-		UpdateFunc: func(update event.UpdateEvent) bool {
-			return annotationWasRemoved(update, annotation)
-		},
-		DeleteFunc: func(de event.DeleteEvent) bool {
-			return false
-		},
-	}
-}
-
 func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	if cmp.Equal(update.ObjectOld.GetAnnotations(), update.ObjectNew.GetAnnotations()) {
 		return false
@@ -175,21 +174,6 @@ func annotationWasRemoved(update event.UpdateEvent, annotation string) bool {
 	}
 
 	return o && !n
-}
-
-// AnnotationAddedPredicate returns a predicate when the given annotation key was added.
-func AnnotationAddedPredicate(annotation string) predicate.Funcs {
-	return predicate.Funcs{
-		CreateFunc: func(ce event.CreateEvent) bool {
-			return false
-		},
-		UpdateFunc: func(update event.UpdateEvent) bool {
-			return annotationWasAdded(update, annotation)
-		},
-		DeleteFunc: func(de event.DeleteEvent) bool {
-			return false
-		},
-	}
 }
 
 func annotationWasAdded(update event.UpdateEvent, annotation string) bool {
@@ -213,9 +197,32 @@ func annotationWasAdded(update event.UpdateEvent, annotation string) bool {
 	return !o && n
 }
 
-// IsAnnotationTrue returns true if the given object has an annotation with a given
-// key and the value of this annotation is a true boolean.
-func IsAnnotationTrue(o client.Object, key string) bool {
-	enabled, err := strconv.ParseBool(o.GetAnnotations()[key])
-	return err == nil && enabled
+// AnnotationAddedPredicate returns a predicate when the given annotation key was added.
+func AnnotationAddedPredicate(annotation string) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return annotationWasAdded(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
+		},
+	}
+}
+
+// AnnotationRemovedPredicate returns a predicate when the given annotation key was removed.
+func AnnotationRemovedPredicate(annotation string) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(update event.UpdateEvent) bool {
+			return annotationWasRemoved(update, annotation)
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool {
+			return false
+		},
+	}
 }
