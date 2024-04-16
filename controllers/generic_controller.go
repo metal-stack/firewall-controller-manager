@@ -147,17 +147,17 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if g.hasStatus {
 		defer func() {
 			log.Info("updating status")
-			newO := g.reconciler.New()
+			obj := g.reconciler.New()
 
-			statusErr = g.c.Get(ctx, req.NamespacedName, newO, &client.GetOptions{})
+			statusErr = g.c.Get(ctx, req.NamespacedName, obj, &client.GetOptions{})
 			if statusErr != nil {
 				log.Error(statusErr, "unable to fetch resource before status update")
 				return
 			}
 
-			g.reconciler.SetStatus(o, newO)
+			g.reconciler.SetStatus(o, obj)
 
-			statusErr = g.c.Status().Update(ctx, newO)
+			statusErr = g.c.Status().Update(ctx, obj)
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
@@ -172,15 +172,15 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		rctx.InMaintenance = true
 
 		defer func() {
-			newO := g.reconciler.New()
+			obj := g.reconciler.New()
 
-			err := g.c.Get(ctx, req.NamespacedName, newO, &client.GetOptions{})
+			err := g.c.Get(ctx, req.NamespacedName, obj, &client.GetOptions{})
 			if err != nil {
 				log.Error(err, "unable to fetch resource before maintenance annotation removal")
 				return
 			}
 
-			err = v2.RemoveAnnotation(ctx, g.c, newO, v2.MaintenanceAnnotation)
+			err = v2.RemoveAnnotation(ctx, g.c, obj, v2.MaintenanceAnnotation)
 			if err != nil {
 				log.Error(err, "unable to cleanup maintenance annotation")
 				return
