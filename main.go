@@ -20,7 +20,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
@@ -121,16 +124,24 @@ func main() {
 	}
 
 	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                  scheme,
-		MetricsBindAddress:      metricsAddr,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    9443,
+			CertDir: certDir,
+		}),
+		Cache: cache.Options{
+			SyncPeriod: &reconcileInterval,
+			DefaultNamespaces: map[string]cache.Config{
+				namespace: cache.Config{},
+			},
+		},
 		HealthProbeBindAddress:  healthAddr,
-		Port:                    9443,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
-		Namespace:               namespace,
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
-		SyncPeriod:              &reconcileInterval,
-		CertDir:                 certDir,
 	})
 	if err != nil {
 		log.Fatalf("unable to setup firewall-controller-manager %v", err)
@@ -220,10 +231,16 @@ func main() {
 	}
 
 	shootMgr, err := ctrl.NewManager(shootConfig, ctrl.Options{
-		Scheme:                  scheme,
-		MetricsBindAddress:      "0",
-		LeaderElection:          false,
-		Namespace:               v2.FirewallShootNamespace,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+		LeaderElection: false,
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				v2.FirewallShootNamespace: cache.Config{},
+			},
+		},
 		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
 	})
 	if err != nil {
