@@ -9,23 +9,16 @@ require (
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/metal-stack/metal-go v0.28.1
-	github.com/metal-stack/metal-lib v0.16.0
+	github.com/metal-stack/metal-go v0.28.4
+	github.com/metal-stack/metal-lib v0.16.2
 	github.com/metal-stack/v v1.0.3
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/stretchr/testify v1.9.0
-	k8s.io/api v0.29.0
-	k8s.io/apimachinery v0.29.0
-	k8s.io/client-go v0.29.0
-	sigs.k8s.io/controller-runtime v0.14.7
-)
-
-replace (
-	k8s.io/api => k8s.io/api v0.26.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.26.3
-	k8s.io/client-go => k8s.io/client-go v0.26.3
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
+	k8s.io/api v0.29.3
+	k8s.io/apimachinery v0.29.3
+	k8s.io/client-go v0.29.3
+	sigs.k8s.io/controller-runtime v0.16.5
 )
 
 require (
@@ -64,7 +57,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/gnostic v0.5.7-v3refs // indirect
+	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20230323073829-e72429f035bd // indirect
 	github.com/gorilla/mux v1.8.1 // indirect

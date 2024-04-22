@@ -22,6 +22,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -78,12 +80,16 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
-		LeaderElection:     false,
-		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
-		Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
+		Scheme: scheme.Scheme,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+			Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+		}),
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+		LeaderElection: false,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
