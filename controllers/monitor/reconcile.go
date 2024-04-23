@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
@@ -43,7 +45,13 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
 
+	old := fw.DeepCopy()
+
 	firewall.SetFirewallStatusFromMonitor(fw, r.Target)
+
+	if !significantFirewallStatusChange(old.Status, fw.Status) {
+		return fw, nil
+	}
 
 	err = c.c.GetSeedClient().Status().Update(r.Ctx, fw)
 	if err != nil {
@@ -109,4 +117,20 @@ func findCorrespondingSet(ctx context.Context, c client.Client, fw *v2.Firewall)
 	}
 
 	return set, nil
+}
+
+func significantFirewallStatusChange(o, n v2.FirewallStatus) bool {
+	// only consider relevant fields, we only care for controller status updates in this controller
+	// (to immediately see when the controller has connected)
+	// after that the firewall controller syncs the status every 2 minutes anyway
+
+	if o.ControllerStatus == nil && n.ControllerStatus != nil {
+		return true
+	}
+
+	if !cmp.Equal(o.Conditions, n.Conditions, cmpopts.IgnoreFields(v2.Condition{}, "Message", "LastUpdateTime", "LastTransitionTime")) {
+		return true
+	}
+
+	return false
 }
