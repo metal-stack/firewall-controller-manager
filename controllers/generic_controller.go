@@ -18,10 +18,10 @@ import (
 
 type (
 	Ctx[O client.Object] struct {
-		Ctx           context.Context
-		Log           logr.Logger
-		Target        O
-		InMaintenance bool
+		Ctx               context.Context
+		Log               logr.Logger
+		Target            O
+		WithinMaintenance bool
 	}
 	Reconciler[O client.Object] interface {
 		// New returns a new object of O.
@@ -82,10 +82,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		o    = g.reconciler.New()
 		log  = g.logger(req)
 		rctx = &Ctx[O]{
-			Ctx:           ctx,
-			Log:           log,
-			Target:        o,
-			InMaintenance: false,
+			Ctx:               ctx,
+			Log:               log,
+			Target:            o,
+			WithinMaintenance: false,
 		}
 	)
 
@@ -169,7 +169,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if v2.IsAnnotationPresent(o, v2.MaintenanceAnnotation) {
 		log.Info("reconciling in maintenance mode")
 
-		rctx.InMaintenance = true
+		rctx.WithinMaintenance = true
 
 		defer func() {
 			obj := g.reconciler.New()
