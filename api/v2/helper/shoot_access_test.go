@@ -9,6 +9,7 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/genericcli"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,11 +71,11 @@ users:
 			}
 
 			if got != nil {
-				assert.Equal(t, got.Host, "https://shoot-name")
+				assert.Equal(t, "https://shoot-name", got.Host)
 			}
 
 			gotRaw, err := h.Raw(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			equal, err := genericcli.YamlIsEqual(gotRaw, []byte(`apiVersion: v1
 clusters:
 - cluster:
@@ -95,7 +96,7 @@ users:
   user:
     token: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/token
 `))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.True(t, equal)
 		})
 	}

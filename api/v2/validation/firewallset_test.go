@@ -128,7 +128,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallSetValidator(testr.New(t))
 
-			got := v.ValidateCreate(context.Background(), tt.mutateFn(valid.DeepCopy()))
+			_, got := v.ValidateCreate(context.Background(), tt.mutateFn(valid.DeepCopy()))
 			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}
@@ -230,7 +230,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallSetValidator(testr.New(t))
 
-			got := v.ValidateUpdate(context.Background(), valid.DeepCopy(), tt.mutateFn(valid.DeepCopy()))
+			_, got := v.ValidateUpdate(context.Background(), valid.DeepCopy(), tt.mutateFn(valid.DeepCopy()))
 			if diff := cmp.Diff(tt.wantErr, got, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}

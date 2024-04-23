@@ -18,9 +18,10 @@ import (
 
 type (
 	Ctx[O client.Object] struct {
-		Ctx    context.Context
-		Log    logr.Logger
-		Target O
+		Ctx               context.Context
+		Log               logr.Logger
+		Target            O
+		WithinMaintenance bool
 	}
 	Reconciler[O client.Object] interface {
 		// New returns a new object of O.
@@ -81,9 +82,10 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		o    = g.reconciler.New()
 		log  = g.logger(req)
 		rctx = &Ctx[O]{
-			Ctx:    ctx,
-			Log:    log,
-			Target: o,
+			Ctx:               ctx,
+			Log:               log,
+			Target:            o,
+			WithinMaintenance: false,
 		}
 	)
 
@@ -129,40 +131,79 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	if v2.IsAnnotationPresent(o, v2.ReconcileAnnotation) {
+		err := v2.RemoveAnnotation(ctx, g.c, o, v2.ReconcileAnnotation)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("unable to remove reconcile annotation: %w", err)
+		}
+
+		// the update of the annotation removal triggers the next reconciliation
+		log.Info("removed reconcile annotation from resource")
+		return ctrl.Result{}, nil
+	}
+
 	var statusErr error
 
 	if g.hasStatus {
 		defer func() {
 			log.Info("updating status")
-			refetched := g.reconciler.New()
+			obj := g.reconciler.New()
 
-			statusErr = g.c.Get(ctx, req.NamespacedName, refetched, &client.GetOptions{})
+			statusErr = g.c.Get(ctx, req.NamespacedName, obj, &client.GetOptions{})
 			if statusErr != nil {
 				log.Error(statusErr, "unable to fetch resource before status update")
 				return
 			}
 
-			g.reconciler.SetStatus(o, refetched)
+			g.reconciler.SetStatus(o, obj)
 
-			statusErr = g.c.Status().Update(ctx, refetched)
+			statusErr = g.c.Status().Update(ctx, obj)
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
+
 			return
 		}()
 	}
 
+	if v2.IsAnnotationPresent(o, v2.MaintenanceAnnotation) {
+		log.Info("reconciling in maintenance mode")
+
+		rctx.WithinMaintenance = true
+
+		defer func() {
+			obj := g.reconciler.New()
+
+			err := g.c.Get(ctx, req.NamespacedName, obj, &client.GetOptions{})
+			if err != nil {
+				log.Error(err, "unable to fetch resource before maintenance annotation removal")
+				return
+			}
+
+			err = v2.RemoveAnnotation(ctx, g.c, obj, v2.MaintenanceAnnotation)
+			if err != nil {
+				log.Error(err, "unable to cleanup maintenance annotation")
+				return
+			}
+
+			log.Info("cleaned up maintenance annotation")
+		}()
+	}
+
 	log.Info("reconciling resource")
+
 	err := g.reconciler.Reconcile(rctx)
 	if err != nil {
 		var requeueErr *requeueError
-		if errors.As(err, &requeueErr) {
+
+		switch {
+		case errors.As(err, &requeueErr):
 			log.Info(requeueErr.Error())
 			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
+		default:
+			log.Error(err, "error during reconcile")
+			return ctrl.Result{}, err
 		}
-
-		log.Error(err, "error during reconcile")
-		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, statusErr

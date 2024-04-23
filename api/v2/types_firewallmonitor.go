@@ -58,6 +58,7 @@ type ControllerStatus struct {
 	ControllerVersion       string           `json:"controllerVersion,omitempty"`
 	NftablesExporterVersion string           `json:"nftablesExporterVersion,omitempty"`
 	Updated                 metav1.Time      `json:"lastRun,omitempty"`
+	SeedUpdated             metav1.Time      `json:"lastRunAgainstSeed,omitempty"`
 	Distance                FirewallDistance `json:"distance,omitempty"`
 	DistanceSupported       bool             `json:"distanceSupported,omitempty"`
 }

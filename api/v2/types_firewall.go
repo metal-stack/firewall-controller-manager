@@ -9,18 +9,6 @@ import (
 )
 
 const (
-	// FirewallNoControllerConnectionAnnotation can be used as an annotation to the firewall resource in order
-	// to indicate that the firewall-controller does not connect to the firewall monitor. this way, the replica
-	// set will become healthy without a controller connection.
-	//
-	// useful for the migration when having old firewall v1 controllers that cannot update the monitor.
-	FirewallNoControllerConnectionAnnotation = "firewall.metal-stack.io/no-controller-connection"
-	// FirewallControllerManagedByAnnotation is used as tag for creating a firewall to indicate who is managing the firewall.
-	FirewallControllerManagedByAnnotation = "firewall.metal-stack.io/managed-by"
-	// FirewallWeightAnnotation is considered when deciding which firewall is thrown away on scale down.
-	// Value must be parsable as an integer. Firewalls with higher weight are kept longer.
-	// Defaults to 0 if no annotation is present. Negative values are allowed.
-	FirewallWeightAnnotation = "firewall.metal-stack.io/weight"
 	// FirewallControllerManager is a name of the firewall-controller-manager managing the firewall.
 	FirewallControllerManager = "firewall-controller-manager"
 )
@@ -110,6 +98,19 @@ type FirewallSpec struct {
 	DNSServerAddress string `json:"dnsServerAddress,omitempty"`
 	// DNSPort specifies port to which DNS proxy should be bound
 	DNSPort *uint `json:"dnsPort,omitempty"`
+
+	// AllowedNetworks defines dedicated networks for which the firewall allows in- and outgoing traffic.
+	// The firewall-controller only enforces this setting in combination with NetworkAccessType set to forbidden.
+	// The node network is always allowed.
+	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
+}
+
+// AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is forbidden.
+type AllowedNetworks struct {
+	// Ingress defines a list of cidrs which are allowed for incoming traffic like service type loadbalancer.
+	Ingress []string `json:"ingress,omitempty"`
+	// Egress defines a list of cidrs which are allowed for outgoing traffic.
+	Egress []string `json:"egress,omitempty"`
 }
 
 // FirewallTemplateSpec describes the data a firewall should have when created from a template
@@ -174,8 +175,10 @@ const (
 	FirewallCreated ConditionType = "Created"
 	// FirewallReady indicates that the firewall is running and and according to the metal-api in a healthy, working state
 	FirewallReady ConditionType = "Ready"
-	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
+	// FirewallControllerConnected indicates that the firewall-controller running on the firewall is reconciling the shoot
 	FirewallControllerConnected ConditionType = "Connected"
+	// FirewallControllerSeedConnected indicates that the firewall-controller running on the firewall is reconciling the firewall resource
+	FirewallControllerSeedConnected ConditionType = "SeedConnected"
 	// FirewallMonitorDeployed indicates that the firewall monitor is deployed into the shoot cluster
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
@@ -226,8 +229,10 @@ type MachineLastEvent struct {
 type ControllerConnection struct {
 	// ActualVersion is the actual version running at the firewall-controller.
 	ActualVersion string `json:"actualVersion,omitempty"`
-	// Updated is a timestamp when the controller has last reconciled the firewall resource.
+	// Updated is a timestamp when the controller has last reconciled the shoot cluster.
 	Updated metav1.Time `json:"lastRun,omitempty"`
+	// SeedUpdated is a timestamp when the controller has last reconciled the firewall resource.
+	SeedUpdated metav1.Time `json:"lastRunAgainstSeed,omitempty"`
 	// ActualDistance is the actual distance as reflected by the firewall-controller.
 	ActualDistance FirewallDistance `json:"actualDistance,omitempty"`
 }
@@ -238,9 +243,9 @@ type FirewallNetwork struct {
 	// Asn is the autonomous system number of this network.
 	ASN *int64 `json:"asn"`
 	// DestinationPrefixes are the destination prefixes of this network.
-	DestinationPrefixes []string `json:"destinationPrefixes"`
+	DestinationPrefixes []string `json:"destinationPrefixes,omitempty"`
 	// IPs are the ip addresses used in this network.
-	IPs []string `json:"ips"`
+	IPs []string `json:"ips,omitempty"`
 	// Nat specifies whether the outgoing traffic is natted or not.
 	Nat *bool `json:"nat"`
 	// NetworkID is the id of this network.
@@ -248,7 +253,7 @@ type FirewallNetwork struct {
 	// NetworkType is the type of this network.
 	NetworkType *string `json:"networkType"`
 	// Prefixes are the network prefixes of this network.
-	Prefixes []string `json:"prefixes"`
+	Prefixes []string `json:"prefixes,omitempty"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
 }
@@ -310,7 +315,7 @@ func SortFirewallsByImportance(fws []*Firewall) {
 		a := fws[i]
 		b := fws[j]
 
-		// prefer heigher weight
+		// prefer higher weight
 		if weight(a) > weight(b) {
 			return true
 		}

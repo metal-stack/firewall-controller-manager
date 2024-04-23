@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 type genericValidation[O client.Object] interface {
@@ -28,7 +29,7 @@ func (g *genericValidator[O, V]) Instance() V {
 	return v
 }
 
-func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime.Object) error {
+func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	var (
 		v       = g.Instance()
 		o, ok   = obj.(O)
@@ -36,12 +37,12 @@ func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime
 	)
 
 	if !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", obj))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", obj))
 	}
 
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
 	}
 
 	g.log.Info("validating resource creation", "name", accessor.GetName(), "namespace", accessor.GetNamespace())
@@ -50,17 +51,17 @@ func (g *genericValidator[O, V]) ValidateCreate(ctx context.Context, obj runtime
 	allErrs = append(allErrs, v.ValidateCreate(g.log, o)...)
 
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		obj.GetObjectKind().GroupVersionKind().GroupKind(),
 		accessor.GetName(),
 		allErrs,
 	)
 }
 
-func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) error {
+func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	var (
 		v           = g.Instance()
 		oldO, oldOk = oldObj.(O)
@@ -69,19 +70,19 @@ func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, new
 	)
 
 	if !oldOk {
-		return apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", oldO))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", oldO))
 	}
 	if !newOk {
-		return apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", newO))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("validator received unexpected type: %T", newO))
 	}
 
 	oldAccessor, err := meta.Accessor(oldO)
 	if err != nil {
-		return apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
 	}
 	newAccessor, err := meta.Accessor(newO)
 	if err != nil {
-		return apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("failed to get accessor for object: %s", err))
 	}
 
 	g.log.Info("validating resource update", "name", newAccessor.GetName(), "namespace", newAccessor.GetNamespace())
@@ -90,18 +91,18 @@ func (g *genericValidator[O, V]) ValidateUpdate(ctx context.Context, oldObj, new
 	allErrs = append(allErrs, v.ValidateUpdate(g.log, oldO, newO)...)
 
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		newO.GetObjectKind().GroupVersionKind().GroupKind(),
 		newAccessor.GetName(),
 		allErrs,
 	)
 }
 
-func (_ *genericValidator[O, V]) ValidateDelete(ctx context.Context, obj runtime.Object) error {
-	return nil
+func (_ *genericValidator[O, V]) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 type (

@@ -31,7 +31,7 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.Firewall](log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
 		log:      log,
 		recorder: recorder,
 		c:        c,

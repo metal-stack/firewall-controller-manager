@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
+	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	controllerconfig "github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -20,11 +20,13 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -54,10 +56,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	l, err := controllers.NewZapLogger("debug")
+	l, err := controllers.NewLogger("debug")
 	Expect(err).NotTo(HaveOccurred())
 
-	ctrl.SetLogger(zapr.NewLogger(l.Desugar()))
+	ctrl.SetLogger(logr.FromSlogHandler(l))
 
 	ctx, cancel = context.WithCancel(context.Background())
 
@@ -91,12 +93,16 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
-		LeaderElection:     false,
-		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
-		Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
+		Scheme: scheme.Scheme,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			CertDir: testEnv.WebhookInstallOptions.LocalServingCertDir,
+			Host:    testEnv.WebhookInstallOptions.LocalServingHost,
+			Port:    testEnv.WebhookInstallOptions.LocalServingPort,
+		}),
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
+		},
+		LeaderElection: false,
 	})
 	Expect(err).ToNot(HaveOccurred())
 

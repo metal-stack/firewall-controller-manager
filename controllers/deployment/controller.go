@@ -30,7 +30,7 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.FirewallDeployment](log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
 		c:               c,
 		log:             log,
 		recorder:        recorder,
@@ -49,15 +49,28 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		For(
 			&v2.FirewallDeployment{},
 			builder.WithPredicates(
-				predicate.Or(
-					predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
-					predicate.AnnotationChangedPredicate{},
-					predicate.LabelChangedPredicate{},
+				predicate.And(
+					predicate.Not(v2.AnnotationRemovedPredicate(v2.MaintenanceAnnotation)),
+					predicate.Or(
+						predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
+						predicate.AnnotationChangedPredicate{},
+						predicate.LabelChangedPredicate{},
+					),
 				),
 			),
 		).
 		Named("FirewallDeployment").
-		Owns(&v2.FirewallSet{}).
+		Owns(
+			&v2.FirewallSet{},
+			builder.WithPredicates(
+				predicate.Not(
+					predicate.Or(
+						v2.AnnotationAddedPredicate(v2.ReconcileAnnotation),
+						v2.AnnotationRemovedPredicate(v2.ReconcileAnnotation),
+					),
+				),
+			),
+		).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
 		Complete(g)
 }

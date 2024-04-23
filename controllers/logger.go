@@ -2,26 +2,18 @@ package controllers
 
 import (
 	"fmt"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"log/slog"
+	"os"
 )
 
-func NewZapLogger(levelString string) (*zap.SugaredLogger, error) {
-	level, err := zap.ParseAtomicLevel(levelString)
+func NewLogger(levelString string) (slog.Handler, error) {
+	var (
+		lvlvar slog.LevelVar
+	)
+	err := lvlvar.UnmarshalText([]byte(levelString))
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse log level: %w", err)
+		return nil, fmt.Errorf("can't initialize logger: %w", err)
 	}
-
-	cfg := zap.NewProductionConfig()
-	cfg.Level = level
-	cfg.EncoderConfig.TimeKey = "timestamp"
-	cfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-
-	l, err := cfg.Build()
-	if err != nil {
-		return nil, fmt.Errorf("can't initialize zap logger: %w", err)
-	}
-
-	return l.Sugar(), nil
+	level := lvlvar.Level()
+	return slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}), nil
 }
