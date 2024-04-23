@@ -3,6 +3,7 @@ package monitor
 import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -16,16 +17,21 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.FirewallMonitor](log, c.GetShootClient(), c.GetShootNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetShootClient(), c.GetShootNamespace(), &controller{
 		log: log,
 		c:   c,
 	}).WithoutStatus()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v2.FirewallMonitor{}).
+		For(&v2.FirewallMonitor{},
+			builder.WithPredicates(
+				predicate.Not(
+					v2.AnnotationRemovedPredicate(v2.RollSetAnnotation),
+				),
+			),
+		).
 		Named("FirewallMonitor").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetShootNamespace()))).
-		WithEventFilter(v2.SkipRollSetAnnotationRemoval()).
 		Complete(g)
 }
 

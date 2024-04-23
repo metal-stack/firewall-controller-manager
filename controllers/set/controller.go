@@ -20,7 +20,7 @@ type controller struct {
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
-	g := controllers.NewGenericController[*v2.FirewallSet](log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
+	g := controllers.NewGenericController(log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
 		log:      log,
 		recorder: recorder,
 		c:        c,
@@ -37,7 +37,17 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			),
 		).
 		Named("FirewallSet").
-		Owns(&v2.Firewall{}).
+		Owns(
+			&v2.Firewall{},
+			builder.WithPredicates(
+				predicate.Not(
+					predicate.Or(
+						v2.AnnotationAddedPredicate(v2.ReconcileAnnotation),
+						v2.AnnotationRemovedPredicate(v2.ReconcileAnnotation),
+					),
+				),
+			),
+		).
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
 		Complete(g)
 }

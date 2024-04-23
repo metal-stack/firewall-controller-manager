@@ -54,51 +54,33 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 }
 
 func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) error {
-	v, ok := r.Target.Annotations[v2.RollSetAnnotation]
-	if !ok {
+	rollSet := v2.IsAnnotationTrue(r.Target, v2.RollSetAnnotation)
+	if !rollSet {
 		return nil
 	}
 
-	r.Log.Info("resource was annotated", "annotation", v2.RollSetAnnotation, "value", v)
+	r.Log.Info("initiating firewall set roll as requested by user annotation")
 
-	delete(r.Target.Annotations, v2.RollSetAnnotation)
-
-	err := c.c.GetShootClient().Update(r.Ctx, r.Target)
-	if err != nil {
-		return err
+	fw := &v2.Firewall{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.Target.Name,
+			Namespace: c.c.GetSeedNamespace(),
+		},
 	}
 
-	r.Log.Info("cleaned up annotation")
-
-	rollSet, err := strconv.ParseBool(v)
+	set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
 	if err != nil {
-		r.Log.Error(err, "unable to parse annotation value, ignoring")
-		return nil
+		return client.IgnoreNotFound(err)
 	}
 
-	if rollSet {
-		r.Log.Info("initiating firewall set roll as requested by user annotation")
+	err = v2.AddAnnotation(r.Ctx, c.c.GetSeedClient(), set, v2.RollSetAnnotation, strconv.FormatBool(true))
+	if err != nil {
+		return fmt.Errorf("unable to annotate firewall set: %w", err)
+	}
 
-		fw := &v2.Firewall{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.Target.Name,
-				Namespace: c.c.GetSeedNamespace(),
-			},
-		}
-
-		set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
-		if err != nil {
-			return client.IgnoreNotFound(err)
-		}
-
-		set.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
-
-		err = c.c.GetSeedClient().Update(r.Ctx, set)
-		if err != nil {
-			return fmt.Errorf("unable to annotate firewall set: %w", err)
-		}
-
-		r.Log.Info("firewall set annotated")
+	err = v2.RemoveAnnotation(r.Ctx, c.c.GetShootClient(), r.Target, v2.RollSetAnnotation)
+	if err != nil {
+		return fmt.Errorf("unable to cleanup firewall monitor roll-set annotation: %w", err)
 	}
 
 	return nil
