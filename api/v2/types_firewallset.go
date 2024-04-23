@@ -10,9 +10,6 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// FirewallControllerSetAnnotation is a tag added to the firewall entity indicating to which set a firewall belongs to.
-	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
-
 	FirewallShortestDistance         = FirewallDistance(0)
 	FirewallRollingUpdateSetDistance = FirewallDistance(3)
 	FirewallLongestDistance          = FirewallDistance(8)
