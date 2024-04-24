@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -205,7 +204,7 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		return ok, nil
 	}
 
-	ok, err := c.osImageHasChanged(r.Ctx, newS, oldS)
+	ok, err := c.osImageHasChanged(r, latestSet, newS, oldS)
 	if err != nil {
 		return false, err
 	}
@@ -227,14 +226,39 @@ func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
 	return newS.Size != oldS.Size
 }
 
-func (c *controller) osImageHasChanged(ctx context.Context, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
-	image, err := c.imageCache.Get(ctx, newS.Image)
+func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
+	if newS.Image != oldS.Image {
+		return true, nil
+	}
+
+	if r.WithinMaintenance {
+		return false, nil
+	}
+
+	// let's resolve the latest image from the api in case a shorthand image flag is being used
+	// then compare to the actual image deployed on the firewalls in this set
+
+	image, err := c.imageCache.Get(r.Ctx, newS.Image)
 	if err != nil {
 		return false, err
 	}
 
-	if pointer.SafeDeref(image.ID) != oldS.Image {
-		return true, nil
+	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, latestSet, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+		return fl.GetItems()
+	})
+	if err != nil {
+		return false, fmt.Errorf("unable to get owned firewalls: %w", err)
+	}
+
+	for _, fw := range ownedFirewalls {
+		if fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
+			continue
+		}
+
+		if pointer.SafeDeref(image.ID) != fw.Status.MachineStatus.ImageID {
+			// when there is one firewall where the image does not match, let's roll the set
+			return true, nil
+		}
 	}
 
 	return false, nil
