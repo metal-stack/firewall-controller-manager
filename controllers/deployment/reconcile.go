@@ -250,18 +250,19 @@ func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment
 		return false, fmt.Errorf("unable to get owned firewalls: %w", err)
 	}
 
-	for _, fw := range ownedFirewalls {
-		if fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
-			continue
-		}
-
-		if pointer.SafeDeref(image.ID) != fw.Status.MachineStatus.ImageID {
-			// when there is one firewall where the image does not match, let's roll the set
-			return true, nil
-		}
+	if len(ownedFirewalls) == 0 {
+		return false, err
 	}
 
-	return false, nil
+	v2.SortFirewallsByImportance(ownedFirewalls)
+
+	fw := ownedFirewalls[0] // this is the currently active one
+
+	if fw.Status.Phase != v2.FirewallPhaseRunning || fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
+		return false, err
+	}
+
+	return pointer.SafeDeref(image.ID) != fw.Status.MachineStatus.ImageID, nil
 }
 
 func networksHaveChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
