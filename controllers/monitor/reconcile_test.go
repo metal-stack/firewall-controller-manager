@@ -60,6 +60,20 @@ func Test_significantFirewallStatusChange(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "controller version update",
+			o: v2.FirewallStatus{
+				ControllerStatus: &v2.ControllerConnection{
+					ActualVersion: "v1.2.3",
+				},
+			},
+			n: v2.FirewallStatus{
+				ControllerStatus: &v2.ControllerConnection{
+					ActualVersion: "v1.2.4",
+				},
+			},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

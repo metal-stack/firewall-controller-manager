@@ -128,6 +128,10 @@ func significantFirewallStatusChange(o, n v2.FirewallStatus) bool {
 		return true
 	}
 
+	if o.ControllerStatus != nil && n.ControllerStatus != nil && o.ControllerStatus.ActualVersion != n.ControllerStatus.ActualVersion {
+		return true
+	}
+
 	if !cmp.Equal(o.Conditions, n.Conditions, cmpopts.IgnoreFields(v2.Condition{}, "Message", "LastUpdateTime", "LastTransitionTime")) {
 		return true
 	}
