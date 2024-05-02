@@ -236,12 +236,17 @@ func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment
 	}
 
 	// let's resolve the latest image from the api in case a shorthand image flag is being used
-	// then compare to the actual image deployed on the firewalls in this set
-
 	image, err := c.imageCache.Get(r.Ctx, newS.Image)
 	if err != nil {
 		return false, err
 	}
+
+	if pointer.SafeDeref(image.ID) == newS.Image {
+		// early return because no shorthand image used
+		return false, err
+	}
+
+	// now compare to the actual image deployed on the firewalls in this set
 
 	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, latestSet, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
 		return fl.GetItems()
