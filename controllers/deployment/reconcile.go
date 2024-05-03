@@ -231,7 +231,7 @@ func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment
 		return true, nil
 	}
 
-	if r.WithinMaintenance {
+	if !r.WithinMaintenance {
 		return false, nil
 	}
 
@@ -263,7 +263,7 @@ func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment
 
 	fw := ownedFirewalls[0] // this is the currently active one
 
-	if fw.Status.Phase != v2.FirewallPhaseRunning || fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
+	if fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
 		return false, err
 	}
 
