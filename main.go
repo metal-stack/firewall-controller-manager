@@ -33,6 +33,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 )
 
 const (
@@ -135,7 +136,7 @@ func main() {
 		Cache: cache.Options{
 			SyncPeriod: &reconcileInterval,
 			DefaultNamespaces: map[string]cache.Config{
-				namespace: cache.Config{},
+				namespace: {},
 			},
 		},
 		HealthProbeBindAddress:  healthAddr,
@@ -238,7 +239,7 @@ func main() {
 		LeaderElection: false,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
-				v2.FirewallShootNamespace: cache.Config{},
+				v2.FirewallShootNamespace: {},
 			},
 		},
 		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
@@ -272,16 +273,19 @@ func main() {
 	}
 
 	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorderFor("firewall-deployment-controller"), seedMgr, cc); err != nil {
-		log.Fatalf("unable to setup controller deployment %v", err)
+		log.Fatalf("unable to setup deployment controller: %v", err)
 	}
 	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorderFor("firewall-set-controller"), seedMgr, cc); err != nil {
-		log.Fatalf("unable to setup controller set %v", err)
+		log.Fatalf("unable to setup set controller: %v", err)
 	}
 	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorderFor("firewall-controller"), seedMgr, cc); err != nil {
-		log.Fatalf("unable to setup controller firewall %v", err)
+		log.Fatalf("unable to setup firewall controller: %v", err)
 	}
 	if err := monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), shootMgr, cc); err != nil {
-		log.Fatalf("unable to setup controller monitor %v", err)
+		log.Fatalf("unable to setup monitor controller: %v", err)
+	}
+	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorderFor("update-controller"), seedMgr, cc); err != nil {
+		log.Fatalf("unable to setup update controller: %v", err)
 	}
 
 	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {

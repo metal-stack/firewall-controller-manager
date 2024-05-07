@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
@@ -204,10 +203,7 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		return ok, nil
 	}
 
-	ok, err := c.osImageHasChanged(r, latestSet, newS, oldS)
-	if err != nil {
-		return false, err
-	}
+	ok = osImageHasChanged(newS, oldS)
 	if ok {
 		r.Log.Info("firewall image has changed", "image", newS.Image)
 		return ok, nil
@@ -226,48 +222,8 @@ func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
 	return newS.Size != oldS.Size
 }
 
-func (c *controller) osImageHasChanged(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
-	if newS.Image != oldS.Image {
-		return true, nil
-	}
-
-	if !r.WithinMaintenance {
-		return false, nil
-	}
-
-	// let's resolve the latest image from the api in case a shorthand image flag is being used
-	image, err := c.imageCache.Get(r.Ctx, newS.Image)
-	if err != nil {
-		return false, err
-	}
-
-	if pointer.SafeDeref(image.ID) == newS.Image {
-		// early return because no shorthand image used
-		return false, err
-	}
-
-	// now compare to the actual image deployed on the firewalls in this set
-
-	ownedFirewalls, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, latestSet, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
-		return fl.GetItems()
-	})
-	if err != nil {
-		return false, fmt.Errorf("unable to get owned firewalls: %w", err)
-	}
-
-	if len(ownedFirewalls) == 0 {
-		return false, err
-	}
-
-	v2.SortFirewallsByImportance(ownedFirewalls)
-
-	fw := ownedFirewalls[0] // this is the currently active one
-
-	if fw.Status.MachineStatus == nil || fw.Status.MachineStatus.ImageID == "" {
-		return false, err
-	}
-
-	return pointer.SafeDeref(image.ID) != fw.Status.MachineStatus.ImageID, nil
+func osImageHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
+	return newS.Image != oldS.Image
 }
 
 func networksHaveChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
