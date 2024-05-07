@@ -1,8 +1,6 @@
 package deployment
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -16,9 +14,6 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/image"
-	"github.com/metal-stack/metal-go/api/models"
-	"github.com/metal-stack/metal-lib/pkg/cache"
 )
 
 type controller struct {
@@ -26,7 +21,6 @@ type controller struct {
 	log             logr.Logger
 	lastSetCreation map[string]time.Time
 	recorder        record.EventRecorder
-	imageCache      *cache.Cache[string, *models.V1ImageResponse]
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
@@ -35,14 +29,6 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		log:             log,
 		recorder:        recorder,
 		lastSetCreation: map[string]time.Time{},
-		imageCache: cache.New(5*time.Minute, func(ctx context.Context, id string) (*models.V1ImageResponse, error) {
-			resp, err := c.GetMetal().Image().FindLatestImage(image.NewFindLatestImageParams().WithID(id).WithContext(ctx), nil)
-			if err != nil {
-				return nil, fmt.Errorf("latest firewall image %q not found: %w", id, err)
-			}
-
-			return resp.Payload, nil
-		}),
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).

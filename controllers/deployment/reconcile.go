@@ -186,10 +186,10 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	return nil
 }
 
-func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet) (bool, error) {
+func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet) bool {
 	if v2.IsAnnotationTrue(latestSet, v2.RollSetAnnotation) {
 		r.Log.Info("set roll initiated by annotation")
-		return true, nil
+		return true
 	}
 
 	var (
@@ -200,22 +200,22 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 	ok := sizeHasChanged(newS, oldS)
 	if ok {
 		r.Log.Info("firewall size has changed", "size", newS.Size)
-		return ok, nil
+		return ok
 	}
 
 	ok = osImageHasChanged(newS, oldS)
 	if ok {
 		r.Log.Info("firewall image has changed", "image", newS.Image)
-		return ok, nil
+		return ok
 	}
 
 	ok = networksHaveChanged(newS, oldS)
 	if ok {
 		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
-		return ok, nil
+		return ok
 	}
 
-	return false, nil
+	return false
 }
 
 func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {

@@ -11,12 +11,7 @@ import (
 
 // recreateStrategy first deletes the existing firewall sets and then creates a new one
 func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet, latestSet *v2.FirewallSet) error {
-	newSetRequired, err := c.isNewSetRequired(r, latestSet)
-	if err != nil {
-		return err
-	}
-
-	if newSetRequired {
+	if c.isNewSetRequired(r, latestSet) {
 		r.Log.Info("significant changes detected in the spec, create new scaled down firewall set, then cleaning up old sets")
 
 		set, err := c.createNextFirewallSet(r, latestSet, &setOverrides{
@@ -31,7 +26,7 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 		latestSet = set
 	}
 
-	err = c.deleteFirewallSets(r, controllers.Except(ownedSets, latestSet)...)
+	err := c.deleteFirewallSets(r, controllers.Except(ownedSets, latestSet)...)
 	if err != nil {
 		return err
 	}
