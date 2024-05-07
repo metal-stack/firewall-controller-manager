@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func Test_controller_osImageHasChanged(t *testing.T) {
+func Test_controller_autoUpdateOS(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
 	err := v2.AddToScheme(scheme)

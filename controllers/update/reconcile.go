@@ -110,7 +110,7 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 		}
 
 		refetched.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
-		if !isFullyQualifiedImageNotation {
+		if isFullyQualifiedImageNotation {
 			refetched.Spec.Template.Spec.Image = *image.ID
 		}
 
