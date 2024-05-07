@@ -36,7 +36,6 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			&v2.FirewallDeployment{},
 			builder.WithPredicates(
 				predicate.And(
-					predicate.Not(v2.AnnotationAddedPredicate(v2.MaintenanceAnnotation)),
 					predicate.Not(v2.AnnotationRemovedPredicate(v2.MaintenanceAnnotation)),
 					predicate.Or(
 						predicate.GenerationChangedPredicate{}, // prevents reconcile on status sub resource update
