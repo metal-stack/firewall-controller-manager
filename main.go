@@ -42,7 +42,7 @@ const (
 
 func healthCheckFunc(log *slog.Logger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
 	return func(req *http.Request) error {
-		log.Info("health check called")
+		log.Debug("health check called")
 
 		fws := &v2.FirewallList{}
 		err := seedClient.List(req.Context(), fws, controllerclient.InNamespace(namespace))
