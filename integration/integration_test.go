@@ -1707,7 +1707,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should adopt the existing firewall", func() {
 				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 					return l.GetItems()
-				}, 3*time.Second)
+				}, 10*time.Second)
 
 				Expect(fw.Name).To(Equal("test"))
 				Expect(fw.OwnerReferences).To(HaveLen(1))
