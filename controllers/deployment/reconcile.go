@@ -197,35 +197,20 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		oldS = &latestSet.Spec.Template.Spec
 	)
 
-	ok := sizeHasChanged(newS, oldS)
-	if ok {
+	if newS.Size != oldS.Size {
 		r.Log.Info("firewall size has changed", "size", newS.Size)
-		return ok
+		return true
 	}
 
-	ok = osImageHasChanged(newS, oldS)
-	if ok {
+	if newS.Image != oldS.Image {
 		r.Log.Info("firewall image has changed", "image", newS.Image)
-		return ok
+		return true
 	}
 
-	ok = networksHaveChanged(newS, oldS)
-	if ok {
+	if !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...)) {
 		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
-		return ok
+		return true
 	}
 
 	return false
-}
-
-func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
-	return newS.Size != oldS.Size
-}
-
-func osImageHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
-	return newS.Image != oldS.Image
-}
-
-func networksHaveChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
-	return !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...))
 }
