@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -9,8 +8,6 @@ import (
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-go/api/client/image"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
@@ -189,10 +186,10 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	return nil
 }
 
-func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet) (bool, error) {
+func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment], latestSet *v2.FirewallSet) bool {
 	if v2.IsAnnotationTrue(latestSet, v2.RollSetAnnotation) {
 		r.Log.Info("set roll initiated by annotation")
-		return true, nil
+		return true
 	}
 
 	var (
@@ -200,49 +197,20 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 		oldS = &latestSet.Spec.Template.Spec
 	)
 
-	ok := sizeHasChanged(newS, oldS)
-	if ok {
+	if newS.Size != oldS.Size {
 		r.Log.Info("firewall size has changed", "size", newS.Size)
-		return ok, nil
+		return true
 	}
 
-	ok, err := osImageHasChanged(r.Ctx, c.c.GetMetal(), newS, oldS)
-	if err != nil {
-		return false, err
-	}
-	if ok {
-		r.Log.Info("firewall image has changed", "image", newS.Image)
-		return ok, nil
-	}
-
-	ok = networksHaveChanged(newS, oldS)
-	if ok {
-		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
-		return ok, nil
-	}
-
-	return false, nil
-}
-
-func sizeHasChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
-	return newS.Size != oldS.Size
-}
-
-func osImageHasChanged(ctx context.Context, m metalgo.Client, newS *v2.FirewallSpec, oldS *v2.FirewallSpec) (bool, error) {
 	if newS.Image != oldS.Image {
-		image, err := m.Image().FindLatestImage(image.NewFindLatestImageParams().WithID(newS.Image).WithContext(ctx), nil)
-		if err != nil {
-			return false, fmt.Errorf("latest firewall image not found:%s %w", newS.Image, err)
-		}
-
-		if image.Payload != nil && image.Payload.ID != nil && *image.Payload.ID != oldS.Image {
-			return true, nil
-		}
+		r.Log.Info("firewall image has changed", "image", newS.Image)
+		return true
 	}
 
-	return false, nil
-}
+	if !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...)) {
+		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
+		return true
+	}
 
-func networksHaveChanged(newS *v2.FirewallSpec, oldS *v2.FirewallSpec) bool {
-	return !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...))
+	return false
 }
