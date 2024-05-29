@@ -10,12 +10,7 @@ import (
 
 // rollingUpdateStrategy first creates a new set and deletes the old one's when the new one becomes ready
 func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet, latestSet *v2.FirewallSet) error {
-	newSetRequired, err := c.isNewSetRequired(r, latestSet)
-	if err != nil {
-		return err
-	}
-
-	if newSetRequired {
+	if c.isNewSetRequired(r, latestSet) {
 		r.Log.Info("significant changes detected in the spec, creating new firewall set", "distance", v2.FirewallRollingUpdateSetDistance)
 
 		newSet, err := c.createNextFirewallSet(r, latestSet, &setOverrides{
@@ -32,7 +27,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	err = c.syncFirewallSet(r, latestSet)
+	err := c.syncFirewallSet(r, latestSet)
 	if err != nil {
 		return fmt.Errorf("unable to update firewall set: %w", err)
 	}

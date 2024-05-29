@@ -16,6 +16,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
@@ -153,6 +154,14 @@ var _ = BeforeSuite(func() {
 	err = firewall.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("firewall"),
 		mgr.GetEventRecorderFor("firewall-controller"),
+		mgr,
+		cc,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = update.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("update"),
+		mgr.GetEventRecorderFor("update-controller"),
 		mgr,
 		cc,
 	)

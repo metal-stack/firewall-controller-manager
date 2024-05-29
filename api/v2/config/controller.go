@@ -59,6 +59,9 @@ type NewControllerConfig struct {
 	FirewallHealthTimeout time.Duration
 	// CreateTimeout is used in the firewall creation phase to recreate a firewall when it does not become ready.
 	CreateTimeout time.Duration
+
+	// SkipValidation skips configuration validation, use this only for testing purposes
+	SkipValidation bool
 }
 
 type ControllerConfig struct {
@@ -90,7 +93,7 @@ type ControllerConfig struct {
 }
 
 func New(c *NewControllerConfig) (*ControllerConfig, error) {
-	if err := c.validate(); err != nil {
+	if err := c.validate(); !c.SkipValidation && err != nil {
 		return nil, err
 	}
 

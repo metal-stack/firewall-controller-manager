@@ -213,6 +213,8 @@ type MachineStatus struct {
 	CrashLoop bool `json:"crashLoop,omitempty"`
 	// LastEvent contains the last provisioning event of the machine.
 	LastEvent *MachineLastEvent `json:"lastEvent,omitempty"`
+	// ImageID contains the used os image id of the firewall (the fully qualified version, no shorthand version).
+	ImageID string `json:"imageID,omitempty"`
 }
 
 // MachineLastEvent contains the last provisioning event of the machine.

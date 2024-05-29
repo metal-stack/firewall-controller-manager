@@ -8,6 +8,7 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/models"
+	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,14 +46,16 @@ func setMachineStatus(fw *v2.Firewall, f *models.V1FirewallResponse) error {
 }
 
 func getMachineStatus(f *models.V1FirewallResponse) (*v2.MachineStatus, error) {
-	if f.ID == nil || f.Allocation == nil || f.Allocation.Created == nil || f.Liveliness == nil {
+	if f.ID == nil || f.Allocation == nil || f.Allocation.Created == nil || f.Liveliness == nil || f.Allocation.Image == nil {
 		return nil, fmt.Errorf("firewall entity from metal-api is missing essential fields")
 	}
 
-	result := &v2.MachineStatus{}
-	result.MachineID = *f.ID
-	result.AllocationTimestamp = metav1.NewTime(time.Time(*f.Allocation.Created))
-	result.Liveliness = *f.Liveliness
+	result := &v2.MachineStatus{
+		MachineID:           *f.ID,
+		AllocationTimestamp: metav1.NewTime(time.Time(*f.Allocation.Created)),
+		Liveliness:          *f.Liveliness,
+		ImageID:             pointer.SafeDeref(f.Allocation.Image.ID),
+	}
 
 	if f.Events != nil && f.Events.CrashLoop != nil {
 		result.CrashLoop = *f.Events.CrashLoop
