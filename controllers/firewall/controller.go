@@ -2,7 +2,9 @@ package firewall
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -44,30 +46,45 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		}),
 		// the cache is only very short but on quickly repeated status updates, this should prevent the metal-api from being flooded
 		firewallCache: cache.New(5*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
+			searchFirewalls := func() ([]*models.V1FirewallResponse, error) {
+				resp, err := c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
+					AllocationName:    fw.Name,
+					AllocationProject: fw.Spec.Project,
+					Tags:              []string{c.GetClusterTag()},
+				}).WithContext(ctx), nil)
+				if err != nil {
+					return nil, fmt.Errorf("firewall search error: %w", err)
+				}
+
+				return resp.Payload, nil
+			}
+
 			// First try to find the firewall by machineID but check that allocation, project and hostname still matches
 			// this prevent erroneous situations where a metal admin just deleted the allocated firewall by hand
+			//
+			// This is kind of an anti-pattern because we depend on our own status, but performance benefit of this approach is
+			// big enough that we agreed to do it. We still need to run the expensive lookup in the metal-api in case deriving
+			// the machine from the status field does not work.
 			if fw.Status.MachineStatus != nil && fw.Status.MachineStatus.MachineID != "" {
 				resp, err := c.GetMetal().Firewall().FindFirewall(firewall.NewFindFirewallParams().WithContext(ctx).WithID(fw.Status.MachineStatus.MachineID), nil)
 				if err != nil {
+					var defaultErr *firewall.FindFirewallDefault
+					if errors.As(err, &defaultErr) && defaultErr.Code() == http.StatusNotFound {
+						return searchFirewalls()
+					}
+
 					return nil, fmt.Errorf("firewall find error: %w", err)
 				}
+
 				if resp.Payload.Allocation != nil &&
 					*resp.Payload.Allocation.Project == fw.Spec.Project &&
 					*resp.Payload.Allocation.Hostname == fw.Name {
 					return []*models.V1FirewallResponse{resp.Payload}, nil
 				}
 			}
-			// in any other situations make a expensive find firewalls call
-			resp, err := c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-				AllocationName:    fw.Name,
-				AllocationProject: fw.Spec.Project,
-				Tags:              []string{c.GetClusterTag()},
-			}).WithContext(ctx), nil)
-			if err != nil {
-				return nil, fmt.Errorf("firewall find error: %w", err)
-			}
 
-			return resp.Payload, nil
+			// in any other situations make a expensive find firewalls call
+			return searchFirewalls()
 		}),
 	})
 
