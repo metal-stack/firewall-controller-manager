@@ -61,6 +61,10 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 
 			// First try to find the firewall by machineID but check that allocation, project and hostname still matches
 			// this prevent erroneous situations where a metal admin just deleted the allocated firewall by hand
+			//
+			// This is kind of an anti-pattern because we depend on our own status, but performance benefit of this approach is
+			// big enough that we agreed to do it. We still need to run the expensive lookup in the metal-api in case deriving
+			// the machine from the status field does not work.
 			if fw.Status.MachineStatus != nil && fw.Status.MachineStatus.MachineID != "" {
 				resp, err := c.GetMetal().Firewall().FindFirewall(firewall.NewFindFirewallParams().WithContext(ctx).WithID(fw.Status.MachineStatus.MachineID), nil)
 				if err != nil {
