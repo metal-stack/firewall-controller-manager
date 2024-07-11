@@ -32,10 +32,11 @@ type collector struct {
 	namespace  string
 }
 
-func mustRegisterCustomMetrics(log *slog.Logger, seedClient client.Client) {
+func mustRegisterCustomMetrics(log *slog.Logger, seedClient client.Client, namespace string) {
 	c := &collector{
 		log:        log,
 		seedClient: seedClient,
+		namespace:  namespace,
 	}
 
 	metrics.Registry.MustRegister(c)

@@ -164,7 +164,7 @@ func main() {
 		log.Fatalf("unable to set up ready check %v", err)
 	}
 
-	mustRegisterCustomMetrics(l.WithGroup("metrics"), seedClient)
+	mustRegisterCustomMetrics(l.WithGroup("metrics"), seedClient, namespace)
 
 	var (
 		externalShootAccess = &v2.ShootAccess{
