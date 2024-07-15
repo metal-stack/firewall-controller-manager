@@ -35,7 +35,7 @@ manager: generate fmt vet
 								   -X 'github.com/metal-stack/v.Revision=$(GITVERSION)' \
 								   -X 'github.com/metal-stack/v.GitSHA1=$(SHA)' \
 								   -X 'github.com/metal-stack/v.BuildDate=$(BUILDDATE)'" \
-						 -o bin/firewall-controller-manager main.go
+						 -o bin/firewall-controller-manager .
 	strip bin/firewall-controller-manager
 
 # Run against the mini-lab

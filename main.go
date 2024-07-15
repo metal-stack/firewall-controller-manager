@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -39,19 +38,6 @@ import (
 const (
 	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
 )
-
-func healthCheckFunc(log *slog.Logger, seedClient controllerclient.Client, namespace string) func(req *http.Request) error {
-	return func(req *http.Request) error {
-		log.Debug("health check called")
-
-		fws := &v2.FirewallList{}
-		err := seedClient.List(req.Context(), fws, controllerclient.InNamespace(namespace))
-		if err != nil {
-			return fmt.Errorf("unable to list firewalls in namespace %s", namespace)
-		}
-		return nil
-	}
-}
 
 func main() {
 	var (
@@ -150,7 +136,7 @@ func main() {
 
 	// cannot use seedMgr.GetClient() because it gets initialized at a later point in time
 	// we have to create an own client
-	seedClient, err := controllerclient.New(seedMgr.GetConfig(), controllerclient.Options{
+	seedClient, err := client.New(seedMgr.GetConfig(), client.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
@@ -163,6 +149,8 @@ func main() {
 	if err := seedMgr.AddReadyzCheck("check", healthCheckFunc(l.WithGroup("ready"), seedMgr.GetClient(), namespace)); err != nil {
 		log.Fatalf("unable to set up ready check %v", err)
 	}
+
+	mustRegisterCustomMetrics(l.WithGroup("metrics"), seedClient, namespace)
 
 	var (
 		externalShootAccess = &v2.ShootAccess{
