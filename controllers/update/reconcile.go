@@ -1,14 +1,12 @@
 package update
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	metalcommon "github.com/metal-stack/metal-lib/pkg/metal"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,7 +29,7 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 
 	// first, let's resolve the latest image from the api
 
-	os, version, err := getOsAndSemverFromImage(r.Target.Spec.Template.Spec.Image)
+	os, version, err := metalcommon.GetOsAndSemverFromImage(r.Target.Spec.Template.Spec.Image)
 	if err != nil {
 		return fmt.Errorf("image version cannot be parsed: %w", err)
 	}
@@ -126,21 +124,4 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 	}
 
 	return nil
-}
-
-// copied over from metal-api because this is only available in internal package
-func getOsAndSemverFromImage(id string) (string, *semver.Version, error) {
-	imageParts := strings.Split(id, "-")
-	if len(imageParts) < 2 {
-		return "", nil, errors.New("image does not contain a version")
-	}
-
-	parts := len(imageParts) - 1
-	os := strings.Join(imageParts[:parts], "-")
-	version := strings.Join(imageParts[parts:], "")
-	v, err := semver.NewVersion(version)
-	if err != nil {
-		return "", nil, err
-	}
-	return os, v, nil
 }
