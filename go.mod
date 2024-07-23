@@ -10,10 +10,11 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/metal-stack/metal-go v0.28.4
-	github.com/metal-stack/metal-lib v0.16.2
+	github.com/metal-stack/metal-lib v0.17.2
 	github.com/metal-stack/v v1.0.3
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
+	github.com/prometheus/client_golang v1.18.0
 	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
@@ -89,7 +90,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
