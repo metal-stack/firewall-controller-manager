@@ -269,18 +269,18 @@ var (
 	size1 = &models.V1SizeResponse{
 		Constraints: []*models.V1SizeConstraint{
 			{
-				Max:  pointer.Pointer(int64(2)),
-				Min:  pointer.Pointer(int64(1)),
+				Max:  int64(2),
+				Min:  int64(1),
 				Type: pointer.Pointer("storage"),
 			},
 			{
-				Max:  pointer.Pointer(int64(4)),
-				Min:  pointer.Pointer(int64(3)),
+				Max:  int64(4),
+				Min:  int64(3),
 				Type: pointer.Pointer("memory"),
 			},
 			{
-				Max:  pointer.Pointer(int64(6)),
-				Min:  pointer.Pointer(int64(5)),
+				Max:  int64(6),
+				Min:  int64(5),
 				Type: pointer.Pointer("cores"),
 			},
 		},
