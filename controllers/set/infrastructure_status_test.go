@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
@@ -21,7 +21,7 @@ import (
 func Test_controller_updateInfrastructureStatus(t *testing.T) {
 	scheme := runtime.NewScheme()
 	ctx := context.Background()
-	log := logr.Logger{}
+	log := testr.New(t)
 
 	testNamespace := "shoot--abcdef--mycluster1"
 
@@ -109,7 +109,7 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "infrastructure is present, egress cidrs have already been set",
+			name: "infrastructure is present, egress cidrs have already been set but not up-to-date",
 			objs: func() []client.Object {
 				return []client.Object{
 					&unstructured.Unstructured{
@@ -161,6 +161,76 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 						"name":            "mycluster1",
 						"namespace":       testNamespace,
 						"resourceVersion": "1000",
+					},
+					"spec": map[string]any{
+						"providerConfig": map[string]any{
+							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+							"firewall": map[string]any{
+								"controllerVersion": "auto",
+							},
+						},
+					},
+					"status": map[string]any{
+						"phase":       "foo",
+						"egressCIDRs": []any{"1.1.1.1/32"},
+					},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "infrastructure is present, egress cidrs have already been set and are up-to-date",
+			objs: func() []client.Object {
+				return []client.Object{
+					&unstructured.Unstructured{
+						Object: map[string]any{
+							"apiVersion": "extensions.gardener.cloud/v1alpha1",
+							"kind":       "Infrastructure",
+							"metadata": map[string]any{
+								"name":            "mycluster1",
+								"namespace":       testNamespace,
+								"resourceVersion": "999",
+							},
+							"spec": map[string]any{
+								"providerConfig": map[string]any{
+									"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+									"firewall": map[string]any{
+										"controllerVersion": "auto",
+									},
+								},
+							},
+							"status": map[string]any{
+								"phase":       "foo",
+								"egressCIDRs": []any{"1.1.1.1/32"},
+							},
+						},
+					},
+				}
+			},
+			ownedFirewalls: []*v2.Firewall{
+				{
+					Status: v2.FirewallStatus{
+						FirewallNetworks: []v2.FirewallNetwork{
+							{
+								NetworkType: pointer.Pointer("external"),
+								IPs:         []string{"1.1.1.1"},
+							},
+							{
+								NetworkType: pointer.Pointer("underlay"),
+								IPs:         []string{"10.8.0.4"},
+							},
+						},
+					},
+				},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "extensions.gardener.cloud/v1alpha1",
+					"kind":       "Infrastructure",
+					"metadata": map[string]any{
+						"name":            "mycluster1",
+						"namespace":       testNamespace,
+						"resourceVersion": "999",
 					},
 					"spec": map[string]any{
 						"providerConfig": map[string]any{

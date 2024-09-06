@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -41,7 +42,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallS
 		return err
 	}
 
-	var egressCIDRs []string
+	var egressCIDRs []any
 
 	for _, fw := range ownedFirewalls {
 		for _, network := range fw.Status.FirewallNetworks {
@@ -56,6 +57,16 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallS
 				}
 
 				egressCIDRs = append(egressCIDRs, fmt.Sprintf("%s/%d", ip, parsed.BitLen()))
+			}
+		}
+	}
+
+	// check if an update is required or not
+	if currentStatus, ok := infraObj.Object["status"].(map[string]any); ok {
+		if currentCIDRs, ok := currentStatus["egressCIDRs"].([]any); ok {
+			if slices.Equal(egressCIDRs, currentCIDRs) {
+				c.log.Info("found gardener infrastructure resource, egress cidrs already up-to-date", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
+				return nil
 			}
 		}
 	}
@@ -76,7 +87,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallS
 		return fmt.Errorf("error patching infrastructure status egress cidrs field: %w", err)
 	}
 
-	c.log.Info("found gardener infrastructure resource and patched egress cidrs for acl extension", "infrastructure-name", infraObj.GetName(), "egress-cidrs", strings.Join(egressCIDRs, ","))
+	c.log.Info("found gardener infrastructure resource and patched egress cidrs for acl extension", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
 
 	return nil
 }
