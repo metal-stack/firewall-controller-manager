@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/yaml"
 )
 
 func Test_controller_updateInfrastructureStatus(t *testing.T) {
@@ -43,28 +42,28 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 		{
 			name: "infrastructure is present, egress cidrs were not yet set",
 			objs: func() []client.Object {
-				rawInfra := `
-                apiVersion: extensions.gardener.cloud/v1alpha1
-                kind: Infrastructure
-                metadata:
-                  name: mycluster1
-                  namespace: shoot--abcdef--mycluster1
-                spec:
-                  providerConfig:
-                    apiVersion: metal.provider.extensions.gardener.cloud/v1alpha1
-                    firewall:
-                      controllerVersion: auto
-                status:
-                    phase: "foo"
-                `
-
-				var testInfraMapObj map[string]any
-				err := yaml.Unmarshal([]byte(rawInfra), &testInfraMapObj)
-				require.NoError(t, err)
-
 				return []client.Object{
 					&unstructured.Unstructured{
-						Object: testInfraMapObj,
+						Object: map[string]any{
+							"apiVersion": "extensions.gardener.cloud/v1alpha1",
+							"kind":       "Infrastructure",
+							"metadata": map[string]any{
+								"name":            "mycluster1",
+								"namespace":       testNamespace,
+								"resourceVersion": "999",
+							},
+							"spec": map[string]any{
+								"providerConfig": map[string]any{
+									"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+									"firewall": map[string]any{
+										"controllerVersion": "auto",
+									},
+								},
+							},
+							"status": map[string]any{
+								"phase": "foo",
+							},
+						},
 					},
 				}
 			},
@@ -112,31 +111,29 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 		{
 			name: "infrastructure is present, egress cidrs have already been set",
 			objs: func() []client.Object {
-				rawInfra := `
-                apiVersion: extensions.gardener.cloud/v1alpha1
-                kind: Infrastructure
-                metadata:
-                  name: mycluster1
-                  namespace: shoot--abcdef--mycluster1
-                spec:
-                  providerConfig:
-                    apiVersion: metal.provider.extensions.gardener.cloud/v1alpha1
-                    firewall:
-                        controllerVersion: auto
-                status:
-                    phase: "foo"
-                    egressCIDRs:
-                        - 5.6.7.8/32
-                        - 1.2.3.4/32
-                `
-
-				var testInfraMapObj map[string]any
-				err := yaml.Unmarshal([]byte(rawInfra), &testInfraMapObj)
-				require.NoError(t, err)
-
 				return []client.Object{
 					&unstructured.Unstructured{
-						Object: testInfraMapObj,
+						Object: map[string]any{
+							"apiVersion": "extensions.gardener.cloud/v1alpha1",
+							"kind":       "Infrastructure",
+							"metadata": map[string]any{
+								"name":            "mycluster1",
+								"namespace":       testNamespace,
+								"resourceVersion": "999",
+							},
+							"spec": map[string]any{
+								"providerConfig": map[string]any{
+									"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+									"firewall": map[string]any{
+										"controllerVersion": "auto",
+									},
+								},
+							},
+							"status": map[string]any{
+								"phase":       "foo",
+								"egressCIDRs": []any{"1.2.3.4/32", "2.3.4.5/32"},
+							},
+						},
 					},
 				}
 			},
