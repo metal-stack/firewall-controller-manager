@@ -61,14 +61,48 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallS
 		}
 	}
 
-	// check if an update is required or not
-	if currentStatus, ok := infraObj.Object["status"].(map[string]any); ok {
-		if currentCIDRs, ok := currentStatus["egressCIDRs"].([]any); ok {
-			if slices.Equal(egressCIDRs, currentCIDRs) {
-				c.log.Info("found gardener infrastructure resource, egress cidrs already up-to-date", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
-				return nil
+	type infrastructure struct {
+		Spec struct {
+			ProviderConfig struct {
+				Firewall struct {
+					EgressRules []struct {
+						IPs []string `json:"ips"`
+					} `json:"egressRules"`
+				} `json:"firewall"`
+			} `json:"providerConfig"`
+		} `json:"spec"`
+		Status struct {
+			EgressCIDRs []any `json:"egressCIDRs"`
+		} `json:"status"`
+	}
+
+	infraRaw, err := json.Marshal(infraObj)
+	if err != nil {
+		return fmt.Errorf("unable to convert gardener infrastructure object: %w", err)
+	}
+
+	var typedInfra infrastructure
+	err = json.Unmarshal(infraRaw, &typedInfra)
+	if err != nil {
+		return fmt.Errorf("unable to convert gardener infrastructure object: %w", err)
+	}
+
+	// add egress rules cidrs
+	for _, rule := range typedInfra.Spec.ProviderConfig.Firewall.EgressRules {
+		for _, ip := range rule.IPs {
+			parsed, err := netip.ParseAddr(ip)
+			if err != nil {
+				continue
 			}
+
+			egressCIDRs = append(egressCIDRs, fmt.Sprintf("%s/%d", ip, parsed.BitLen()))
 		}
+	}
+
+	// check if an update is required or not
+	if slices.Equal(egressCIDRs, typedInfra.Status.EgressCIDRs) {
+		c.log.Info("found gardener infrastructure resource, egress cidrs already up-to-date", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
+		return nil
 	}
 
 	infraStatusPatch := map[string]any{
