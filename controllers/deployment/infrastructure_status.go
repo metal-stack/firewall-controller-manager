@@ -1,4 +1,4 @@
-package set
+package deployment
 
 import (
 	"encoding/json"
@@ -18,12 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewalls []*v2.Firewall) error {
-	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(c.c.GetSeedNamespace())
-	if !ok {
-		return nil
-	}
-
+func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallDeployment], infrastructureName string, ownedFirewalls []*v2.Firewall) error {
 	infraObj := &unstructured.Unstructured{}
 
 	infraObj.SetGroupVersionKind(schema.GroupVersionKind{

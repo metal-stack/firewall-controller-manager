@@ -1,20 +1,11 @@
 package deployment
 
 import (
-	"fmt"
-
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 )
 
-func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallDeployment]) error {
-	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
-		return fsl.GetItems()
-	})
-	if err != nil {
-		return fmt.Errorf("unable to get owned sets: %w", err)
-	}
-
+func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallDeployment], ownedSets []*v2.FirewallSet) error {
 	latestSet, err := controllers.MaxRevisionOf(ownedSets)
 	if err != nil {
 		return err

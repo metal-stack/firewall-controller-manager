@@ -1,4 +1,4 @@
-package set
+package deployment
 
 import (
 	"context"
@@ -429,10 +429,10 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 				c:   cc,
 			}
 
-			err = ctrl.updateInfrastructureStatus(&controllers.Ctx[*v2.FirewallSet]{
+			err = ctrl.updateInfrastructureStatus(&controllers.Ctx[*v2.FirewallDeployment]{
 				Ctx: ctx,
 				Log: log,
-			}, tt.ownedFirewalls)
+			}, "mycluster1", tt.ownedFirewalls)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}

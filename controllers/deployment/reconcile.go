@@ -43,22 +43,32 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		return nil
 	}
 
+	var reconcileErr error
 	switch s := r.Target.Spec.Strategy; s {
 	case v2.StrategyRecreate:
-		err = c.recreateStrategy(r, ownedSets, latestSet)
+		reconcileErr = c.recreateStrategy(r, ownedSets, latestSet)
 	case v2.StrategyRollingUpdate:
-		err = c.rollingUpdateStrategy(r, ownedSets, latestSet)
+		reconcileErr = c.rollingUpdateStrategy(r, ownedSets, latestSet)
 	default:
-		err = fmt.Errorf("unknown deployment strategy: %s", s)
+		reconcileErr = fmt.Errorf("unknown deployment strategy: %s", s)
 	}
 
-	statusErr := c.setStatus(r)
+	// refetch sets after possible creation
+	// we want to update the set status before a possible return due to reconciliation having failed
+	ownedSets, _, err = controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
+		return fsl.GetItems()
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get owned sets: %w", err)
+	}
 
+	err = c.setStatus(r, ownedSets)
 	if err != nil {
 		return err
 	}
-	if statusErr != nil {
-		return err
+
+	if reconcileErr != nil {
+		return reconcileErr
 	}
 
 	// we are done with the update, give the set the shortest distance if this is not already the case
@@ -71,6 +81,26 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		}
 
 		r.Log.Info("swapped latest set to shortest distance", "distance", v2.FirewallShortestDistance)
+	}
+
+	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(c.c.GetSeedNamespace())
+	if ok {
+		var ownedFirewalls []*v2.Firewall
+		for _, set := range ownedSets {
+			fws, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, set, &v2.FirewallList{}, func(fl *v2.FirewallList) []*v2.Firewall {
+				return fl.GetItems()
+			})
+			if err != nil {
+				return fmt.Errorf("unable to get owned firewalls: %w", err)
+			}
+
+			ownedFirewalls = append(ownedFirewalls, fws...)
+		}
+
+		err = c.updateInfrastructureStatus(r, infrastructureName, ownedFirewalls)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

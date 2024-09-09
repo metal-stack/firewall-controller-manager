@@ -121,11 +121,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		return err
 	}
 
-	err = c.updateInfrastructureStatus(r, ownedFirewalls)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
