@@ -132,7 +132,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 	err = c.c.GetSeedClient().Get(r.Ctx, client.ObjectKey{
 		Namespace: c.c.GetSeedNamespace(),
 		Name:      "acl",
-	}, infraObj)
+	}, aclObj)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -144,6 +144,8 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 	if err != nil {
 		return fmt.Errorf("error annotating acl extension with reconcile operation: %w", err)
 	}
+
+	c.log.Info("added reconcile annotation to gardener acl extension object")
 
 	return nil
 }

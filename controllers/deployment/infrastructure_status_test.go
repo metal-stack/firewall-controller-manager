@@ -29,7 +29,7 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 		name           string
 		objs           func() []client.Object
 		ownedFirewalls []*v2.Firewall
-		want           client.Object
+		want           []client.Object
 		wantErr        error
 	}{
 		{
@@ -40,7 +40,7 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "infrastructure is present, egress cidrs were not yet set",
+			name: "infrastructure is present, egress cidrs were not yet set (acl extension gets annotated)",
 			objs: func() []client.Object {
 				return []client.Object{
 					&unstructured.Unstructured{
@@ -65,6 +65,17 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 							},
 						},
 					},
+					&unstructured.Unstructured{
+						Object: map[string]any{
+							"apiVersion": "extensions.gardener.cloud/v1alpha1",
+							"kind":       "Extension",
+							"metadata": map[string]any{
+								"name":            "acl",
+								"namespace":       testNamespace,
+								"resourceVersion": "999",
+							},
+						},
+					},
 				}
 			},
 			ownedFirewalls: []*v2.Firewall{
@@ -83,26 +94,43 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "extensions.gardener.cloud/v1alpha1",
-					"kind":       "Infrastructure",
-					"metadata": map[string]any{
-						"name":            "mycluster1",
-						"namespace":       testNamespace,
-						"resourceVersion": "1000",
-					},
-					"spec": map[string]any{
-						"providerConfig": map[string]any{
-							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
-							"firewall": map[string]any{
-								"controllerVersion": "auto",
+			want: []client.Object{
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Infrastructure",
+						"metadata": map[string]any{
+							"name":            "mycluster1",
+							"namespace":       testNamespace,
+							"resourceVersion": "1000",
+						},
+						"spec": map[string]any{
+							"providerConfig": map[string]any{
+								"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+								"firewall": map[string]any{
+									"controllerVersion": "auto",
+								},
 							},
 						},
+						"status": map[string]any{
+							"phase":       "foo",
+							"egressCIDRs": []any{"1.1.1.1/32"},
+						},
 					},
-					"status": map[string]any{
-						"phase":       "foo",
-						"egressCIDRs": []any{"1.1.1.1/32"},
+				},
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Extension",
+						"metadata": map[string]any{
+							"name":            "acl",
+							"namespace":       testNamespace,
+							"resourceVersion": "1000",
+							"annotations": map[string]any{
+								"gardener.cloud/operation": "reconcile",
+							},
+						},
+						"status": nil,
 					},
 				},
 			},
@@ -153,26 +181,28 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "extensions.gardener.cloud/v1alpha1",
-					"kind":       "Infrastructure",
-					"metadata": map[string]any{
-						"name":            "mycluster1",
-						"namespace":       testNamespace,
-						"resourceVersion": "1000",
-					},
-					"spec": map[string]any{
-						"providerConfig": map[string]any{
-							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
-							"firewall": map[string]any{
-								"controllerVersion": "auto",
+			want: []client.Object{
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Infrastructure",
+						"metadata": map[string]any{
+							"name":            "mycluster1",
+							"namespace":       testNamespace,
+							"resourceVersion": "1000",
+						},
+						"spec": map[string]any{
+							"providerConfig": map[string]any{
+								"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+								"firewall": map[string]any{
+									"controllerVersion": "auto",
+								},
 							},
 						},
-					},
-					"status": map[string]any{
-						"phase":       "foo",
-						"egressCIDRs": []any{"1.1.1.1/32"},
+						"status": map[string]any{
+							"phase":       "foo",
+							"egressCIDRs": []any{"1.1.1.1/32"},
+						},
 					},
 				},
 			},
@@ -223,26 +253,28 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "extensions.gardener.cloud/v1alpha1",
-					"kind":       "Infrastructure",
-					"metadata": map[string]any{
-						"name":            "mycluster1",
-						"namespace":       testNamespace,
-						"resourceVersion": "999",
-					},
-					"spec": map[string]any{
-						"providerConfig": map[string]any{
-							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
-							"firewall": map[string]any{
-								"controllerVersion": "auto",
+			want: []client.Object{
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Infrastructure",
+						"metadata": map[string]any{
+							"name":            "mycluster1",
+							"namespace":       testNamespace,
+							"resourceVersion": "999",
+						},
+						"spec": map[string]any{
+							"providerConfig": map[string]any{
+								"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+								"firewall": map[string]any{
+									"controllerVersion": "auto",
+								},
 							},
 						},
-					},
-					"status": map[string]any{
-						"phase":       "foo",
-						"egressCIDRs": []any{"1.1.1.1/32"},
+						"status": map[string]any{
+							"phase":       "foo",
+							"egressCIDRs": []any{"1.1.1.1/32"},
+						},
 					},
 				},
 			},
@@ -298,31 +330,33 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "extensions.gardener.cloud/v1alpha1",
-					"kind":       "Infrastructure",
-					"metadata": map[string]any{
-						"name":            "mycluster1",
-						"namespace":       testNamespace,
-						"resourceVersion": "1000",
-					},
-					"spec": map[string]any{
-						"providerConfig": map[string]any{
-							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
-							"firewall": map[string]any{
-								"controllerVersion": "auto",
-								"egressRules": []any{
-									map[string]any{
-										"ips": []any{"3.4.5.6"},
+			want: []client.Object{
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Infrastructure",
+						"metadata": map[string]any{
+							"name":            "mycluster1",
+							"namespace":       testNamespace,
+							"resourceVersion": "1000",
+						},
+						"spec": map[string]any{
+							"providerConfig": map[string]any{
+								"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+								"firewall": map[string]any{
+									"controllerVersion": "auto",
+									"egressRules": []any{
+										map[string]any{
+											"ips": []any{"3.4.5.6"},
+										},
 									},
 								},
 							},
 						},
-					},
-					"status": map[string]any{
-						"phase":       "foo",
-						"egressCIDRs": []any{"1.1.1.1/32", "3.4.5.6/32"},
+						"status": map[string]any{
+							"phase":       "foo",
+							"egressCIDRs": []any{"1.1.1.1/32", "3.4.5.6/32"},
+						},
 					},
 				},
 			},
@@ -387,26 +421,28 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "extensions.gardener.cloud/v1alpha1",
-					"kind":       "Infrastructure",
-					"metadata": map[string]any{
-						"name":            "mycluster1",
-						"namespace":       testNamespace,
-						"resourceVersion": "999",
-					},
-					"spec": map[string]any{
-						"providerConfig": map[string]any{
-							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
-							"firewall": map[string]any{
-								"controllerVersion": "auto",
+			want: []client.Object{
+				&unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "extensions.gardener.cloud/v1alpha1",
+						"kind":       "Infrastructure",
+						"metadata": map[string]any{
+							"name":            "mycluster1",
+							"namespace":       testNamespace,
+							"resourceVersion": "999",
+						},
+						"spec": map[string]any{
+							"providerConfig": map[string]any{
+								"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+								"firewall": map[string]any{
+									"controllerVersion": "auto",
+								},
 							},
 						},
-					},
-					"status": map[string]any{
-						"phase":       "foo",
-						"egressCIDRs": []any{"1.1.1.2/32", "1.1.1.1/32"},
+						"status": map[string]any{
+							"phase":       "foo",
+							"egressCIDRs": []any{"1.1.1.2/32", "1.1.1.1/32"},
+						},
 					},
 				},
 			},
@@ -437,14 +473,14 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 				t.Errorf("error diff (+got -want):\n %s", diff)
 			}
 
-			if tt.want != nil {
+			for _, want := range tt.want {
 				u := unstructured.Unstructured{}
-				u.SetGroupVersionKind(tt.want.GetObjectKind().GroupVersionKind())
+				u.SetGroupVersionKind(want.GetObjectKind().GroupVersionKind())
 
-				err = c.Get(ctx, client.ObjectKeyFromObject(tt.want), &u)
+				err = c.Get(ctx, client.ObjectKeyFromObject(want), &u)
 				require.NoError(t, err)
 
-				if diff := cmp.Diff(tt.want, &u); diff != "" {
+				if diff := cmp.Diff(want, &u); diff != "" {
 					t.Errorf("diff (+got -want):\n %s", diff)
 				}
 			}
