@@ -38,25 +38,6 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 		return err
 	}
 
-	var egressCIDRs []any
-
-	for _, fw := range ownedFirewalls {
-		for _, network := range fw.Status.FirewallNetworks {
-			if pointer.SafeDeref(network.NetworkType) != "external" {
-				continue
-			}
-
-			for _, ip := range network.IPs {
-				parsed, err := netip.ParseAddr(ip)
-				if err != nil {
-					continue
-				}
-
-				egressCIDRs = append(egressCIDRs, fmt.Sprintf("%s/%d", ip, parsed.BitLen()))
-			}
-		}
-	}
-
 	type infrastructure struct {
 		Spec struct {
 			ProviderConfig struct {
@@ -83,7 +64,25 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 		return fmt.Errorf("unable to convert gardener infrastructure object: %w", err)
 	}
 
-	// add egress rules cidrs
+	var egressCIDRs []any
+
+	for _, fw := range ownedFirewalls {
+		for _, network := range fw.Status.FirewallNetworks {
+			if pointer.SafeDeref(network.NetworkType) != "external" {
+				continue
+			}
+
+			for _, ip := range network.IPs {
+				parsed, err := netip.ParseAddr(ip)
+				if err != nil {
+					continue
+				}
+
+				egressCIDRs = append(egressCIDRs, fmt.Sprintf("%s/%d", ip, parsed.BitLen()))
+			}
+		}
+	}
+
 	for _, rule := range typedInfra.Spec.ProviderConfig.Firewall.EgressRules {
 		for _, ip := range rule.IPs {
 			parsed, err := netip.ParseAddr(ip)
