@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
-	"sort"
 	"strings"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -49,7 +48,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 			} `json:"providerConfig"`
 		} `json:"spec"`
 		Status struct {
-			EgressCIDRs []any `json:"egressCIDRs"`
+			EgressCIDRs []string `json:"egressCIDRs"`
 		} `json:"status"`
 	}
 
@@ -64,7 +63,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 		return fmt.Errorf("unable to convert gardener infrastructure object: %w", err)
 	}
 
-	var egressCIDRs []any
+	var egressCIDRs []string
 
 	for _, fw := range ownedFirewalls {
 		for _, network := range fw.Status.FirewallNetworks {
@@ -94,8 +93,8 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 		}
 	}
 
-	sortUntypedStringSlice(egressCIDRs)
-	sortUntypedStringSlice(typedInfra.Status.EgressCIDRs)
+	slices.Sort(egressCIDRs)
+	slices.Sort(typedInfra.Status.EgressCIDRs)
 
 	// check if an update is required or not
 	if slices.Equal(egressCIDRs, typedInfra.Status.EgressCIDRs) {
@@ -161,15 +160,4 @@ func extractInfrastructureNameFromSeedNamespace(namespace string) (string, bool)
 	}
 
 	return strings.Join(parts[2:], "--"), true
-}
-
-func sortUntypedStringSlice(s []any) {
-	sort.Slice(s, func(i, j int) bool {
-		a, aok := s[i].(string)
-		b, bok := s[j].(string)
-		if aok && bok {
-			return a < b
-		}
-		return false
-	})
 }
