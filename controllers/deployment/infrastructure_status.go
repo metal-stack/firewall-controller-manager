@@ -121,6 +121,30 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 
 	c.log.Info("found gardener infrastructure resource and patched egress cidrs for acl extension", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
 
+	aclObj := &unstructured.Unstructured{}
+
+	aclObj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "extensions.gardener.cloud",
+		Kind:    "Extension",
+		Version: "v1alpha1",
+	})
+
+	err = c.c.GetSeedClient().Get(r.Ctx, client.ObjectKey{
+		Namespace: c.c.GetSeedNamespace(),
+		Name:      "acl",
+	}, infraObj)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	err = v2.AddAnnotation(r.Ctx, c.c.GetSeedClient(), aclObj, "gardener.cloud/operation", "reconcile")
+	if err != nil {
+		return fmt.Errorf("error annotating acl extension with reconcile operation: %w", err)
+	}
+
 	return nil
 }
 
