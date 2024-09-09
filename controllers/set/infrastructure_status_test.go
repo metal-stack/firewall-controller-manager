@@ -328,6 +328,90 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		{
+			name: "skip update on different order of ip elements in slice",
+			objs: func() []client.Object {
+				return []client.Object{
+					&unstructured.Unstructured{
+						Object: map[string]any{
+							"apiVersion": "extensions.gardener.cloud/v1alpha1",
+							"kind":       "Infrastructure",
+							"metadata": map[string]any{
+								"name":            "mycluster1",
+								"namespace":       testNamespace,
+								"resourceVersion": "999",
+							},
+							"spec": map[string]any{
+								"providerConfig": map[string]any{
+									"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+									"firewall": map[string]any{
+										"controllerVersion": "auto",
+									},
+								},
+							},
+							"status": map[string]any{
+								"phase":       "foo",
+								"egressCIDRs": []any{"1.1.1.2/32", "1.1.1.1/32"},
+							},
+						},
+					},
+				}
+			},
+			ownedFirewalls: []*v2.Firewall{
+				{
+					Status: v2.FirewallStatus{
+						FirewallNetworks: []v2.FirewallNetwork{
+							{
+								NetworkType: pointer.Pointer("external"),
+								IPs:         []string{"1.1.1.1"},
+							},
+							{
+								NetworkType: pointer.Pointer("underlay"),
+								IPs:         []string{"10.8.0.4"},
+							},
+						},
+					},
+				},
+				{
+					Status: v2.FirewallStatus{
+						FirewallNetworks: []v2.FirewallNetwork{
+							{
+								NetworkType: pointer.Pointer("external"),
+								IPs:         []string{"1.1.1.2"},
+							},
+							{
+								NetworkType: pointer.Pointer("underlay"),
+								IPs:         []string{"10.8.0.5"},
+							},
+						},
+					},
+				},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "extensions.gardener.cloud/v1alpha1",
+					"kind":       "Infrastructure",
+					"metadata": map[string]any{
+						"name":            "mycluster1",
+						"namespace":       testNamespace,
+						"resourceVersion": "999",
+					},
+					"spec": map[string]any{
+						"providerConfig": map[string]any{
+							"apiVersion": "metal.provider.extensions.gardener.cloud/v1alpha1",
+							"firewall": map[string]any{
+								"controllerVersion": "auto",
+							},
+						},
+					},
+					"status": map[string]any{
+						"phase":       "foo",
+						"egressCIDRs": []any{"1.1.1.2/32", "1.1.1.1/32"},
+					},
+				},
+			},
+			wantErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

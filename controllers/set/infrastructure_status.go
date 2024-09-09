@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
@@ -99,6 +100,9 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallS
 		}
 	}
 
+	sortUntypedStringSlice(egressCIDRs)
+	sortUntypedStringSlice(typedInfra.Status.EgressCIDRs)
+
 	// check if an update is required or not
 	if slices.Equal(egressCIDRs, typedInfra.Status.EgressCIDRs) {
 		c.log.Info("found gardener infrastructure resource, egress cidrs already up-to-date", "infrastructure-name", infraObj.GetName(), "egress-cidrs", egressCIDRs)
@@ -137,4 +141,15 @@ func extractInfrastructureNameFromSeedNamespace(namespace string) (string, bool)
 	}
 
 	return strings.Join(parts[2:], "--"), true
+}
+
+func sortUntypedStringSlice(s []any) {
+	sort.Slice(s, func(i, j int) bool {
+		a, aok := s[i].(string)
+		b, bok := s[j].(string)
+		if aok && bok {
+			return a < b
+		}
+		return false
+	})
 }
