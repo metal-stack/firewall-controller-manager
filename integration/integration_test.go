@@ -162,6 +162,53 @@ var _ = Context("integration test", Ordered, func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 	})
 
+	When("creating a firewall deployment that simulates unhealthiness", Ordered, func() {
+		var fwSet *v2.FirewallSet
+
+		BeforeAll(func() {
+			// Create the Firewall Deployment
+			fwDeployment := deployment()
+			Expect(k8sClient.Create(ctx, fwDeployment)).To(Succeed())
+
+			// Wait for the FirewallSet to be created
+			Eventually(func() error {
+				fwSetList := &v2.FirewallSetList{}
+				err := k8sClient.List(ctx, fwSetList, client.InNamespace(namespaceName))
+				if err != nil {
+					return err
+				}
+				if len(fwSetList.Items) == 0 {
+					return fmt.Errorf("no firewall sets found")
+				}
+				fwSet = &fwSetList.Items[0]
+				return nil
+			}, 15*time.Second, interval).Should(Succeed(), "FirewallSet should be created")
+		})
+
+		It("should update the deployment status to reflect the unhealthy replica", func() {
+			// Simulate unhealthiness by updating the FirewallSet status
+			fwSet.Status.UnhealthyReplicas = 1
+			Expect(k8sClient.Status().Update(ctx, fwSet)).To(Succeed())
+
+			// Wait for the deployment status to reflect the unhealthy replica
+			Eventually(func() int {
+				fetchedDeployment := &v2.FirewallDeployment{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment()), fetchedDeployment)).To(Succeed())
+				return fetchedDeployment.Status.UnhealthyReplicas
+			}, 15*time.Second, interval).Should(Equal(1), "unhealthy replicas should be reported")
+		})
+
+		It("should eventually replace the unhealthy firewall", func() {
+			// Wait for the controller to replace the unhealthy firewall
+			Eventually(func() bool {
+				fwSetList := &v2.FirewallSetList{}
+				Expect(k8sClient.List(ctx, fwSetList, client.InNamespace(namespaceName))).To(Succeed())
+				// Check if a new FirewallSet has been created
+				return len(fwSetList.Items) > 1
+			}, 60*time.Second, interval).Should(BeTrue(), "A new FirewallSet should be created to replace the unhealthy one")
+		})
+	})
+
 	Describe("the rolling update", Ordered, func() {
 		When("creating a firewall deployment", Ordered, func() {
 			It("the creation works", func() {
@@ -1910,5 +1957,7 @@ var _ = Context("integration test", Ordered, func() {
 				})
 			})
 		})
+
 	})
+
 })
