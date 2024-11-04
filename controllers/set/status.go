@@ -25,8 +25,8 @@ func evaluateFirewallConditions(fw *v2.Firewall, healthTimeout time.Duration) Fi
 
 	return FirewallConditionStatus{
 		IsReady:       allConditionsMet,
-		IsProgressing: created && allocationTimeExceeded,
-		IsUnhealthy:   !allConditionsMet || unhealthyTimeExceeded,
+		IsProgressing: allocationTimeExceeded,
+		IsUnhealthy:   unhealthyTimeExceeded,
 	}
 }
 
@@ -38,14 +38,15 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 
 	for _, fw := range ownedFirewalls {
 		statusReport := evaluateFirewallConditions(fw, c.c.GetFirewallHealthTimeout())
-
 		if statusReport.IsReady {
 			r.Target.Status.ReadyReplicas++
-		} else if statusReport.IsProgressing {
-			r.Target.Status.ProgressingReplicas++
-		} else {
-			r.Target.Status.UnhealthyReplicas++
+			continue
 		}
+		if statusReport.IsProgressing {
+			r.Target.Status.ProgressingReplicas++
+			continue
+		}
+		r.Target.Status.UnhealthyReplicas++
 	}
 
 	revision, err := controllers.Revision(r.Target)

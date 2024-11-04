@@ -76,6 +76,16 @@ func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallS
 }
 
 func (c *controller) isFirewallUnhealthy(fw *v2.Firewall) bool {
+
 	statusReport := evaluateFirewallConditions(fw, c.c.GetFirewallHealthTimeout())
-	return statusReport.IsUnhealthy
+
+	if statusReport.IsReady {
+		return false
+	}
+
+	if statusReport.IsUnhealthy {
+		return true
+	}
+
+	return false
 }
