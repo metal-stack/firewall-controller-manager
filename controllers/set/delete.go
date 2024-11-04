@@ -45,15 +45,10 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 
 	return nil
 }
-
 func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
 	var result []*v2.Firewall
 
 	for _, fw := range fws {
-		fw := fw
-
-		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-
 		if c.isFirewallUnhealthy(fw) {
 			r.Log.Info("unhealthy firewall not recovering, deleting from set", "firewall-name", fw.Name)
 			err := c.deleteFirewalls(r, fw)
@@ -67,40 +62,20 @@ func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallS
 		if fw.Status.Phase != v2.FirewallPhaseCreating {
 			continue
 		}
-
+		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
 		if !connected && time.Since(fw.CreationTimestamp.Time) > c.c.GetCreateTimeout() {
 			r.Log.Info("firewall not getting ready, deleting from set", "firewall-name", fw.Name)
-
 			err := c.deleteFirewalls(r, fw)
 			if err != nil {
 				return nil, err
 			}
-
 			result = append(result, fw)
-
 		}
 	}
-
 	return result, nil
 }
 
 func (c *controller) isFirewallUnhealthy(fw *v2.Firewall) bool {
-
-	var (
-		created       = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
-		ready         = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
-		connected     = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-		seedConnected = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
-		distance      = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
-	)
-
-	if created && ready && connected && seedConnected && distance {
-		return false
-	}
-
-	if created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) > c.c.GetFirewallHealthTimeout() {
-		return true
-	}
-
-	return false
+	statusReport := evaluateFirewallConditions(fw, c.c.GetFirewallHealthTimeout())
+	return statusReport.IsUnhealthy
 }
