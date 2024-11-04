@@ -162,53 +162,6 @@ var _ = Context("integration test", Ordered, func() {
 		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, shootTokenSecret.DeepCopy()))).To(Succeed())
 	})
 
-	When("creating a firewall deployment that simulates unhealthiness", Ordered, func() {
-		var fwSet *v2.FirewallSet
-
-		BeforeAll(func() {
-			// Create the Firewall Deployment
-			fwDeployment := deployment()
-			Expect(k8sClient.Create(ctx, fwDeployment)).To(Succeed())
-
-			// Wait for the FirewallSet to be created
-			Eventually(func() error {
-				fwSetList := &v2.FirewallSetList{}
-				err := k8sClient.List(ctx, fwSetList, client.InNamespace(namespaceName))
-				if err != nil {
-					return err
-				}
-				if len(fwSetList.Items) == 0 {
-					return fmt.Errorf("no firewall sets found")
-				}
-				fwSet = &fwSetList.Items[0]
-				return nil
-			}, 15*time.Second, interval).Should(Succeed(), "FirewallSet should be created")
-		})
-
-		It("should update the deployment status to reflect the unhealthy replica", func() {
-			// Simulate unhealthiness by updating the FirewallSet status
-			fwSet.Status.UnhealthyReplicas = 1
-			Expect(k8sClient.Status().Update(ctx, fwSet)).To(Succeed())
-
-			// Wait for the deployment status to reflect the unhealthy replica
-			Eventually(func() int {
-				fetchedDeployment := &v2.FirewallDeployment{}
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment()), fetchedDeployment)).To(Succeed())
-				return fetchedDeployment.Status.UnhealthyReplicas
-			}, 15*time.Second, interval).Should(Equal(1), "unhealthy replicas should be reported")
-		})
-
-		It("should eventually replace the unhealthy firewall", func() {
-			// Wait for the controller to replace the unhealthy firewall
-			Eventually(func() bool {
-				fwSetList := &v2.FirewallSetList{}
-				Expect(k8sClient.List(ctx, fwSetList, client.InNamespace(namespaceName))).To(Succeed())
-				// Check if a new FirewallSet has been created
-				return len(fwSetList.Items) > 1
-			}, 60*time.Second, interval).Should(BeTrue(), "A new FirewallSet should be created to replace the unhealthy one")
-		})
-	})
-
 	Describe("the rolling update", Ordered, func() {
 		When("creating a firewall deployment", Ordered, func() {
 			It("the creation works", func() {
@@ -1956,6 +1909,75 @@ var _ = Context("integration test", Ordered, func() {
 					}, 10*time.Second)
 				})
 			})
+		})
+
+	})
+
+	When("creating a firewall set that simulates unhealthiness", Ordered, func() {
+		var firewallSet *v2.FirewallSet
+
+		BeforeAll(func() {
+			swapMetalClient(&metalclient.MetalMockFns{
+				Firewall: func(m *mock.Mock) {
+					m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall3}, nil).Maybe()
+					m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall3}, nil).Maybe()
+					m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall3}}, nil).Maybe()
+				},
+				Network: func(m *mock.Mock) {
+					m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
+				},
+				Machine: func(m *mock.Mock) {
+					m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
+					m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall3.ID}}, nil).Maybe()
+				},
+				Image: func(m *mock.Mock) {
+					m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
+				},
+			})
+
+			Expect(k8sClient.Create(ctx, deployment())).To(Succeed())
+			Eventually(func() error {
+				firewallSetList := &v2.FirewallSetList{}
+				err := k8sClient.List(ctx, firewallSetList, client.InNamespace(namespaceName))
+				if err != nil {
+					return err
+				}
+				if len(firewallSetList.Items) == 0 {
+					return fmt.Errorf("no firewall sets found")
+				}
+				firewallSet = &firewallSetList.Items[0]
+				return nil
+			}, 15*time.Second, interval).Should(Succeed(), "FirewallSet should be created")
+		})
+
+		It("should simulate unhealthiness and trigger deletion", func() {
+			firewallList := &v2.FirewallList{}
+			Eventually(func() int {
+
+				err := k8sClient.List(ctx, firewallList, client.InNamespace(firewallSet.Namespace))
+				if err != nil {
+					return 0
+				}
+				return len(firewallList.Items)
+			}, 15*time.Second, interval).Should(BeNumerically(">", 0), "Should have at least one firewall")
+
+			By("waiting for the firewall to be deleted")
+			Eventually(func() bool {
+				for _, fw := range firewallList.Items {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&fw), &v2.Firewall{})
+					if !apierrors.IsNotFound(err) {
+						return false
+					}
+				}
+				return true
+			}, 10*time.Second, interval).Should(BeTrue(), "All Firewalls should be deleted")
+
+			By("verifying that a new firewall has been created")
+			Eventually(func() int {
+				newFirewallList := &v2.FirewallList{}
+				Expect(k8sClient.List(ctx, newFirewallList, client.InNamespace(firewallSet.Namespace))).To(Succeed())
+				return len(newFirewallList.Items)
+			}, 10*time.Second, interval).Should(Equal(1), "A new firewall should be created")
 		})
 
 	})

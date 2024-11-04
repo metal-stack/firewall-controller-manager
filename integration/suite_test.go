@@ -130,7 +130,7 @@ var _ = BeforeSuite(func() {
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 		SafetyBackoff:         10 * time.Second,
 		ProgressDeadline:      10 * time.Minute,
-		FirewallHealthTimeout: 20 * time.Minute,
+		FirewallHealthTimeout: 19 * 24 * time.Hour,
 		CreateTimeout:         10 * time.Minute,
 	})
 	Expect(err).ToNot(HaveOccurred())

@@ -109,7 +109,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		}
 	}
 
-	deletedFws, err := c.deleteAfterTimeout(r, ownedFirewalls...)
+	deletedFws, err := c.deleteIfUnhealthyOrTimeout(r, ownedFirewalls...)
 	if err != nil {
 		return err
 	}
