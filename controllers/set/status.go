@@ -19,33 +19,33 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 	allocationTimeout := c.c.GetCreateTimeout()
 
 	var (
-		created               = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
-		ready                 = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
-		connected             = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-		seedConnected         = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
-		distanceConfigured    = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
-		allConditionsMet      = created && ready && connected && seedConnected && distanceConfigured
-		createTimeoutExceeded bool
-		healthTimeoutExceeded bool
+		created            = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
+		ready              = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
+		connected          = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
+		seedConnected      = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
+		distanceConfigured = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
+		allConditionsMet   = created && ready && connected && seedConnected && distanceConfigured
 	)
 
 	allocationTimestamp := pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
 	timeSinceAllocation := time.Since(allocationTimestamp)
 
+	if allConditionsMet {
+		return firewallConditionStatus{IsReady: true}
+	}
+
 	if created && timeSinceAllocation > allocationTimeout {
-		createTimeoutExceeded = true
 		return firewallConditionStatus{CreateTimeout: true}
 	}
 
 	if created && timeSinceAllocation > unhealthyTimeout {
-		healthTimeoutExceeded = true
 		return firewallConditionStatus{HealthTimeout: true}
 	}
 
 	return firewallConditionStatus{
 		IsReady:       allConditionsMet,
-		CreateTimeout: createTimeoutExceeded,
-		HealthTimeout: healthTimeoutExceeded,
+		CreateTimeout: false,
+		HealthTimeout: false,
 	}
 }
 

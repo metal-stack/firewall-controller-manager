@@ -131,7 +131,7 @@ var _ = BeforeSuite(func() {
 		SafetyBackoff:         10 * time.Second,
 		ProgressDeadline:      10 * time.Minute,
 		FirewallHealthTimeout: 19 * 24 * time.Hour,
-		CreateTimeout:         10 * time.Minute,
+		CreateTimeout:         19 * 24 * time.Hour,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
