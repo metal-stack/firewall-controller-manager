@@ -35,7 +35,12 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 	}
 
 	if created && timeSinceAllocation > allocationTimeout {
-		return firewallConditionStatus{CreateTimeout: true}
+
+		// If the firewall is still creating, don't set a timeout
+		if fw.Status.Phase != v2.FirewallPhaseCreating {
+			return firewallConditionStatus{CreateTimeout: true}
+		}
+
 	}
 
 	if created && timeSinceAllocation > unhealthyTimeout {
