@@ -8,25 +8,44 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
-type FirewallConditionStatus struct {
-	IsReady, IsProgressing, IsUnhealthy bool
+type firewallConditionStatus struct {
+	IsReady       bool
+	CreateTimeout bool
+	HealthTimeout bool
 }
 
-func evaluateFirewallConditions(fw *v2.Firewall, healthTimeout time.Duration) FirewallConditionStatus {
-	created := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
-	ready := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
-	connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-	seedConnected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
-	distance := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
+func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditionStatus {
+	unhealthyTimeout := c.c.GetFirewallHealthTimeout()
+	allocationTimeout := c.c.GetCreateTimeout()
 
-	allConditionsMet := created && ready && connected && seedConnected && distance
-	allocationTimeExceeded := created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) < healthTimeout
-	unhealthyTimeExceeded := created && time.Since(pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time) > healthTimeout
+	var (
+		created               = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
+		ready                 = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
+		connected             = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
+		seedConnected         = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
+		distanceConfigured    = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
+		allConditionsMet      = created && ready && connected && seedConnected && distanceConfigured
+		createTimeoutExceeded bool
+		healthTimeoutExceeded bool
+	)
 
-	return FirewallConditionStatus{
+	allocationTimestamp := pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
+	timeSinceAllocation := time.Since(allocationTimestamp)
+
+	if created && timeSinceAllocation > allocationTimeout {
+		createTimeoutExceeded = true
+		return firewallConditionStatus{CreateTimeout: true}
+	}
+
+	if created && timeSinceAllocation > unhealthyTimeout {
+		healthTimeoutExceeded = true
+		return firewallConditionStatus{HealthTimeout: true}
+	}
+
+	return firewallConditionStatus{
 		IsReady:       allConditionsMet,
-		IsProgressing: allocationTimeExceeded,
-		IsUnhealthy:   unhealthyTimeExceeded,
+		CreateTimeout: createTimeoutExceeded,
+		HealthTimeout: healthTimeoutExceeded,
 	}
 }
 
@@ -37,16 +56,18 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 	r.Target.Status.UnhealthyReplicas = 0
 
 	for _, fw := range ownedFirewalls {
-		statusReport := evaluateFirewallConditions(fw, c.c.GetFirewallHealthTimeout())
-		if statusReport.IsReady {
+		statusReport := c.evaluateFirewallConditions(fw)
+
+		switch {
+		case statusReport.IsReady:
 			r.Target.Status.ReadyReplicas++
 			continue
-		}
-		if statusReport.IsProgressing {
-			r.Target.Status.ProgressingReplicas++
+		case statusReport.CreateTimeout || statusReport.HealthTimeout:
+			r.Target.Status.UnhealthyReplicas++
 			continue
 		}
-		r.Target.Status.UnhealthyReplicas++
+
+		r.Target.Status.ProgressingReplicas++
 	}
 
 	revision, err := controllers.Revision(r.Target)
