@@ -27,7 +27,7 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 		allConditionsMet   = created && ready && connected && seedConnected && distanceConfigured
 	)
 
-	allocationTimestamp := pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
+	allocationTimestamp := pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
 	timeSinceAllocation := time.Since(allocationTimestamp)
 
 	if allConditionsMet {
@@ -43,7 +43,7 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 
 	}
 
-	if created && timeSinceAllocation > unhealthyTimeout {
+	if unhealthyTimeout != 0 && created && timeSinceAllocation > unhealthyTimeout {
 		return firewallConditionStatus{HealthTimeout: true}
 	}
 
