@@ -15,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 
 	testcommon "github.com/metal-stack/firewall-controller-manager/integration/common"
 
@@ -1962,13 +1961,13 @@ var _ = Context("integration test", Ordered, func() {
 				return len(firewallList.Items)
 			}, 15*time.Second, interval).Should(BeNumerically(">", 0), "Should have at least one firewall")
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				for _, item := range firewallList.Items {
 					var fw v2.Firewall
 					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&item), &fw)
 					if err != nil {
 						fmt.Printf("Failed to get firewall: %v\n", err)
-						return false
+						return err
 					}
 
 					if fw.Status.ControllerStatus == nil {
@@ -1976,25 +1975,22 @@ var _ = Context("integration test", Ordered, func() {
 					}
 					//add a fake concile so the unhealty firewall gets deleted
 					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
-					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&fw), &fw); err != nil {
-							return err
-						}
-						if fw.Status.ControllerStatus == nil {
-							fw.Status.ControllerStatus = &v2.ControllerConnection{}
-						}
-						fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
-						return k8sClient.Status().Update(ctx, &fw)
-					})
-
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&fw), &fw); err != nil {
+						return err
+					}
+					if fw.Status.ControllerStatus == nil {
+						fw.Status.ControllerStatus = &v2.ControllerConnection{}
+					}
+					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
+					err = k8sClient.Status().Update(ctx, &fw)
 					if err != nil {
 						fmt.Printf("Failed to update firewall status: %v\n", err)
-						return false
+						return err
 					}
-
 				}
-				return true
-			}, 10*time.Second, interval).Should(BeTrue(), "All Firewalls should be deleted")
+
+				return nil
+			}, 10*time.Second, interval).Should(Succeed(), "All Firewalls should be deleted")
 
 			By("verifying that a new firewall has been created")
 			Eventually(func() int {
