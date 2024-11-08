@@ -27,26 +27,25 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 		allConditionsMet   = created && ready && connected && seedConnected && distanceConfigured
 	)
 
-	allocationTimestamp := pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
-	timeSinceAllocation := time.Since(allocationTimestamp)
+	seedUpdatedTime := pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
+	timeSinceReconcile := time.Since(seedUpdatedTime)
 
 	if allConditionsMet {
 		return firewallConditionStatus{IsReady: true}
 	}
 
-	if created && timeSinceAllocation > allocationTimeout {
-
-		// If the firewall is still creating, don't set a timeout
-		if fw.Status.Phase != v2.FirewallPhaseCreating {
-			return firewallConditionStatus{CreateTimeout: true}
-		}
-
+	// duration after which a firewall in the creation phase will be recreated, exceeded
+	if fw.Status.Phase == v2.FirewallPhaseCreating && timeSinceReconcile > allocationTimeout {
+		c.log.Info("create timeout reached")
+		return firewallConditionStatus{CreateTimeout: true}
 	}
 
-	if unhealthyTimeout != 0 && created && timeSinceAllocation > unhealthyTimeout {
+	if seedConnected && unhealthyTimeout != 0 && created && timeSinceReconcile > unhealthyTimeout {
+		c.log.Info("unhealthy timeout reached")
 		return firewallConditionStatus{HealthTimeout: true}
 	}
 
+	//if everything returns false, it is progressing
 	return firewallConditionStatus{
 		IsReady:       allConditionsMet,
 		CreateTimeout: false,
