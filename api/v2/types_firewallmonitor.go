@@ -10,6 +10,9 @@ import (
 const (
 	// FirewallShootNamespace is the name of the namespace to which the firewall monitor gets deployed and in which the firewall-controller operates
 	FirewallShootNamespace = "firewall"
+
+	FirewallBootstrapTokenIDLabel           = "firewall.metal-stack.io/bootstrap-token-id"
+	FirewallBootstrapTokenNextRotationLabel = "firewall.metal-stack.io/bootstrap-token-next-rotation"
 )
 
 // +kubebuilder:object:root=true

@@ -17,11 +17,9 @@ import (
 )
 
 const (
-	firewallBootstrapTokenIDLabel           = "firewall.metal-stack.io/bootstrap-token-id"
-	firewallBootstrapTokenNextRotationLabel = "firewall.metal-stack.io/bootstrap-token-next-rotation"
-	characterSetResourceNameFragment        = "abcdefghijklmnopqrstuvwxyz0123456789"
-	firewallBootstrapTokenExpiration        = 20 * time.Minute
-	firewallBootstrapTokenRotationPeriod    = 15 * time.Minute
+	characterSetResourceNameFragment     = "abcdefghijklmnopqrstuvwxyz0123456789"
+	firewallBootstrapTokenExpiration     = 20 * time.Minute
+	firewallBootstrapTokenRotationPeriod = 15 * time.Minute
 	// Extra groups to authenticate the token as. Must start with "system:bootstrappers:"
 	firewallBootstrapTokenAuthExtraGroups = ""
 )
@@ -86,8 +84,8 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 
 func (c *controller) rotateFirewallBootstrapTokenIfNeeded(r *controllers.Ctx[*v2.Firewall]) error {
 	var (
-		tokenID         = r.Target.Labels[firewallBootstrapTokenIDLabel]
-		nextRotationStr = r.Target.Labels[firewallBootstrapTokenNextRotationLabel]
+		tokenID         = r.Target.Labels[v2.FirewallBootstrapTokenIDLabel]
+		nextRotationStr = r.Target.Labels[v2.FirewallBootstrapTokenNextRotationLabel]
 	)
 
 	if tokenID == "" || nextRotationStr == "" {
@@ -111,8 +109,8 @@ func (c *controller) rotateFirewallBootstrapTokenIfNeeded(r *controllers.Ctx[*v2
 	nextRotation = time.Now().Add(firewallBootstrapTokenRotationPeriod)
 	nextRotationStr = nextRotation.Format(time.RFC3339)
 
-	r.Target.Labels[firewallBootstrapTokenNextRotationLabel] = nextRotationStr
-	r.Target.Labels[firewallBootstrapTokenIDLabel] = tokenID
+	r.Target.Labels[v2.FirewallBootstrapTokenNextRotationLabel] = nextRotationStr
+	r.Target.Labels[v2.FirewallBootstrapTokenIDLabel] = tokenID
 
 	secretName := bootstraptokenutil.BootstrapTokenSecretName(tokenID)
 	bootstrapTokenSecret := &corev1.Secret{
