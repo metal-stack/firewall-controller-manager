@@ -150,7 +150,7 @@ type EgressRule struct {
 	Ports []int32 `json:"ports"`
 	// Protocol constraints the protocol this rule applies to.
 	Protocol NetworkProtocol `json:"protocol"`
-	// To target addresses this rule applies to. May contain IPs or dns names.
+	// To source address cidrs this rule applies to.
 	To []string `json:"to"`
 }
 
@@ -161,7 +161,7 @@ type IngressRule struct {
 	Ports []int32 `json:"ports"`
 	// Protocol constraints the protocol this rule applies to.
 	Protocol NetworkProtocol `json:"protocol"`
-	// From source addresses this rule applies to. May contain IPs or dns names.
+	// From source address cidrs this rule applies to.
 	From []string `json:"from"`
 }
 
