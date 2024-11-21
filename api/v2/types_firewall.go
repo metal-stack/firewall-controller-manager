@@ -74,6 +74,9 @@ type FirewallSpec struct {
 	// EgressRules contains egress rules configured for this firewall.
 	EgressRules []EgressRuleSNAT `json:"egressRules,omitempty"`
 
+	// InitialRuleSet is the initial firewall ruleset applied before the firewall-controller starts running.
+	InitialRuleSet *InitialRuleSet `json:"initialRuleSet,omitempty"`
+
 	// Interval on which rule reconciliation by the firewall-controller should happen.
 	Interval string `json:"interval,omitempty"`
 	// DryRun if set to true, firewall rules are not applied. For devel-purposes only.
@@ -120,6 +123,33 @@ type FirewallTemplateSpec struct {
 
 	// Spec contains the firewall specification.
 	Spec FirewallSpec `json:"spec,omitempty"`
+}
+
+// InitialRuleSet is the initial rule set deployed on the firewall.
+type InitialRuleSet struct {
+	Egress  []EgressRule
+	Ingress []IngressRule
+}
+
+type NetworkProtocol string
+
+const (
+	NetworkProtocolTCP = "TCP"
+	NetworkProtocolUDP = "UDP"
+)
+
+type EgressRule struct {
+	Comment  string
+	Ports    []int32
+	Protocol NetworkProtocol
+	To       []string
+}
+
+type IngressRule struct {
+	Comment  string
+	Ports    []int32
+	Protocol NetworkProtocol
+	From     []string
 }
 
 // EgressRuleSNAT holds a Source-NAT rule
