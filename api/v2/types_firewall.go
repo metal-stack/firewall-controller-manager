@@ -127,29 +127,42 @@ type FirewallTemplateSpec struct {
 
 // InitialRuleSet is the initial rule set deployed on the firewall.
 type InitialRuleSet struct {
-	Egress  []EgressRule
-	Ingress []IngressRule
+	// Egress rules to be deployed initially on the firewall.
+	Egress []EgressRule `json:"egress,omitempty"`
+	// Ingress rules to be deployed initially on the firewall.
+	Ingress []IngressRule `json:"ingress,omitempty"`
 }
 
+// NetworkProtocol represents the kind of network protocol.
 type NetworkProtocol string
 
 const (
+	// NetworkProtocolTCP represents tcp connections.
 	NetworkProtocolTCP = "TCP"
+	// NetworkProtocolUDP represents udp connections.
 	NetworkProtocolUDP = "UDP"
 )
 
 type EgressRule struct {
-	Comment  string
-	Ports    []int32
-	Protocol NetworkProtocol
-	To       []string
+	// Comment provides a human readable description of this rule.
+	Comment string `json:"comment,omitempty"`
+	// Ports contains all affected network ports.
+	Ports []int32 `json:"ports"`
+	// Protocol constraints the protocol this rule applies to.
+	Protocol NetworkProtocol `json:"protocol"`
+	// To target addresses this rule applies to. May contain IPs or dns names.
+	To []string `json:"to"`
 }
 
 type IngressRule struct {
-	Comment  string
-	Ports    []int32
-	Protocol NetworkProtocol
-	From     []string
+	// Comment provides a human readable description of this rule.
+	Comment string `json:"comment,omitempty"`
+	// Ports contains all affected network ports.
+	Ports []int32 `json:"ports"`
+	// Protocol constraints the protocol this rule applies to.
+	Protocol NetworkProtocol `json:"protocol"`
+	// From source addresses this rule applies to. May contain IPs or dns names.
+	From []string `json:"from"`
 }
 
 // EgressRuleSNAT holds a Source-NAT rule
