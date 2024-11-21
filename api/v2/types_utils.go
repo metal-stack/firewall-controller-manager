@@ -40,6 +40,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
+//nolint:recvcheck
 type Conditions []Condition
 
 // NewCondition creates a new condition.
