@@ -27,7 +27,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 	})
 
 	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKey{
-		Namespace: c.c.GetSeedNamespace(),
+		Namespace: r.Target.Namespace,
 		Name:      infrastructureName,
 	}, infraObj)
 	if err != nil {
@@ -129,7 +129,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 	})
 
 	err = c.c.GetSeedClient().Get(r.Ctx, client.ObjectKey{
-		Namespace: c.c.GetSeedNamespace(),
+		Namespace: r.Target.Namespace,
 		Name:      "acl",
 	}, aclObj)
 	if err != nil {
@@ -150,6 +150,7 @@ func (c *controller) updateInfrastructureStatus(r *controllers.Ctx[*v2.FirewallD
 }
 
 func extractInfrastructureNameFromSeedNamespace(namespace string) (string, bool) {
+	// TODO: is this safe to not skip in the future?
 	if !strings.HasPrefix(namespace, "shoot--") {
 		return "", false
 	}
