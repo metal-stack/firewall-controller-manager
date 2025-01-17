@@ -74,7 +74,7 @@ func (g *GenericController[O]) logger(req ctrl.Request) logr.Logger {
 }
 
 func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if req.Namespace != g.namespace { // should already be filtered out through predicate, but we will check anyway
+	if g.namespace != "" && req.Namespace != g.namespace { // should already be filtered out through predicate, but we will check anyway
 		return ctrl.Result{}, nil
 	}
 
