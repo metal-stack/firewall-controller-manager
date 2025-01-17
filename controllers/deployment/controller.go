@@ -31,7 +31,7 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		lastSetCreation: map[string]time.Time{},
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controller := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&v2.FirewallDeployment{},
 			builder.WithPredicates(
@@ -57,9 +57,13 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 					),
 				),
 			),
-		).
-		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
-		Complete(g)
+		)
+
+	if c.GetSeedNamespace() != "" {
+		controller = controller.WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace())))
+	}
+
+	return controller.Complete(g)
 }
 
 func SetupWebhookWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerConfig) error {

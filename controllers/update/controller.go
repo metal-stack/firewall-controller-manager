@@ -34,16 +34,20 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		imageCache: newImageCache(c.GetMetal()),
 	}).WithoutStatus()
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controller := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&v2.FirewallDeployment{},
 			builder.WithPredicates(
 				v2.AnnotationAddedPredicate(v2.MaintenanceAnnotation),
 			),
 		).
-		Named("FirewallDeployment").
-		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
-		Complete(g)
+		Named("FirewallDeployment")
+
+	if c.GetSeedNamespace() != "" {
+		controller = controller.WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace())))
+	}
+
+	return controller.Complete(g)
 }
 
 func (c *controller) New() *v2.FirewallDeployment {
