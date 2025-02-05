@@ -3,7 +3,7 @@ module github.com/metal-stack/firewall-controller-manager
 go 1.23
 
 require (
-	github.com/Masterminds/semver/v3 v3.3.0
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/flatcar/container-linux-config-transpiler v0.9.4
 	github.com/go-logr/logr v1.4.2
 	github.com/go-openapi/strfmt v0.23.0
