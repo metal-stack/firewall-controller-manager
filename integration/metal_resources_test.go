@@ -311,6 +311,92 @@ var (
 		Vrf:       50,
 		Vrfshared: true,
 	}
+	firewall3 = &models.V1FirewallResponse{
+		Allocation: &models.V1MachineAllocation{
+			BootInfo: &models.V1BootInfo{
+				Bootloaderid: pointer.Pointer("bootloaderid"),
+				Cmdline:      pointer.Pointer("cmdline"),
+				ImageID:      pointer.Pointer("imageid"),
+				Initrd:       pointer.Pointer("initrd"),
+				Kernel:       pointer.Pointer("kernel"),
+				OsPartition:  pointer.Pointer("ospartition"),
+				PrimaryDisk:  pointer.Pointer("primarydisk"),
+			},
+			Created:          pointer.Pointer(strfmt.DateTime(testTime.Add(-20 * 24 * time.Hour))),
+			Creator:          pointer.Pointer("creator"),
+			Description:      "firewall allocation 3",
+			Filesystemlayout: fsl1,
+			Hostname:         pointer.Pointer("firewall-hostname-3"),
+			Image:            image1,
+			Name:             pointer.Pointer("firewall-3"),
+			Networks: []*models.V1MachineNetwork{
+				{
+					Asn:                 pointer.Pointer(int64(200)),
+					Destinationprefixes: []string{"2.2.2.2"},
+					Ips:                 []string{"1.1.1.1"},
+					Nat:                 pointer.Pointer(false),
+					Networkid:           pointer.Pointer("private"),
+					Networktype:         pointer.Pointer(net.PrivatePrimaryUnshared),
+					Prefixes:            []string{"prefixes"},
+					Private:             pointer.Pointer(true),
+					Underlay:            pointer.Pointer(false),
+					Vrf:                 pointer.Pointer(int64(100)),
+				},
+			},
+			Project:    pointer.Pointer("project-1"),
+			Reinstall:  pointer.Pointer(false),
+			Role:       pointer.Pointer(models.V1MachineAllocationRoleFirewall),
+			SSHPubKeys: []string{"sshpubkey"},
+			Succeeded:  pointer.Pointer(true),
+			UserData:   "---userdata---",
+		},
+		Bios: &models.V1MachineBIOS{
+			Date:    pointer.Pointer("biosdata"),
+			Vendor:  pointer.Pointer("biosvendor"),
+			Version: pointer.Pointer("biosversion"),
+		},
+		Description: "firewall 1",
+		Events: &models.V1MachineRecentProvisioningEvents{
+			CrashLoop:            pointer.Pointer(true),
+			FailedMachineReclaim: pointer.Pointer(true),
+			LastErrorEvent: &models.V1MachineProvisioningEvent{
+				Event:   pointer.Pointer("Crashed"),
+				Message: "crash",
+				Time:    strfmt.DateTime(testTime.Add(-10 * 24 * time.Hour)),
+			},
+			LastEventTime: strfmt.DateTime(testTime.Add(-7 * 24 * time.Hour)),
+			Log: []*models.V1MachineProvisioningEvent{
+				{
+					Event:   pointer.Pointer("Phoned Home"),
+					Message: "phoning home",
+					Time:    strfmt.DateTime(testTime.Add(-7 * 24 * time.Hour)),
+				},
+			},
+		},
+		Hardware: &models.V1MachineHardware{
+			CPUCores: pointer.Pointer(int32(16)),
+			Disks:    []*models.V1MachineBlockDevice{},
+			Memory:   pointer.Pointer(int64(32)),
+			Nics:     []*models.V1MachineNic{},
+		},
+		ID: pointer.Pointer("3"),
+		Ledstate: &models.V1ChassisIdentifyLEDState{
+			Description: pointer.Pointer(""),
+			Value:       pointer.Pointer(""),
+		},
+		Liveliness: pointer.Pointer("Unhealthy"),
+		Name:       "firewall-3",
+		Partition:  partition1,
+		Rackid:     "rack-1",
+		Size:       size1,
+		State: &models.V1MachineState{
+			Description:        pointer.Pointer("state"),
+			Issuer:             "issuer",
+			MetalHammerVersion: pointer.Pointer("version"),
+			Value:              pointer.Pointer(""),
+		},
+		Tags: []string{"a"},
+	}
 )
 
 // we are sharing a client for the tests, so we need to make sure we do not run contradicting tests in parallel
