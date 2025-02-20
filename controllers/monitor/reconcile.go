@@ -37,7 +37,7 @@ func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
-			Namespace: c.c.GetSeedNamespace(),
+			Namespace: r.Target.Namespace,
 		},
 	}
 	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
@@ -72,7 +72,7 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 	fw := &v2.Firewall{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Target.Name,
-			Namespace: c.c.GetSeedNamespace(),
+			Namespace: r.Target.Namespace,
 		},
 	}
 

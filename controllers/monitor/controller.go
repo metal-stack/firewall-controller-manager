@@ -22,7 +22,7 @@ func SetupWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerCon
 		c:   c,
 	}).WithoutStatus()
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controller := ctrl.NewControllerManagedBy(mgr).
 		For(&v2.FirewallMonitor{},
 			builder.WithPredicates(
 				predicate.Not(
@@ -30,9 +30,13 @@ func SetupWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerCon
 				),
 			),
 		).
-		Named("FirewallMonitor").
-		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetShootNamespace()))).
-		Complete(g)
+		Named("FirewallMonitor")
+
+	if c.GetSeedNamespace() != "" {
+		controller = controller.WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace())))
+	}
+
+	return controller.Complete(g)
 }
 
 func (c *controller) New() *v2.FirewallMonitor {
