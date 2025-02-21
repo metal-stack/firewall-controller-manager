@@ -110,7 +110,7 @@ func main() {
 		log.Fatalf("unable to create metal client %v", err)
 	}
 
-	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgrConfig := ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress: metricsAddr,
@@ -129,7 +129,15 @@ func main() {
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
-	})
+	}
+
+	if namespace == "" {
+		mgrConfig.Cache.DefaultNamespaces = map[string]cache.Config{
+			cache.AllNamespaces: {},
+		}
+	}
+
+	seedMgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrConfig)
 	if err != nil {
 		log.Fatalf("unable to setup firewall-controller-manager %v", err)
 	}
