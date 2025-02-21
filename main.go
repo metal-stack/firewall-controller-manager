@@ -52,6 +52,7 @@ func main() {
 		shootTokenSecret        string
 		shootTokenPath          string
 		sshKeySecret            string
+		sshKeySecretNamespace   string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
@@ -88,9 +89,14 @@ func main() {
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
+	flag.StringVar(&sshKeySecretNamespace, "ssh-key-secret-namespace", "", "the secret name of the ssh key for machine access")
 	flag.StringVar(&shootTokenPath, "shoot-token-path", "", "the path where to store the token file for shoot access")
 
 	flag.Parse()
+
+	if sshKeySecretNamespace == "" {
+		sshKeySecretNamespace = namespace
+	}
 
 	slogHandler, err := controllers.NewLogger(logLevel)
 	if err != nil {
@@ -255,7 +261,7 @@ func main() {
 		ShootAPIServerURL:     shootApiURL,
 		ShootAccess:           externalShootAccess,
 		SSHKeySecretName:      sshKeySecret,
-		SSHKeySecretNamespace: namespace,
+		SSHKeySecretNamespace: sshKeySecretNamespace,
 		ShootAccessHelper:     internalShootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
