@@ -157,6 +157,12 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = "true"
 	}
 
+	if r.Target.Annotations != nil {
+		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
+		}
+	}
+
 	fw := &v2.Firewall{
 		ObjectMeta: *meta,
 		Spec:       r.Target.Spec.Template.Spec,
