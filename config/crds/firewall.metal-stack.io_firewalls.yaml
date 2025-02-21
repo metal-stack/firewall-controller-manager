@@ -158,8 +158,7 @@ spec:
                             applies to.
                           type: string
                         to:
-                          description: To target addresses this rule applies to. May
-                            contain IPs or dns names.
+                          description: To source address cidrs this rule applies to.
                           items:
                             type: string
                           type: array
@@ -178,8 +177,8 @@ spec:
                             of this rule.
                           type: string
                         from:
-                          description: From source addresses this rule applies to.
-                            May contain IPs or dns names.
+                          description: From source address cidrs this rule applies
+                            to.
                           items:
                             type: string
                           type: array
