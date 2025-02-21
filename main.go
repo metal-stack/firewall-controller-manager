@@ -127,9 +127,6 @@ func main() {
 		}),
 		Cache: cache.Options{
 			SyncPeriod: &reconcileInterval,
-			DefaultNamespaces: map[string]cache.Config{
-				namespace: {},
-			},
 		},
 		HealthProbeBindAddress:  healthAddr,
 		LeaderElection:          enableLeaderElection,
@@ -137,9 +134,10 @@ func main() {
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 	}
 
-	if namespace == "" {
+	if namespace != "" {
+		l.Info("running in dedicated namespace only", "namespace", namespace)
 		mgrConfig.Cache.DefaultNamespaces = map[string]cache.Config{
-			cache.AllNamespaces: {},
+			namespace: {},
 		}
 	}
 
@@ -210,7 +208,7 @@ func main() {
 		//     secret for this controller and expose the access secrets through the firewall
 		//     status resource, which can be read by the firewall-controller
 		//   - the firewall-controller can then create a client from these secrets but
-		//     it has to contiuously update the token file because the token will expire
+		//     it has to continuously update the token file because the token will expire
 		//   - we can re-use the same approach for this controller as well and do not have
 		//     to do any additional mounts for the deployment of the controller
 		//
