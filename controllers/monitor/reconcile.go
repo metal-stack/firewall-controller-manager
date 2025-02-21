@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -34,16 +35,21 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 }
 
 func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
-	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Target.Name,
-			Namespace: r.Target.Namespace,
-		},
-	}
-	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
+	fws := &v2.FirewallList{}
+
+	err := c.c.GetSeedClient().List(r.Ctx, fws)
 	if err != nil {
+		return nil, fmt.Errorf("unable to list firewalls: %w", err)
+	}
+
+	idx := slices.IndexFunc(fws.Items, func(fw v2.Firewall) bool {
+		return fw.Name == r.Target.Name // TODO: not sure if this is safe to do?
+	})
+	if idx < 0 {
 		return nil, fmt.Errorf("associated firewall of monitor not found: %w", err)
 	}
+
+	fw := &fws.Items[idx]
 
 	old := fw.DeepCopy()
 
