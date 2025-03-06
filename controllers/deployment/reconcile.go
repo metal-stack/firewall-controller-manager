@@ -83,7 +83,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		r.Log.Info("swapped latest set to shortest distance", "distance", v2.FirewallShortestDistance)
 	}
 
-	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(c.c.GetSeedNamespace())
+	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(r.Target.Namespace)
 	if ok {
 		var ownedFirewalls []*v2.Firewall
 		for _, set := range ownedSets {
