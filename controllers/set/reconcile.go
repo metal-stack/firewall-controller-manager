@@ -159,6 +159,9 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 
 	if r.Target.Annotations != nil {
 		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			if meta.Annotations == nil {
+				meta.Annotations = map[string]string{}
+			}
 			meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
 		}
 	}
