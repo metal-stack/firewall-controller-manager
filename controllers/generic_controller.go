@@ -161,8 +161,6 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			if statusErr != nil {
 				log.Error(statusErr, "status could not be updated")
 			}
-
-			return
 		}()
 	}
 

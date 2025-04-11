@@ -13,7 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -22,7 +21,7 @@ import (
 )
 
 type ShootAccessHelper struct {
-	seed      client.Client
+	seed      controllerclient.Client
 	access    *v2.ShootAccess
 	tokenPath string
 
@@ -31,7 +30,7 @@ type ShootAccessHelper struct {
 
 // NewShootAccessHelper provides shoot access functions based on shoot access secrets,
 // i.e. Gardener's generic kubeconfig and token secret.
-func NewShootAccessHelper(seed client.Client, access *v2.ShootAccess) *ShootAccessHelper {
+func NewShootAccessHelper(seed controllerclient.Client, access *v2.ShootAccess) *ShootAccessHelper {
 	return &ShootAccessHelper{
 		seed:   seed,
 		access: access,
@@ -90,7 +89,7 @@ func (s *ShootAccessHelper) Config(ctx context.Context) (*configv1.Config, error
 		},
 	}
 
-	err := s.seed.Get(ctx, client.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
+	err := s.seed.Get(ctx, controllerclient.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read generic kubeconfig secret: %w", err)
 	}
@@ -152,7 +151,7 @@ func (s *ShootAccessHelper) RESTConfig(ctx context.Context) (*rest.Config, error
 	return restConfig, nil
 }
 
-func (s *ShootAccessHelper) Client(ctx context.Context) (client.Client, error) {
+func (s *ShootAccessHelper) Client(ctx context.Context) (controllerclient.Client, error) {
 	var (
 		config *rest.Config
 		err    error
@@ -185,7 +184,7 @@ func (s *ShootAccessHelper) readTokenSecret(ctx context.Context) (string, error)
 		},
 	}
 
-	err := s.seed.Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret)
+	err := s.seed.Get(ctx, controllerclient.ObjectKeyFromObject(tokenSecret), tokenSecret)
 	if err != nil {
 		return "", fmt.Errorf("unable to read token secret: %w", err)
 	}

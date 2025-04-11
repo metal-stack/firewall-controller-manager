@@ -260,11 +260,10 @@ var (
 			Imageurl:    "imageurl",
 			Kernelurl:   "kernelurl",
 		},
-		Description:                "partition 1",
-		ID:                         pointer.Pointer("1"),
-		Mgmtserviceaddress:         "mgmt",
-		Name:                       "partition-1",
-		Privatenetworkprefixlength: 24,
+		Description:        "partition 1",
+		ID:                 pointer.Pointer("1"),
+		Mgmtserviceaddress: "mgmt",
+		Name:               "partition-1",
 	}
 	size1 = &models.V1SizeResponse{
 		Constraints: []*models.V1SizeConstraint{

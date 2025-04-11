@@ -101,7 +101,7 @@ var _ = Context("firewall set controller", Ordered, func() {
 			for _, fw := range fws.Items {
 				fw := fw
 
-				fmt.Fprintf(GinkgoWriter, "Having %s with creation timestamp: %s\n", fw.Name, fw.CreationTimestamp.String())
+				_, _ = fmt.Fprintf(GinkgoWriter, "Having %s with creation timestamp: %s\n", fw.Name, fw.CreationTimestamp.String())
 
 				if newest == nil {
 					newest = &fw
@@ -112,7 +112,7 @@ var _ = Context("firewall set controller", Ordered, func() {
 			}
 
 			Expect(newest).NotTo(BeNil())
-			fmt.Fprintf(GinkgoWriter, "The latest firewall is: %s\n", newest.Name)
+			_, _ = fmt.Fprintf(GinkgoWriter, "The latest firewall is: %s\n", newest.Name)
 
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(set), set)).To(Succeed())
 			set.Spec.Replicas = 1

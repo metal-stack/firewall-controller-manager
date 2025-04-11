@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega" // nolint:staticcheck
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"

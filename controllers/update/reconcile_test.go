@@ -220,7 +220,7 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			var ownedFirewalls []v2.Firewall
 			for _, existingFw := range tt.existingFws {
 				ownedFirewall := existingFw.DeepCopy()
-				ownedFirewall.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+				ownedFirewall.OwnerReferences = []metav1.OwnerReference{
 					*metav1.NewControllerRef(&latestSet, v2.GroupVersion.WithKind("FirewallSet")),
 				}
 				ownedFirewalls = append(ownedFirewalls, *ownedFirewall)
