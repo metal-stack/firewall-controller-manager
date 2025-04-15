@@ -161,10 +161,10 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to shoot.")
 		fw.Status.Conditions.Set(cond)
 	} else if time.Since(connection.Updated.Time) > 5*time.Minute {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to shoot.", connection.Updated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to shoot.", connection.Updated.String()))
 		fw.Status.Conditions.Set(cond)
 	} else {
-		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled shoot at %s.", connection.Updated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled shoot at %s.", connection.Updated.String()))
 		fw.Status.Conditions.Set(cond)
 	}
 
@@ -173,10 +173,10 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to seed.")
 		fw.Status.Conditions.Set(cond)
 	} else if time.Since(connection.SeedUpdated.Time) > 5*time.Minute {
-		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to seed.", connection.SeedUpdated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to seed.", connection.SeedUpdated.String()))
 		fw.Status.Conditions.Set(cond)
 	} else {
-		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.SeedUpdated.Time.String()))
+		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionTrue, "Connected", fmt.Sprintf("Controller reconciled firewall at %s.", connection.SeedUpdated.String()))
 		fw.Status.Conditions.Set(cond)
 	}
 

@@ -15,7 +15,6 @@ import (
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -313,7 +312,7 @@ func GetAccessKubeconfig(c *AccessConfig) ([]byte, error) {
 			Namespace: c.Namespace,
 		},
 	}
-	err = cl.Get(c.Ctx, client.ObjectKeyFromObject(saSecret), saSecret, &client.GetOptions{})
+	err = cl.Get(c.Ctx, controllerclient.ObjectKeyFromObject(saSecret), saSecret, &controllerclient.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
