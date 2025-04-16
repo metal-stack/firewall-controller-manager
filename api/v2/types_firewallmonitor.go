@@ -10,6 +10,11 @@ import (
 const (
 	// FirewallShootNamespace is the name of the namespace to which the firewall monitor gets deployed and in which the firewall-controller operates
 	FirewallShootNamespace = "firewall"
+	// FirewallBootstrapTokenIDLabel references the the kubernetes bootstrap token ID for a firewall.
+	// It is defined on the firewall.
+	FirewallBootstrapTokenIDLabel = "firewall.metal-stack.io/bootstrap-token-id"
+	// FirewallBootstrapTokenNextRotationLabel reflects when the next rotation of the bootstrap token can be expected.
+	FirewallBootstrapTokenNextRotationLabel = "firewall.metal-stack.io/bootstrap-token-next-rotation"
 )
 
 // +kubebuilder:object:root=true

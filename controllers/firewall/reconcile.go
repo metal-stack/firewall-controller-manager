@@ -29,6 +29,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			r.Log.Error(err, "unable to deploy firewall monitor")
 		}
 
+		err = c.rotateFirewallBootstrapTokenIfNeeded(r)
+		if err != nil {
+			r.Log.Error(err, "unable to rotate firewall bootstrap token")
+		}
+
 		SetFirewallStatusFromMonitor(r.Target, mon)
 	}()
 
