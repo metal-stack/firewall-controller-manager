@@ -88,7 +88,7 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 		}),
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controller := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&v2.Firewall{},
 			builder.WithPredicates(
@@ -99,9 +99,13 @@ func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.M
 			),
 		).
 		// don't think about owning the firewall monitor here, it's in the shoot cluster, we cannot watch two clusters with controller-runtime
-		Named("Firewall").
-		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
-		Complete(g)
+		Named("Firewall")
+
+	if c.GetSeedNamespace() != "" {
+		controller = controller.WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace())))
+	}
+
+	return controller.Complete(g)
 }
 
 func SetupWebhookWithManager(log logr.Logger, mgr ctrl.Manager, c *config.ControllerConfig) error {

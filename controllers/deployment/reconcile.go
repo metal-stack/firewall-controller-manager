@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
@@ -83,7 +84,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 		r.Log.Info("swapped latest set to shortest distance", "distance", v2.FirewallShortestDistance)
 	}
 
-	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(c.c.GetSeedNamespace())
+	infrastructureName, ok := extractInfrastructureNameFromSeedNamespace(r.Target.Namespace)
 	if ok {
 		var ownedFirewalls []*v2.Firewall
 		for _, set := range ownedSets {
@@ -166,6 +167,12 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		},
 	}
 
+	if r.Target.Annotations != nil {
+		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			set.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
+		}
+	}
+
 	err = c.c.GetSeedClient().Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {
 		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s.", err))
@@ -239,6 +246,12 @@ func (c *controller) isNewSetRequired(r *controllers.Ctx[*v2.FirewallDeployment]
 
 	if !sets.NewString(oldS.Networks...).Equal(sets.NewString(newS.Networks...)) {
 		r.Log.Info("firewall networks have changed", "networks", newS.Networks)
+		return true
+	}
+
+	// TODO: improve and write tests
+	if !cmp.Equal(oldS.InitialRuleSet, newS.InitialRuleSet) {
+		r.Log.Info("firewall initial rule set have changed")
 		return true
 	}
 

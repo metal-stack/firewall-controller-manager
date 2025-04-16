@@ -12,6 +12,7 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -454,6 +455,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 			}
 
 			err = ctrl.updateInfrastructureStatus(&controllers.Ctx[*v2.FirewallDeployment]{
+				Target: &v2.FirewallDeployment{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: testNamespace,
+					},
+				},
 				Ctx: ctx,
 				Log: log,
 			}, "mycluster1", tt.ownedFirewalls)

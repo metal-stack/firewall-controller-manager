@@ -40,7 +40,8 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-type Conditions []Condition // nolint:recvcheck
+//nolint:recvcheck
+type Conditions []Condition
 
 // NewCondition creates a new condition.
 func NewCondition(t ConditionType, status ConditionStatus, reason, message string) Condition {
