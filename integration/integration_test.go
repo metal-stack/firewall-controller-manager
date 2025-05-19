@@ -312,7 +312,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Connected"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.Time.String())))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.String())))
 				})
 				It("should have the firewall-controller connected to seed condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
@@ -322,7 +322,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Connected"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.Time.String())))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.String())))
 				})
 				It("should have configured the distance", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
@@ -1024,7 +1024,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Connected"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.Time.String())))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.String())))
 				})
 				It("should have the firewall-controller connected to seed condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
@@ -1034,7 +1034,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Connected"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.Time.String())))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.String())))
 				})
 				It("should have configured the distance", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
@@ -1392,7 +1392,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Connected"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", newMon.ControllerStatus.Updated.Time.String())))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", newMon.ControllerStatus.Updated.String())))
 					})
 
 					It("should have the firewall-controller connected to seed condition true", func() {
@@ -1403,7 +1403,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Connected"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", newMon.ControllerStatus.SeedUpdated.Time.String())))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", newMon.ControllerStatus.SeedUpdated.String())))
 					})
 
 					It("should have firewall networks populated", func() {
