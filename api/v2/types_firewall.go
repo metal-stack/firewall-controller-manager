@@ -77,6 +77,9 @@ type FirewallSpec struct {
 	// EgressRules contains egress rules configured for this firewall.
 	EgressRules []EgressRuleSNAT `json:"egressRules,omitempty"`
 
+	// InitialRuleSet is the initial firewall ruleset applied before the firewall-controller starts running.
+	InitialRuleSet *InitialRuleSet `json:"initialRuleSet,omitempty"`
+
 	// Interval on which rule reconciliation by the firewall-controller should happen.
 	Interval string `json:"interval,omitempty"`
 	// DryRun if set to true, firewall rules are not applied. For devel-purposes only.
@@ -159,6 +162,46 @@ type FirewallTemplateSpec struct {
 
 	// Spec contains the firewall specification.
 	Spec FirewallSpec `json:"spec,omitempty"`
+}
+
+// InitialRuleSet is the initial rule set deployed on the firewall.
+type InitialRuleSet struct {
+	// Egress rules to be deployed initially on the firewall.
+	Egress []EgressRule `json:"egress,omitempty"`
+	// Ingress rules to be deployed initially on the firewall.
+	Ingress []IngressRule `json:"ingress,omitempty"`
+}
+
+// NetworkProtocol represents the kind of network protocol.
+type NetworkProtocol string
+
+const (
+	// NetworkProtocolTCP represents tcp connections.
+	NetworkProtocolTCP = "TCP"
+	// NetworkProtocolUDP represents udp connections.
+	NetworkProtocolUDP = "UDP"
+)
+
+type EgressRule struct {
+	// Comment provides a human readable description of this rule.
+	Comment string `json:"comment,omitempty"`
+	// Ports contains all affected network ports.
+	Ports []int32 `json:"ports"`
+	// Protocol constraints the protocol this rule applies to.
+	Protocol NetworkProtocol `json:"protocol"`
+	// To source address cidrs this rule applies to.
+	To []string `json:"to"`
+}
+
+type IngressRule struct {
+	// Comment provides a human readable description of this rule.
+	Comment string `json:"comment,omitempty"`
+	// Ports contains all affected network ports.
+	Ports []int32 `json:"ports"`
+	// Protocol constraints the protocol this rule applies to.
+	Protocol NetworkProtocol `json:"protocol"`
+	// From source address cidrs this rule applies to.
+	From []string `json:"from"`
 }
 
 // EgressRuleSNAT holds a Source-NAT rule
