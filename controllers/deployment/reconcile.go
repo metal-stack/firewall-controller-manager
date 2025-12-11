@@ -166,6 +166,12 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		},
 	}
 
+	if r.Target.Annotations != nil {
+		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			set.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
+		}
+	}
+
 	err = c.c.GetSeedClient().Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {
 		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s.", err))
