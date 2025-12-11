@@ -12,6 +12,7 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -456,6 +457,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 			err = ctrl.updateInfrastructureStatus(&controllers.Ctx[*v2.FirewallDeployment]{
 				Ctx: ctx,
 				Log: log,
+				Target: &v2.FirewallDeployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+					},
+				},
 			}, "mycluster1", tt.ownedFirewalls)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
 				t.Errorf("error diff (+got -want):\n %s", diff)

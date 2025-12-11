@@ -49,9 +49,7 @@ func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.Firewall
 		})
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), f.Selector, ""))
-		}
-
-		if !selector.Empty() {
+		} else if !selector.Empty() {
 			labels := labels.Set(f.Template.Labels)
 			if !selector.Matches(labels) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), f.Template.Labels, "`selector` does not match template `labels`"))
