@@ -132,9 +132,6 @@ func (c *NewControllerConfig) validate() error {
 	if c.SeedConfig == nil {
 		return fmt.Errorf("seed config must be specified")
 	}
-	if c.SeedNamespace == "" {
-		return fmt.Errorf("seed namespace must be specified")
-	}
 	if c.SeedAPIServerURL == "" {
 		return fmt.Errorf("seed api server url must be specified")
 	}
