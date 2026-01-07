@@ -52,6 +52,7 @@ func main() {
 		shootTokenSecret        string
 		shootTokenPath          string
 		sshKeySecret            string
+		sshKeySecretNamespace   string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
@@ -72,7 +73,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager")
-	flag.StringVar(&namespace, "namespace", "default", "the namespace this controller is running")
+	flag.StringVar(&namespace, "namespace", "", "the namespace this controller is running")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 10*time.Minute, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
 	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
@@ -88,9 +89,14 @@ func main() {
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
+	flag.StringVar(&sshKeySecretNamespace, "ssh-key-secret-namespace", "", "the secret name of the ssh key for machine access")
 	flag.StringVar(&shootTokenPath, "shoot-token-path", "", "the path where to store the token file for shoot access")
 
 	flag.Parse()
+
+	if sshKeySecretNamespace == "" {
+		sshKeySecretNamespace = namespace
+	}
 
 	slogHandler, err := controllers.NewLogger(logLevel)
 	if err != nil {
@@ -130,6 +136,7 @@ func main() {
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 	})
+
 	if err != nil {
 		log.Fatalf("unable to setup firewall-controller-manager %v", err)
 	}
@@ -196,7 +203,7 @@ func main() {
 		//     secret for this controller and expose the access secrets through the firewall
 		//     status resource, which can be read by the firewall-controller
 		//   - the firewall-controller can then create a client from these secrets but
-		//     it has to contiuously update the token file because the token will expire
+		//     it has to continuously update the token file because the token will expire
 		//   - we can re-use the same approach for this controller as well and do not have
 		//     to do any additional mounts for the deployment of the controller
 		//
@@ -247,7 +254,7 @@ func main() {
 		ShootAPIServerURL:     shootApiURL,
 		ShootAccess:           externalShootAccess,
 		SSHKeySecretName:      sshKeySecret,
-		SSHKeySecretNamespace: namespace,
+		SSHKeySecretNamespace: sshKeySecretNamespace,
 		ShootAccessHelper:     internalShootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
