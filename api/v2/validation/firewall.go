@@ -109,6 +109,39 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 		}
 	}
 
+	if f.InitialRuleSet != nil {
+		for _, rule := range f.InitialRuleSet.Egress {
+			if rule.Protocol != v2.NetworkProtocolTCP && rule.Protocol != v2.NetworkProtocolUDP {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule"), rule.Protocol, fmt.Sprintf("protocol not supported: %v", rule.Protocol)))
+			}
+			for _, port := range rule.Ports {
+				if port < 0 || port > 65535 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule").Child("ports"), port, fmt.Sprintf("port is out of range: %v", port)))
+				}
+			}
+			for _, cidr := range rule.To {
+				if _, err := netip.ParsePrefix(cidr); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule").Child("to"), cidr, fmt.Sprintf("invalid cidr: %v", err)))
+				}
+			}
+		}
+		for _, rule := range f.InitialRuleSet.Ingress {
+			if rule.Protocol != v2.NetworkProtocolTCP && rule.Protocol != v2.NetworkProtocolUDP {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule"), rule.Protocol, fmt.Sprintf("protocol not supported: %v", rule.Protocol)))
+			}
+			for _, port := range rule.Ports {
+				if port < 0 || port > 65535 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule").Child("ports"), port, fmt.Sprintf("port is out of range: %v", port)))
+				}
+			}
+			for _, cidr := range rule.From {
+				if _, err := netip.ParsePrefix(cidr); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule").Child("from"), cidr, fmt.Sprintf("invalid cidr: %v", err)))
+				}
+			}
+		}
+	}
+
 	return allErrs
 }
 
