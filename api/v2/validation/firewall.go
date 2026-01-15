@@ -110,35 +110,21 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 	}
 
 	if f.InitialRuleSet != nil {
+		basePath := fldPath.Child("initialRuleSet")
+
 		for _, rule := range f.InitialRuleSet.Egress {
-			if rule.Protocol != v2.NetworkProtocolTCP && rule.Protocol != v2.NetworkProtocolUDP {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule"), rule.Protocol, fmt.Sprintf("protocol not supported: %v", rule.Protocol)))
-			}
-			for _, port := range rule.Ports {
-				if port < 0 || port > 65535 {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule").Child("ports"), port, fmt.Sprintf("port is out of range: %v", port)))
-				}
-			}
-			for _, cidr := range rule.To {
-				if _, err := netip.ParsePrefix(cidr); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("egress").Child("rule").Child("to"), cidr, fmt.Sprintf("invalid cidr: %v", err)))
-				}
-			}
+			egressPath := basePath.Child("egress").Child("rule")
+
+			allErrs = append(allErrs, validateProtocol(rule.Protocol, egressPath.Child("protocol"))...)
+			allErrs = append(allErrs, validatePorts(rule.Ports, egressPath.Child("ports"))...)
+			allErrs = append(allErrs, validateCIDRs(rule.To, egressPath.Child("to"))...)
 		}
 		for _, rule := range f.InitialRuleSet.Ingress {
-			if rule.Protocol != v2.NetworkProtocolTCP && rule.Protocol != v2.NetworkProtocolUDP {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule"), rule.Protocol, fmt.Sprintf("protocol not supported: %v", rule.Protocol)))
-			}
-			for _, port := range rule.Ports {
-				if port < 0 || port > 65535 {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule").Child("ports"), port, fmt.Sprintf("port is out of range: %v", port)))
-				}
-			}
-			for _, cidr := range rule.From {
-				if _, err := netip.ParsePrefix(cidr); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("initialRuleSet").Child("ingress").Child("rule").Child("from"), cidr, fmt.Sprintf("invalid cidr: %v", err)))
-				}
-			}
+			ingressPath := basePath.Child("ingress").Child("rule")
+
+			allErrs = append(allErrs, validateProtocol(rule.Protocol, ingressPath.Child("protocol"))...)
+			allErrs = append(allErrs, validatePorts(rule.Ports, ingressPath.Child("ports"))...)
+			allErrs = append(allErrs, validateCIDRs(rule.From, ingressPath.Child("from"))...)
 		}
 	}
 
@@ -191,6 +177,44 @@ func validateDistance(distance v2.FirewallDistance, fldPath *field.Path) field.E
 
 	if distance < v2.FirewallShortestDistance || distance > v2.FirewallLongestDistance {
 		allErrs = append(allErrs, field.Invalid(fldPath, distance, fmt.Sprintf("distance must be between %d and %d", v2.FirewallShortestDistance, v2.FirewallLongestDistance)))
+	}
+
+	return allErrs
+}
+
+func validateProtocol(protocol v2.NetworkProtocol, rulesPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if protocol != v2.NetworkProtocolTCP && protocol != v2.NetworkProtocolUDP {
+		allErrs = append(allErrs, field.Invalid(rulesPath, protocol, fmt.Sprintf("protocol not supported: %v", protocol)))
+	}
+
+	return allErrs
+}
+
+func validatePorts(ports []int32, rulesPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	const (
+		minPort = 0
+		maxPort = 65535
+	)
+
+	for _, port := range ports {
+		if port < minPort || port > maxPort {
+			allErrs = append(allErrs, field.Invalid(rulesPath, port, fmt.Sprintf("port is out of range: %v", port)))
+		}
+	}
+
+	return allErrs
+}
+
+func validateCIDRs(cidrs []string, rulesPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for _, cidr := range cidrs {
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			allErrs = append(allErrs, field.Invalid(rulesPath, cidr, fmt.Sprintf("invalid cidr: %v", err)))
+		}
 	}
 
 	return allErrs

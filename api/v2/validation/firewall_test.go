@@ -129,7 +129,7 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall-123" is invalid: spec.initialRuleSet.egress.rule: Invalid value: "foo": protocol not supported: foo`,
+					Message: ` "firewall-123" is invalid: spec.initialRuleSet.egress.rule.protocol: Invalid value: "foo": protocol not supported: foo`,
 				},
 			},
 		},
