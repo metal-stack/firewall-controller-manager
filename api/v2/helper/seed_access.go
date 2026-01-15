@@ -207,6 +207,11 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 			},
 			{
 				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "create", "update", "list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
 				Resources: []string{"events"},
 				Verbs:     []string{"*"},
 			},
