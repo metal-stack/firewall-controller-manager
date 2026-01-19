@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -19,6 +20,13 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallDeployment]) error
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		err := c.monitorScheduler.StartIfNeeded(context.TODO(), r.Target)
+		if err != nil {
+			c.log.Error(err, "unable to start monitor scheduler")
+		}
+	}()
 
 	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
