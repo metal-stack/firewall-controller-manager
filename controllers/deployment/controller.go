@@ -14,6 +14,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 )
 
 type controller struct {
@@ -21,6 +22,8 @@ type controller struct {
 	log             logr.Logger
 	lastSetCreation map[string]time.Time
 	recorder        record.EventRecorder
+
+	monitorScheduler *monitor.MonitorManagerScheduler
 }
 
 func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {

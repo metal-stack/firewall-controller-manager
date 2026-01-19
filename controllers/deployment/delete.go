@@ -9,6 +9,8 @@ import (
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
+	c.monitorScheduler.Stop(r.Target)
+
 	ownedSets, _, err := controllers.GetOwnedResources(r.Ctx, c.c.GetSeedClient(), nil, r.Target, &v2.FirewallSetList{}, func(fsl *v2.FirewallSetList) []*v2.FirewallSet {
 		return fsl.GetItems()
 	})
@@ -21,8 +23,6 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
 
 func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeployment], sets ...*v2.FirewallSet) error {
 	for _, set := range sets {
-		set := set
-
 		if set.DeletionTimestamp != nil {
 			r.Log.Info("deletion timestamp on firewall set already set", "firewall-name", set.Name)
 			continue
