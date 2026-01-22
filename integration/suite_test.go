@@ -32,7 +32,9 @@ import (
 )
 
 const (
-	namespaceName = "test"
+	namespaceName          = "test"
+	firewallHealthTimeout  = 19 * 24 * time.Hour
+	firewallCreateTimeout  = 19 * 24 * time.Hour
 )
 
 var (
@@ -130,8 +132,8 @@ var _ = BeforeSuite(func() {
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 		SafetyBackoff:         10 * time.Second,
 		ProgressDeadline:      10 * time.Minute,
-		FirewallHealthTimeout: 19 * 24 * time.Hour,
-		CreateTimeout:         19 * 24 * time.Hour,
+		FirewallHealthTimeout: firewallHealthTimeout,
+		CreateTimeout:         firewallCreateTimeout,
 	})
 	Expect(err).ToNot(HaveOccurred())
 

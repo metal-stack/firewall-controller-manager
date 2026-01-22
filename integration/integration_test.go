@@ -1974,18 +1974,10 @@ var _ = Context("integration test", Ordered, func() {
 						fw.Status.ControllerStatus = &v2.ControllerConnection{}
 					}
 					//add a fake concile so the unhealty firewall gets deleted
-					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
-					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&fw), &fw); err != nil {
-						return err
-					}
-					if fw.Status.ControllerStatus == nil {
-						fw.Status.ControllerStatus = &v2.ControllerConnection{}
-					}
-					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
+					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-(firewallHealthTimeout + time.Minute))
 					err = k8sClient.Status().Update(ctx, &fw)
 					if err != nil {
-						return fmt.Errorf("Failed to update firewall status: %v\n", err)
-						return err
+						return fmt.Errorf("failed to update firewall status: %w", err)
 					}
 				}
 
