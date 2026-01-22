@@ -1984,7 +1984,7 @@ var _ = Context("integration test", Ordered, func() {
 					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-20 * 24 * time.Hour)
 					err = k8sClient.Status().Update(ctx, &fw)
 					if err != nil {
-						fmt.Printf("Failed to update firewall status: %v\n", err)
+						return fmt.Errorf("Failed to update firewall status: %v\n", err)
 						return err
 					}
 				}
