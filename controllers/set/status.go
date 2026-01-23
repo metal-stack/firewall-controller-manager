@@ -38,7 +38,7 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 	// duration after which a firewall in the creation phase will be recreated, exceeded
 	if allocationTimeout != 0 && fw.Status.Phase == v2.FirewallPhaseCreating && !allocationTime.IsZero() {
 		if time.Since(allocationTime) > allocationTimeout {
-			c.log.Info("create timeout reached")
+			c.log.Info("create timeout exceeded", "firewall-name", fw.Name, "allocated-at", allocationTime.String(), "timeout-after", allocationTimeout.String())
 			return firewallConditionStatus{CreateTimeout: true}
 		}
 	}
