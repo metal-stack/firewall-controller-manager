@@ -15,21 +15,21 @@ type firewallConditionStatus struct {
 }
 
 func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditionStatus {
-	unhealthyTimeout := c.c.GetFirewallHealthTimeout()
-	allocationTimeout := c.c.GetCreateTimeout()
-
 	var (
+		unhealthyTimeout  = c.c.GetFirewallHealthTimeout()
+		allocationTimeout = c.c.GetCreateTimeout()
+
 		created            = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
 		ready              = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
 		connected          = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
 		seedConnected      = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
 		distanceConfigured = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
 		allConditionsMet   = created && ready && connected && seedConnected && distanceConfigured
-	)
 
-	seedUpdatedTime := pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
-	timeSinceReconcile := time.Since(seedUpdatedTime)
-	allocationTime := pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
+		seedUpdatedTime    = pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
+		timeSinceReconcile = time.Since(seedUpdatedTime)
+		allocationTime     = pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
+	)
 
 	if allConditionsMet {
 		return firewallConditionStatus{IsReady: true}
