@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: firewallmonitors.firewall.metal-stack.io
 spec:
   group: firewall.metal-stack.io
@@ -184,6 +184,9 @@ spec:
                 - idsStats
                 - rules
                 type: object
+            required:
+            - lastRun
+            - lastRunAgainstSeed
             type: object
           egressRules:
             description: EgressRules contains egress rules configured for this firewall.
@@ -307,6 +310,7 @@ spec:
         required:
         - conditions
         - image
+        - metadata
         - networks
         - partition
         - project
