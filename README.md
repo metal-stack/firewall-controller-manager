@@ -43,7 +43,7 @@ kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
 
 ## Development
 
-Most of the functionality is developed with the help of the [intgration](integration) test suite.
+Most of the functionality is developed with the help of the [integration](integration) test suite.
 
 To play with the FCM, you can also run this controller inside the [mini-lab](https://github.com/metal-stack/mini-lab) and without a running Gardener installation:
 

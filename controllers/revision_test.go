@@ -188,7 +188,7 @@ func TestExcept(t *testing.T) {
 		want   []*v2.FirewallSet
 	}{
 		{
-			name: "exlclude middle",
+			name: "exclude middle",
 			sets: []*v2.FirewallSet{
 				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
 				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
@@ -203,7 +203,7 @@ func TestExcept(t *testing.T) {
 			},
 		},
 		{
-			name: "exlclude two resources",
+			name: "exclude two resources",
 			sets: []*v2.FirewallSet{
 				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
 				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},

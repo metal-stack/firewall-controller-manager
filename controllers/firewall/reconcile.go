@@ -46,7 +46,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			return err
 		}
 
-		// requeueing in order to continue checking progression
+		// requeuing in order to continue checking progression
 		return controllers.RequeueAfter(10*time.Second, "firewall creation is progressing")
 	case 1:
 		f = fws[0]
