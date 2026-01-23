@@ -45,12 +45,12 @@ func (f FirewallDistance) Pointer() *FirewallDistance {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type FirewallSet struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec contains the firewall set specification.
-	Spec FirewallSetSpec `json:"spec"`
+	Spec FirewallSetSpec `json:"spec,omitempty"`
 	// Status contains current status information on the firewall set.
-	Status FirewallSetStatus `json:"status"`
+	Status FirewallSetStatus `json:"status,omitempty"`
 }
 
 // FirewallSetSpec specifies the firewall set.
@@ -100,7 +100,7 @@ type FirewallSetStatus struct {
 // +kubebuilder:object:root=true
 type FirewallSetList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items contains the list items.
 	Items []FirewallSet `json:"items"`

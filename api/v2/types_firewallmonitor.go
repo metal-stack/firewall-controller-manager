@@ -24,7 +24,7 @@ const (
 // which are deployed into the seed cluster's shoot namespace.
 type FirewallMonitor struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Size is the machine size of the firewall.
 	Size string `json:"size"`
@@ -57,8 +57,8 @@ type ControllerStatus struct {
 	FirewallStats           *FirewallStats   `json:"stats,omitempty"`
 	ControllerVersion       string           `json:"controllerVersion,omitempty"`
 	NftablesExporterVersion string           `json:"nftablesExporterVersion,omitempty"`
-	Updated                 metav1.Time      `json:"lastRun"`
-	SeedUpdated             metav1.Time      `json:"lastRunAgainstSeed"`
+	Updated                 metav1.Time      `json:"lastRun,omitempty"`
+	SeedUpdated             metav1.Time      `json:"lastRunAgainstSeed,omitempty"`
 	Distance                FirewallDistance `json:"distance,omitempty"`
 	DistanceSupported       bool             `json:"distanceSupported,omitempty"`
 }
@@ -107,7 +107,7 @@ type InterfaceStat struct {
 // +kubebuilder:object:root=true
 type FirewallMonitorList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []FirewallMonitor `json:"items"`
 }

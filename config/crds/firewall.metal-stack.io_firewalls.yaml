@@ -423,9 +423,7 @@ spec:
             type: object
         required:
         - distance
-        - metadata
         - spec
-        - status
         type: object
     served: true
     storage: true

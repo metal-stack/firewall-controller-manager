@@ -184,9 +184,6 @@ spec:
                 - idsStats
                 - rules
                 type: object
-            required:
-            - lastRun
-            - lastRunAgainstSeed
             type: object
           egressRules:
             description: EgressRules contains egress rules configured for this firewall.
@@ -310,7 +307,6 @@ spec:
         required:
         - conditions
         - image
-        - metadata
         - networks
         - partition
         - project

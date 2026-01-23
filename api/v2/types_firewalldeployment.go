@@ -20,12 +20,12 @@ import (
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type FirewallDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec contains the firewall deployment specification.
-	Spec FirewallDeploymentSpec `json:"spec"`
+	Spec FirewallDeploymentSpec `json:"spec,omitempty"`
 	// Status contains current status information on the firewall deployment.
-	Status FirewallDeploymentStatus `json:"status"`
+	Status FirewallDeploymentStatus `json:"status,omitempty"`
 }
 
 // FirewallUpdateStrategy describes the strategy how firewalls are updated in case the update requires a physical recreation of the firewalls.
@@ -93,7 +93,7 @@ const (
 // +kubebuilder:object:root=true
 type FirewallDeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items contains the list items.
 	Items []FirewallDeployment `json:"items"`

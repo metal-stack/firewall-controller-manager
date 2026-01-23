@@ -30,12 +30,12 @@ const (
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".status.machineStatus.allocationTimestamp"
 type Firewall struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec contains the firewall specification.
 	Spec FirewallSpec `json:"spec"`
 	// Status contains current status information on the firewall.
-	Status FirewallStatus `json:"status"`
+	Status FirewallStatus `json:"status,omitempty"`
 
 	// Distance defines the as-path length of a firewall.
 	// This field is typically orchestrated by the deployment controller.
