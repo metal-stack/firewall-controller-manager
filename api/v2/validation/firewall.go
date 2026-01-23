@@ -29,10 +29,14 @@ func NewFirewallValidator(log logr.Logger) admission.Validator[*v2.Firewall] {
 func (v *firewallValidator) ValidateCreate(ctx context.Context, f *v2.Firewall) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, validateFirewallAnnotations(f)...)
 	allErrs = append(allErrs, validateFirewallSpec(&f.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateDistance(f.Distance, field.NewPath("distance"))...)
+
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
 
 	return nil, apierrors.NewInvalid(
 		f.GetObjectKind().GroupVersionKind().GroupKind(),
@@ -48,6 +52,10 @@ func (v *firewallValidator) ValidateUpdate(ctx context.Context, fOld, fNew *v2.F
 	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
 	allErrs = append(allErrs, validateFirewallSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateDistance(fNew.Distance, field.NewPath("distance"))...)
+
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
 
 	return nil, apierrors.NewInvalid(
 		fNew.GetObjectKind().GroupVersionKind().GroupKind(),
@@ -118,8 +126,6 @@ func validateFirewallSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorLi
 	}
 
 	for _, limit := range f.RateLimits {
-		limit := limit
-
 		r = requiredFields{
 			{path: fldPath.Child("rateLimits").Child("networkID"), value: limit.NetworkID},
 		}

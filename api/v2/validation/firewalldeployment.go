@@ -28,7 +28,11 @@ func (v *firewallDeploymentValidator) ValidateCreate(ctx context.Context, f *v2.
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, v.validateSpec(v.log, &f.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
+
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
 
 	return nil, apierrors.NewInvalid(
 		f.GetObjectKind().GroupVersionKind().GroupKind(),
@@ -43,6 +47,10 @@ func (v *firewallDeploymentValidator) ValidateUpdate(ctx context.Context, oldF, 
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(&newF.ObjectMeta, &oldF.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, v.validateSpecUpdate(v.log, &oldF.Spec, &newF.Spec, &newF.Status, field.NewPath("spec"))...)
 
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
+
 	return nil, apierrors.NewInvalid(
 		newF.GetObjectKind().GroupVersionKind().GroupKind(),
 		newF.GetName(),
@@ -54,7 +62,7 @@ func (v *firewallDeploymentValidator) ValidateDelete(ctx context.Context, f *v2.
 	return nil, nil
 }
 
-func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
+func (*firewallDeploymentValidator) validateSpec(f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	switch f.Strategy {
@@ -96,7 +104,7 @@ func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.Firewall
 func (v *firewallDeploymentValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v2.FirewallDeploymentSpec, status *v2.FirewallDeploymentStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpec(log, newF, fldPath)...)
+	allErrs = append(allErrs, v.validateSpec(newF, fldPath)...)
 
 	allErrs = append(allErrs, validateFirewallSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 

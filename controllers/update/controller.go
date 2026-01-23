@@ -41,7 +41,7 @@ func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.M
 				v2.AnnotationAddedPredicate(v2.MaintenanceAnnotation),
 			),
 		).
-		Named("FirewallDeployment").
+		Named("Update").
 		WithEventFilter(predicate.NewPredicateFuncs(controllers.SkipOtherNamespace(c.GetSeedNamespace()))).
 		Complete(g)
 }

@@ -62,7 +62,6 @@ users:
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			h := NewShootAccessHelper(tt.seed, tt.access)
 			got, err := h.RESTConfig(context.Background())
@@ -90,14 +89,13 @@ contexts:
   name: shoot-name
 current-context: shoot-name
 kind: Config
-preferences: {}
 users:
 - name: shoot-name
   user:
     token: /var/run/secrets/gardener.cloud/shoot/generic-kubeconfig/token
 `))
 			require.NoError(t, err)
-			assert.True(t, equal)
+			assert.True(t, equal, string(gotRaw))
 		})
 	}
 }

@@ -82,7 +82,6 @@ func TestMaxRevisionOf(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := MaxRevisionOf(tt.sets)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
@@ -167,7 +166,6 @@ func TestMinRevisionOf(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := MinRevisionOf(tt.sets)
 			if diff := cmp.Diff(tt.wantErr, err, testcommon.ErrorStringComparer()); diff != "" {
@@ -238,7 +236,6 @@ func TestExcept(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := Except(tt.sets, tt.except...)
 			if diff := cmp.Diff(tt.want, got); diff != "" {

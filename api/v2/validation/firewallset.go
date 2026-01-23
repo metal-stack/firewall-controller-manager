@@ -28,7 +28,11 @@ func (v *firewallSetValidator) ValidateCreate(ctx context.Context, f *v2.Firewal
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, v.validateSpec(v.log, &f.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
+
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
 
 	return nil, apierrors.NewInvalid(
 		f.GetObjectKind().GroupVersionKind().GroupKind(),
@@ -43,6 +47,10 @@ func (v *firewallSetValidator) ValidateUpdate(ctx context.Context, oldF, newF *v
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(&newF.ObjectMeta, &oldF.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, v.validateSpecUpdate(v.log, &oldF.Spec, &newF.Spec, field.NewPath("spec"))...)
 
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
+
 	return nil, apierrors.NewInvalid(
 		newF.GetObjectKind().GroupVersionKind().GroupKind(),
 		newF.GetName(),
@@ -54,7 +62,7 @@ func (v *firewallSetValidator) ValidateDelete(ctx context.Context, f *v2.Firewal
 	return nil, nil
 }
 
-func (v *firewallSetValidator) validateSpec(log logr.Logger, f *v2.FirewallSetSpec, fldPath *field.Path) field.ErrorList {
+func (v *firewallSetValidator) validateSpec(f *v2.FirewallSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if f.Replicas < 0 {
@@ -92,7 +100,7 @@ func (v *firewallSetValidator) validateSpec(log logr.Logger, f *v2.FirewallSetSp
 func (v *firewallSetValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v2.FirewallSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpec(log, newF, fldPath)...)
+	allErrs = append(allErrs, v.validateSpec(newF, fldPath)...)
 
 	allErrs = append(allErrs, validateFirewallSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
