@@ -171,7 +171,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
+	c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
 
 	return resp.Payload, nil
 }

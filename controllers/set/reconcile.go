@@ -89,7 +89,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
-			c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
+			c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s", fw.Name)
 
 			ownedFirewalls = append(ownedFirewalls, fw)
 		}

@@ -21,7 +21,7 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 			return err
 		}
 
-		c.recorder.Eventf(set, "Normal", "Recreate", "recreated firewallset old: %s new: %s", latestSet.Name, set.Name)
+		c.recorder.Eventf(set, nil, "Normal", "Recreate", "recreated firewallset old: %s new: %s", latestSet.Name, set.Name)
 
 		latestSet = set
 	}

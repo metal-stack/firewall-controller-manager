@@ -48,7 +48,7 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 
 		r.Log.Info("deleted firewall", "firewall-name", f.Name, "id", *resp.Payload.ID)
 
-		c.recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
+		c.recorder.Eventf(r.Target, nil, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
 	}
 
 	return nil

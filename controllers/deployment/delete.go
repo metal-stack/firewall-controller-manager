@@ -35,7 +35,7 @@ func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeploymen
 
 		r.Log.Info("set deletion timestamp on firewall set", "set-name", set.Name)
 
-		c.recorder.Eventf(set, "Normal", "Delete", "deleted firewallset %s", set.Name)
+		c.recorder.Eventf(set, nil, "Normal", "Delete", "deleted firewallset %s", set.Name)
 	}
 
 	if len(sets) > 0 {
