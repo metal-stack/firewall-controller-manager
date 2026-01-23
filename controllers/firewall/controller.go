@@ -110,8 +110,7 @@ func SetupWebhookWithManager(log logr.Logger, mgr ctrl.Manager, c *config.Contro
 		return err
 	}
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&v2.Firewall{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v2.Firewall{}).
 		WithDefaulter(defaulter).
 		WithValidator(validation.NewFirewallValidator(log.WithName("validating-webhook"))).
 		Complete()

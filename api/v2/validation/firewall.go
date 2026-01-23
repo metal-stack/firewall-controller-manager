@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"context"
 	"fmt"
 	"net/netip"
 	"net/url"
@@ -9,27 +10,57 @@ import (
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-type firewallValidator struct{}
-
-func NewFirewallValidator(log logr.Logger) *genericValidator[*v2.Firewall, *firewallValidator] {
-	return &genericValidator[*v2.Firewall, *firewallValidator]{log: log}
+type firewallValidator struct {
+	log logr.Logger
 }
 
-func (v *firewallValidator) ValidateCreate(log logr.Logger, f *v2.Firewall) field.ErrorList {
+func NewFirewallValidator(log logr.Logger) admission.Validator[*v2.Firewall] {
+	return &firewallValidator{
+		log: log,
+	}
+}
+
+func (v *firewallValidator) ValidateCreate(ctx context.Context, f *v2.Firewall) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, validateFirewallAnnotations(f)...)
-	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateFirewallSpec(&f.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateDistance(f.Distance, field.NewPath("distance"))...)
 
-	return allErrs
+	return nil, apierrors.NewInvalid(
+		f.GetObjectKind().GroupVersionKind().GroupKind(),
+		f.GetName(),
+		allErrs,
+	)
 }
 
-func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
+func (v *firewallValidator) ValidateUpdate(ctx context.Context, fOld, fNew *v2.Firewall) (admission.Warnings, error) {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(&fNew.ObjectMeta, &fOld.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
+	allErrs = append(allErrs, validateFirewallSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateDistance(fNew.Distance, field.NewPath("distance"))...)
+
+	return nil, apierrors.NewInvalid(
+		fNew.GetObjectKind().GroupVersionKind().GroupKind(),
+		fNew.GetName(),
+		allErrs,
+	)
+}
+
+func (v *firewallValidator) ValidateDelete(ctx context.Context, f *v2.Firewall) (admission.Warnings, error) {
+	return nil, nil
+}
+
+func validateFirewallSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	r := requiredFields{
@@ -112,20 +143,10 @@ func (*firewallValidator) validateSpec(f *v2.FirewallSpec, fldPath *field.Path) 
 	return allErrs
 }
 
-func (v *firewallValidator) ValidateUpdate(log logr.Logger, fOld, fNew *v2.Firewall) field.ErrorList {
+func validateFirewallSpecUpdate(fOld, fNew *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validateFirewallAnnotations(fNew)...)
-	allErrs = append(allErrs, v.validateSpecUpdate(&fOld.Spec, &fNew.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, validateDistance(fNew.Distance, field.NewPath("distance"))...)
-
-	return allErrs
-}
-
-func (v *firewallValidator) validateSpecUpdate(fOld, fNew *v2.FirewallSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, v.validateSpec(fNew, fldPath)...)
+	allErrs = append(allErrs, validateFirewallSpec(fNew, fldPath)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Project, fOld.Project, fldPath.Child("project"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.Partition, fOld.Partition, fldPath.Child("partition"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(fNew.DNSPort, fOld.DNSPort, fldPath.Child("dnsPort"))...)

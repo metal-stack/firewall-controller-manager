@@ -1,5 +1,5 @@
 # Build the firewall-controller-manager binary
-FROM golang:1.24 AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /work
 COPY . .
