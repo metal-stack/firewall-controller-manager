@@ -109,7 +109,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	default:
 		var ids []string
 		for _, fw := range fws {
-			fw := fw
 			ids = append(ids, pointer.SafeDeref(fw.ID))
 		}
 
@@ -129,7 +128,6 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		}
 	)
 	for _, n := range r.Target.Spec.Networks {
-		n := n
 		network := &models.V1MachineAllocationNetwork{
 			Networkid:   &n,
 			Autoacquire: pointer.Pointer(true),

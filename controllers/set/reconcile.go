@@ -184,8 +184,6 @@ func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*
 	var adoptions []*v2.Firewall
 
 	for _, fw := range fws {
-		fw := fw
-
 		ok, err := c.adoptFirewall(r, fw)
 		if err != nil {
 			return nil, err

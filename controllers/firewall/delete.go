@@ -33,8 +33,6 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 	}
 
 	for _, f := range fws {
-		f := f
-
 		if f.ID == nil {
 			continue
 		}

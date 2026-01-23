@@ -105,8 +105,6 @@ func validateFirewallSpec(f *v2.FirewallSpec, fldPath *field.Path) field.ErrorLi
 	}
 
 	for _, rule := range f.EgressRules {
-		rule := rule
-
 		r = requiredFields{
 			{path: fldPath.Child("egressRules").Child("networkID"), value: rule.NetworkID},
 		}
