@@ -212,7 +212,12 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 			},
 			{
 				APIGroups: []string{"apiextensions.k8s.io", ""},
-				Resources: []string{"customresourcedefinitions", "services", "endpoints", "endpointslices"},
+				Resources: []string{"customresourcedefinitions", "services", "endpoints"},
+				Verbs:     []string{"get", "create", "update", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"discovery.k8s.io"},
+				Resources: []string{"endpointslices"},
 				Verbs:     []string{"get", "create", "update", "list", "watch"},
 			},
 			{
