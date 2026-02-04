@@ -42,7 +42,8 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 			return firewallConditionStatus{CreateTimeout: true}
 		}
 	}
-	if (!ready || !seedConnected || !connected) && unhealthyTimeout != 0 && created && timeSinceReconcile > unhealthyTimeout {
+	// Only apply health timeout once we have a non-zero seed reconcile timestamp.
+	if (!ready || !seedConnected || !connected) && unhealthyTimeout != 0 && created && !seedUpdatedTime.IsZero() && timeSinceReconcile > unhealthyTimeout {
 		c.log.Info("health timeout exceeded", "firewall-name", fw.Name, "last-reconciled-at", seedUpdatedTime.String(), "timeout-after", unhealthyTimeout.String())
 		return firewallConditionStatus{HealthTimeout: true}
 	}
