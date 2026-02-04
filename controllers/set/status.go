@@ -36,14 +36,14 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 	}
 
 	// duration after which a firewall in the creation phase will be recreated, exceeded
-	if allocationTimeout != 0 && fw.Status.Phase == v2.FirewallPhaseCreating && !allocationTime.IsZero() {
+	if allocationTimeout > 0 && fw.Status.Phase == v2.FirewallPhaseCreating && !allocationTime.IsZero() {
 		if time.Since(allocationTime) > allocationTimeout {
 			c.log.Info("create timeout exceeded", "firewall-name", fw.Name, "allocated-at", allocationTime.String(), "timeout-after", allocationTimeout.String())
 			return firewallConditionStatus{CreateTimeout: true}
 		}
 	}
 	// Only apply health timeout once we have a non-zero seed reconcile timestamp.
-	if (!ready || !seedConnected || !connected) && unhealthyTimeout != 0 && created && !seedUpdatedTime.IsZero() && timeSinceReconcile > unhealthyTimeout {
+	if (!ready || !seedConnected || !connected) && unhealthyTimeout > 0 && created && !seedUpdatedTime.IsZero() && timeSinceReconcile > unhealthyTimeout {
 		c.log.Info("health timeout exceeded", "firewall-name", fw.Name, "last-reconciled-at", seedUpdatedTime.String(), "timeout-after", unhealthyTimeout.String())
 		return firewallConditionStatus{HealthTimeout: true}
 	}

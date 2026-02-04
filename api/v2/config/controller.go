@@ -182,10 +182,10 @@ func (c *NewControllerConfig) validate() error {
 	if c.ProgressDeadline <= 0 {
 		return fmt.Errorf("progress deadline must be specified")
 	}
-	if c.FirewallHealthTimeout <= 0 {
+	if c.FirewallHealthTimeout < 0 {
 		return fmt.Errorf("firewall health timeout must be specified")
 	}
-	if c.CreateTimeout <= 0 {
+	if c.CreateTimeout < 0 {
 		return fmt.Errorf("create timeout must be specified")
 	}
 

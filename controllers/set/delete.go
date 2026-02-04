@@ -46,12 +46,14 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 }
 func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
 	var result []*v2.Firewall
+	createTimeout := c.c.GetCreateTimeout()
+	healthTimeout := c.c.GetFirewallHealthTimeout()
 
 	for _, fw := range fws {
 		status := c.evaluateFirewallConditions(fw)
 
 		switch {
-		case status.CreateTimeout || status.HealthTimeout:
+		case (createTimeout > 0 && status.CreateTimeout) || (healthTimeout > 0 && status.HealthTimeout):
 			r.Log.Info("firewall health or creation timeout exceeded, deleting from set", "firewall-name", fw.Name)
 
 			err := c.deleteFirewalls(r, fw)
