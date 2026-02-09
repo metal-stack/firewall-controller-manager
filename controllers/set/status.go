@@ -47,7 +47,10 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 		c.log.Info("health timeout exceeded", "firewall-name", fw.Name, "last-reconciled-at", seedUpdatedTime.String(), "timeout-after", unhealthyTimeout.String())
 		return firewallConditionStatus{HealthTimeout: true}
 	}
-
+	// Firewall was set to ready at one point, but then one of the conditions in the meantime were set to false so the firewall is unhealthy
+	if !allConditionsMet && fw.Status.Phase == v2.FirewallPhaseRunning {
+		return firewallConditionStatus{HealthTimeout: true}
+	}
 	//if everything returns false, it is progressing
 	return firewallConditionStatus{
 		IsReady:       allConditionsMet,
@@ -69,6 +72,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 		case statusReport.IsReady:
 			r.Target.Status.ReadyReplicas++
 			continue
+
 		case statusReport.CreateTimeout || statusReport.HealthTimeout:
 			r.Target.Status.UnhealthyReplicas++
 			continue
