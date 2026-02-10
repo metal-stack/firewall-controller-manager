@@ -183,6 +183,9 @@ const (
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
 	FirewallDistanceConfigured ConditionType = "Distance"
+	// FirewallHealthy indicates that all health conditions have been met at least once.
+	// Once set to true, it stays true and is used to detect condition degradation.
+	FirewallHealthy ConditionType = "Healthy"
 )
 
 // ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.

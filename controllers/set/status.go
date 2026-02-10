@@ -47,8 +47,10 @@ func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditi
 		c.log.Info("health timeout exceeded", "firewall-name", fw.Name, "last-reconciled-at", seedUpdatedTime.String(), "timeout-after", unhealthyTimeout.String())
 		return firewallConditionStatus{HealthTimeout: true}
 	}
-	// Firewall was set to ready at one point, but then one of the conditions in the meantime were set to false so the firewall is unhealthy
-	if !allConditionsMet && fw.Status.Phase == v2.FirewallPhaseRunning {
+	// Firewall was healthy at one point (all conditions were met), but then one of the conditions degraded so the firewall is unhealthy
+	wasHealthy := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallHealthy)).Status == v2.ConditionTrue
+	if !allConditionsMet && wasHealthy && unhealthyTimeout > 0 {
+		c.log.Info("firewall conditions degraded", "firewall-name", fw.Name)
 		return firewallConditionStatus{HealthTimeout: true}
 	}
 	//if everything returns false, it is progressing

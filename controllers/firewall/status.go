@@ -192,3 +192,19 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		fw.Status.Conditions.Set(cond)
 	}
 }
+
+func isAllConditionsMet(fw *v2.Firewall) bool {
+	for _, ct := range []v2.ConditionType{
+		v2.FirewallCreated,
+		v2.FirewallReady,
+		v2.FirewallControllerConnected,
+		v2.FirewallControllerSeedConnected,
+		v2.FirewallDistanceConfigured,
+	} {
+		cond := fw.Status.Conditions.Get(ct)
+		if cond == nil || cond.Status != v2.ConditionTrue {
+			return false
+		}
+	}
+	return true
+}
