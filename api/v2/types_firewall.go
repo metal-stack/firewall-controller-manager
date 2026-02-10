@@ -183,7 +183,7 @@ const (
 	FirewallMonitorDeployed ConditionType = "MonitorDeployed"
 	// FirewallDistanceConfigured indicates that the firewall-controller has configured the given firewall distance.
 	FirewallDistanceConfigured ConditionType = "Distance"
-	// FirewallHealthy indicates that all health conditions have been met at least once.
+	// FirewallProvisioned indicates that all health conditions have been met at least once.
 	// Once set to true, it stays true and is used to detect condition degradation.
 	FirewallHealthy ConditionType = "Healthy"
 )
