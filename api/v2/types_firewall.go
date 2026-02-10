@@ -185,7 +185,7 @@ const (
 	FirewallDistanceConfigured ConditionType = "Distance"
 	// FirewallProvisioned indicates that all health conditions have been met at least once.
 	// Once set to true, it stays true and is used to detect condition degradation.
-	FirewallHealthy ConditionType = "Healthy"
+	FirewallProvisioned ConditionType = "Provisioned"
 )
 
 // ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.

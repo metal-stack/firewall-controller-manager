@@ -129,6 +129,11 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		cond = v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionTrue, "NotChecking", "Not checking distance due to firewall annotation.")
 		fw.Status.Conditions.Set(cond)
 
+		if isProvisioned(fw) {
+			cond := v2.NewCondition(v2.FirewallProvisioned, v2.ConditionTrue, "Provisioned", "All firewall conditions have been met.")
+			fw.Status.Conditions.Set(cond)
+		}
+
 		return
 	}
 
@@ -190,9 +195,14 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 		cond := v2.NewCondition(v2.FirewallDistanceConfigured, v2.ConditionFalse, "NotConfigured", fmt.Sprintf("Controller has configured distance %d, but %d is specified.", connection.ActualDistance, fw.Distance))
 		fw.Status.Conditions.Set(cond)
 	}
+
+	if isProvisioned(fw) {
+		cond := v2.NewCondition(v2.FirewallProvisioned, v2.ConditionTrue, "Provisioned", "All firewall conditions have been met.")
+		fw.Status.Conditions.Set(cond)
+	}
 }
 
-func isAllConditionsMet(fw *v2.Firewall) bool {
+func isProvisioned(fw *v2.Firewall) bool {
 	for _, ct := range []v2.ConditionType{
 		v2.FirewallCreated,
 		v2.FirewallReady,

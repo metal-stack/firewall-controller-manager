@@ -8,59 +8,83 @@ import (
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
-type firewallConditionStatus struct {
-	IsReady       bool
-	CreateTimeout bool
-	HealthTimeout bool
-}
+type status string
 
-func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) firewallConditionStatus {
-	var (
-		unhealthyTimeout  = c.c.GetFirewallHealthTimeout()
-		allocationTimeout = c.c.GetCreateTimeout()
+const (
+	statusReady         status = "ready"
+	statusProgressing   status = "progressing"
+	statusUnhealthy     status = "unhealthy"
+	statusHealthTimeout status = "health-timeout"
+	statusCreateTimeout status = "create-timeout"
+)
 
-		created            = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
-		ready              = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
-		connected          = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-		seedConnected      = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
-		distanceConfigured = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
-		allConditionsMet   = created && ready && connected && seedConnected && distanceConfigured
+func (c *controller) evaluateFirewallConditions(fw *v2.Firewall) status {
+	switch fw.Status.Phase {
+	case v2.FirewallPhaseCreating, v2.FirewallPhaseCrashing:
+		var (
+			createTimeout = c.c.GetCreateTimeout()
+			provisioned   = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallProvisioned)).Status == v2.ConditionTrue
+		)
 
-		seedUpdatedTime    = pointer.SafeDeref(fw.Status.ControllerStatus).SeedUpdated.Time
-		timeSinceReconcile = time.Since(seedUpdatedTime)
-		allocationTime     = pointer.SafeDeref(fw.Status.MachineStatus).AllocationTimestamp.Time
-	)
-
-	if allConditionsMet {
-		return firewallConditionStatus{IsReady: true}
-	}
-
-	// duration after which a firewall in the creation phase will be recreated, exceeded
-	if allocationTimeout > 0 && fw.Status.Phase == v2.FirewallPhaseCreating && !allocationTime.IsZero() {
-		if time.Since(allocationTime) > allocationTimeout {
-			c.log.Info("create timeout exceeded", "firewall-name", fw.Name, "allocated-at", allocationTime.String(), "timeout-after", allocationTimeout.String())
-			return firewallConditionStatus{CreateTimeout: true}
+		if provisioned {
+			return statusReady
 		}
-	}
-	// Only apply health timeout once we have a non-zero seed reconcile timestamp.
-	if (!ready || !seedConnected || !connected) && unhealthyTimeout > 0 && created && !seedUpdatedTime.IsZero() && timeSinceReconcile > unhealthyTimeout {
-		c.log.Info("health timeout exceeded", "firewall-name", fw.Name, "last-reconciled-at", seedUpdatedTime.String(), "timeout-after", unhealthyTimeout.String())
-		return firewallConditionStatus{HealthTimeout: true}
-	}
-	// Firewall was healthy at one point (all conditions were met), but then one of the monitor conditions
-	// degraded so the firewall is unhealthy. Only check monitor conditions (connected, seedConnected, distanceConfigured)
-	// because the ready condition degradation is already handled by the time-based health timeout above.
-	wasHealthy := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallHealthy)).Status == v2.ConditionTrue
-	monitorConditionsDegraded := !connected || !seedConnected || !distanceConfigured
-	if monitorConditionsDegraded && wasHealthy && unhealthyTimeout > 0 {
-		c.log.Info("firewall monitor conditions degraded", "firewall-name", fw.Name)
-		return firewallConditionStatus{HealthTimeout: true}
-	}
-	//if everything returns false, it is progressing
-	return firewallConditionStatus{
-		IsReady:       allConditionsMet,
-		CreateTimeout: false,
-		HealthTimeout: false,
+
+		if createTimeout > 0 {
+			createTimeout := c.c.GetCreateTimeout()
+
+			if ok := checkForTimeout(fw, v2.FirewallReady, createTimeout); ok {
+				c.log.Info("create timeout exceeded, firewall not provisioned in time", "firewall-name", fw.Name, "timeout-after", createTimeout.String())
+				return statusCreateTimeout
+			}
+		}
+
+		return statusProgressing
+
+	case v2.FirewallPhaseRunning:
+		fallthrough
+
+	default:
+		var (
+			created            = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallCreated)).Status == v2.ConditionTrue
+			ready              = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallReady)).Status == v2.ConditionTrue
+			provisioned        = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallProvisioned)).Status == v2.ConditionTrue
+			connected          = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
+			seedConnected      = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerSeedConnected)).Status == v2.ConditionTrue
+			distanceConfigured = pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallDistanceConfigured)).Status == v2.ConditionTrue
+
+			allConditionsMet = created && ready && provisioned && connected && seedConnected && distanceConfigured
+		)
+
+		if allConditionsMet {
+			return statusReady
+		}
+
+		if provisioned {
+			healthTimeout := c.c.GetFirewallHealthTimeout()
+
+			switch {
+			case !seedConnected:
+				if ok := checkForTimeout(fw, v2.FirewallControllerSeedConnected, healthTimeout); ok {
+					c.log.Info("health timeout exceeded, seed connection lost", "firewall-name", fw.Name, "timeout-after", healthTimeout.String())
+					return statusHealthTimeout
+				}
+
+			case !connected:
+				if ok := checkForTimeout(fw, v2.FirewallControllerConnected, healthTimeout); ok {
+					c.log.Info("health timeout exceeded, firewall monitor not reconciled anymore by controller", "firewall-name", fw.Name, "timeout-after", healthTimeout.String())
+					return statusHealthTimeout
+				}
+
+			case !ready:
+				if ok := checkForTimeout(fw, v2.FirewallReady, healthTimeout); ok {
+					c.log.Info("health timeout exceeded, firewall is not ready from perspective of the metal-api", "firewall-name", fw.Name, "timeout-after", healthTimeout.String())
+					return statusHealthTimeout
+				}
+			}
+		}
+
+		return statusUnhealthy
 	}
 }
 
@@ -73,17 +97,19 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 	for _, fw := range ownedFirewalls {
 		statusReport := c.evaluateFirewallConditions(fw)
 
-		switch {
-		case statusReport.IsReady:
+		switch statusReport {
+		case statusReady:
 			r.Target.Status.ReadyReplicas++
 			continue
-
-		case statusReport.CreateTimeout || statusReport.HealthTimeout:
+		case statusProgressing:
+			r.Target.Status.ProgressingReplicas++
+			continue
+		case statusUnhealthy, statusCreateTimeout, statusHealthTimeout:
+			fallthrough
+		default:
 			r.Target.Status.UnhealthyReplicas++
 			continue
 		}
-
-		r.Target.Status.ProgressingReplicas++
 	}
 
 	revision, err := controllers.Revision(r.Target)
@@ -93,4 +119,14 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallSet], ownedFirewal
 	r.Target.Status.ObservedRevision = revision
 
 	return nil
+}
+
+func checkForTimeout(fw *v2.Firewall, condition v2.ConditionType, timeout time.Duration) bool {
+	if timeout == 0 {
+		return false
+	}
+
+	cond := pointer.SafeDeref(fw.Status.Conditions.Get(condition))
+
+	return time.Since(cond.LastTransitionTime.Time) > timeout
 }
