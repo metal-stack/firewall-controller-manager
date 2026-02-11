@@ -32,9 +32,9 @@ import (
 )
 
 const (
-	namespaceName          = "test"
-	firewallHealthTimeout  = 19 * 24 * time.Hour
-	firewallCreateTimeout  = 19 * 24 * time.Hour
+	namespaceName         = "test"
+	firewallHealthTimeout = 19 * 24 * time.Hour
+	firewallCreateTimeout = 19 * 24 * time.Hour
 )
 
 var (
