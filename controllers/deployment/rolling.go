@@ -6,6 +6,7 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // rollingUpdateStrategy first creates a new set and deletes the old one's when the new one becomes ready
@@ -20,7 +21,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 			return err
 		}
 
-		c.recorder.Eventf(newSet, nil, "Normal", "Create", "created firewallset %s", newSet.Name)
+		c.recorder.Eventf(newSet, nil, corev1.EventTypeNormal, "Create", "creating set", "created firewall set %s", newSet.Name)
 
 		ownedSets = append(ownedSets, newSet)
 
