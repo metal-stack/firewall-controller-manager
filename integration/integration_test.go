@@ -53,7 +53,7 @@ var (
 				Namespace: namespaceName,
 			},
 			Data: map[string][]byte{
-				"kubeconfig": []byte(fmt.Sprintf(`apiVersion: v1
+				"kubeconfig": fmt.Appendf(nil, `apiVersion: v1
 clusters:
 - cluster:
     certificate-authority-data: %s
@@ -73,7 +73,7 @@ users:
     client-certificate-data: %s
     client-key-data: %s
 
-`, apiCA, apiHost, apiCert, apiKey))},
+`, apiCA, apiHost, apiCert, apiKey)},
 		}
 	}
 

@@ -9,7 +9,6 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -79,11 +78,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.1"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.4"},
 							},
 						},
@@ -164,11 +163,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.1"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.4"},
 							},
 						},
@@ -234,11 +233,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.1"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.4"},
 							},
 						},
@@ -309,11 +308,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.1"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.4"},
 							},
 						},
@@ -384,11 +383,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.1"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.4"},
 							},
 						},
@@ -398,11 +397,11 @@ func Test_controller_updateInfrastructureStatus(t *testing.T) {
 					Status: v2.FirewallStatus{
 						FirewallNetworks: []v2.FirewallNetwork{
 							{
-								NetworkType: pointer.Pointer("external"),
+								NetworkType: new("external"),
 								IPs:         []string{"1.1.1.2"},
 							},
 							{
-								NetworkType: pointer.Pointer("underlay"),
+								NetworkType: new("underlay"),
 								IPs:         []string{"10.8.0.5"},
 							},
 						},

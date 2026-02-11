@@ -130,7 +130,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	for _, n := range r.Target.Spec.Networks {
 		network := &models.V1MachineAllocationNetwork{
 			Networkid:   &n,
-			Autoacquire: pointer.Pointer(true),
+			Autoacquire: new(true),
 		}
 		networks = append(networks, network)
 	}
