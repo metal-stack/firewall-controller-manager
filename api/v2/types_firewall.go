@@ -395,7 +395,7 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 			return deadline, false
 		}
 
-		unhealthyConditions = func(cts ...ConditionType) []*Condition {
+		collectUnhealthyConditions = func(cts ...ConditionType) []*Condition {
 			var res []*Condition
 
 			for _, ct := range cts {
@@ -414,12 +414,13 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 
 	switch fw.Status.Phase {
 	case FirewallPhaseCreating, FirewallPhaseCrashing:
-		conditions := unhealthyConditions(FirewallCreated,
+		unhealthyConds := collectUnhealthyConditions(
+			FirewallCreated,
 			FirewallReady,
 			FirewallProvisioned,
 		)
 
-		if len(conditions) == 0 {
+		if len(unhealthyConds) == 0 {
 			return &FirewallStatusEvalResult{
 				Result: FirewallStatusReady,
 				Reason: "",
@@ -437,7 +438,7 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 			}
 		}
 
-		for _, c := range conditions {
+		for _, c := range unhealthyConds {
 			unhealthyTypes = append(unhealthyTypes, string(c.Type))
 		}
 
@@ -451,7 +452,8 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 		fallthrough
 
 	default:
-		conditions := unhealthyConditions(FirewallCreated,
+		unhealthyConds := collectUnhealthyConditions(
+			FirewallCreated,
 			FirewallReady,
 			FirewallProvisioned,
 			FirewallControllerConnected,
@@ -459,7 +461,7 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 			FirewallDistanceConfigured,
 		)
 
-		if len(conditions) == 0 {
+		if len(unhealthyConds) == 0 {
 			return &FirewallStatusEvalResult{
 				Result: FirewallStatusReady,
 				Reason: "",
@@ -507,7 +509,7 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 			}
 		}
 
-		for _, c := range conditions {
+		for _, c := range unhealthyConds {
 			unhealthyTypes = append(unhealthyTypes, string(c.Type))
 		}
 
