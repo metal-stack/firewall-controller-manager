@@ -2,8 +2,8 @@
 name: Docker Build Action
 on:
   pull_request:
-    branches:
-      - main
+    # branches:
+    #   - main
   release:
     types:
       - published
