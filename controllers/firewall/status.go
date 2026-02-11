@@ -160,11 +160,30 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 
 	fw.Status.ControllerStatus = connection
 
+	var (
+		// currently, the firewall-controller writes the reconcile time hard-coded every three minutes
+		// the FCM reconciles the firewall hard-coded at least every two minutes
+		//
+		// this can be visualized as:
+		//
+		// fc (write)  w        w        w        w
+		//             |        |        |        |
+		// t (minutes) 0--1--2--3--4--5--6--7--8--9--10--
+		//             |     |     |     |     |     |
+		// FCM (read)  r     r     r     r     r     r
+		//
+		// so, read out data will contain t={0, 0, 3, 6, 6, 9}, which shows that the maximum distance is three minutes
+		maximumSeedUpdateDrift = 3 * time.Minute
+		// in this case, the firewall-controller almost permanently updates this value (fw.Spec.Interval, by default 10s)
+		// so we can assume the read out interval from the fcm firewall reconcile, which is maximum two minutes as described above
+		maximumShootUpdateDrift = 2 * time.Minute
+	)
+
 	// Check if the firewall-controller has reconciled the shoot
 	if connection.Updated.Time.IsZero() {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to shoot.")
 		fw.Status.Conditions.Set(cond)
-	} else if time.Since(connection.Updated.Time) > 5*time.Minute {
+	} else if time.Since(connection.Updated.Time) > maximumShootUpdateDrift {
 		cond := v2.NewCondition(v2.FirewallControllerConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to shoot.", connection.Updated.String()))
 		fw.Status.Conditions.Set(cond)
 	} else {
@@ -176,7 +195,7 @@ func SetFirewallStatusFromMonitor(fw *v2.Firewall, mon *v2.FirewallMonitor) {
 	if connection.SeedUpdated.Time.IsZero() {
 		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "NotConnected", "Controller has not yet connected to seed.")
 		fw.Status.Conditions.Set(cond)
-	} else if time.Since(connection.SeedUpdated.Time) > 5*time.Minute {
+	} else if time.Since(connection.SeedUpdated.Time) > maximumSeedUpdateDrift {
 		cond := v2.NewCondition(v2.FirewallControllerSeedConnected, v2.ConditionFalse, "StoppedReconciling", fmt.Sprintf("Controller has stopped reconciling since %s to seed.", connection.SeedUpdated.String()))
 		fw.Status.Conditions.Set(cond)
 	} else {

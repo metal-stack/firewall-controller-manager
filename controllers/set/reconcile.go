@@ -110,13 +110,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 		}
 	}
 
-	deletedFws, err := c.deleteIfUnhealthyOrTimeout(r, ownedFirewalls...)
-	if err != nil {
-		return err
-	}
-
-	ownedFirewalls = controllers.Except(ownedFirewalls, deletedFws...)
-
 	err = c.setStatus(r, ownedFirewalls)
 	if err != nil {
 		return err

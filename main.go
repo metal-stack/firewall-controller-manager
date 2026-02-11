@@ -32,6 +32,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 )
 
@@ -281,6 +282,9 @@ func main() {
 	}
 	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorder("update-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup update controller: %v", err)
+	}
+	if err := timeout.SetupWithManager(ctrl.Log.WithName("controllers").WithName("timeout"), seedMgr.GetEventRecorderFor("timeout-controller"), seedMgr, cc); err != nil {
+		log.Fatalf("unable to setup timeout controller: %v", err)
 	}
 
 	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {
