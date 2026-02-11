@@ -16,6 +16,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -169,13 +170,13 @@ var _ = BeforeSuite(func() {
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	// err = timeout.SetupWithManager(
-	// 	ctrl.Log.WithName("controllers").WithName("timeout"),
-	// 	mgr.GetEventRecorder("timeout-controller"),
-	// 	mgr,
-	// 	cc,
-	// )
-	// Expect(err).ToNot(HaveOccurred())
+	err = timeout.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("timeout"),
+		mgr.GetEventRecorder("timeout-controller"),
+		mgr,
+		cc,
+	)
+	Expect(err).ToNot(HaveOccurred())
 
 	err = deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)
 	Expect(err).ToNot(HaveOccurred())
