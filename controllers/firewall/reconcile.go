@@ -140,18 +140,42 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		tags = append(tags, v2.FirewallSetTag(ref.Name))
 	}
 
+	var rules *models.V1FirewallRules
+	if r.Target.Spec.InitialRuleSet != nil {
+		rules = &models.V1FirewallRules{}
+
+		for _, rule := range r.Target.Spec.InitialRuleSet.Egress {
+			rules.Egress = append(rules.Egress, &models.V1FirewallEgressRule{
+				Comment:  rule.Comment,
+				Ports:    rule.Ports,
+				Protocol: string(rule.Protocol),
+				To:       rule.To,
+			})
+		}
+
+		for _, rule := range r.Target.Spec.InitialRuleSet.Ingress {
+			rules.Ingress = append(rules.Ingress, &models.V1FirewallIngressRule{
+				Comment:  rule.Comment,
+				From:     rule.From,
+				Ports:    rule.Ports,
+				Protocol: string(rule.Protocol),
+			})
+		}
+	}
+
 	createRequest := &models.V1FirewallCreateRequest{
-		Description: "created by firewall-controller-manager",
-		Name:        r.Target.Name,
-		Hostname:    r.Target.Name,
-		Sizeid:      &r.Target.Spec.Size,
-		Projectid:   &r.Target.Spec.Project,
-		Partitionid: &r.Target.Spec.Partition,
-		Imageid:     &r.Target.Spec.Image,
-		SSHPubKeys:  r.Target.Spec.SSHPublicKeys,
-		Networks:    networks,
-		UserData:    r.Target.Spec.Userdata,
-		Tags:        tags,
+		Description:   "created by firewall-controller-manager",
+		Name:          r.Target.Name,
+		Hostname:      r.Target.Name,
+		Sizeid:        &r.Target.Spec.Size,
+		Projectid:     &r.Target.Spec.Project,
+		Partitionid:   &r.Target.Spec.Partition,
+		Imageid:       &r.Target.Spec.Image,
+		SSHPubKeys:    r.Target.Spec.SSHPublicKeys,
+		Networks:      networks,
+		UserData:      r.Target.Spec.Userdata,
+		Tags:          tags,
+		FirewallRules: rules,
 	}
 
 	resp, err := c.c.GetMetal().Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(r.Ctx), nil)
