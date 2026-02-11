@@ -30,6 +30,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		}
 
 		SetFirewallStatusFromMonitor(r.Target, mon)
+
+		if isAllConditionsMet(r.Target) {
+			cond := v2.NewCondition(v2.FirewallHealthy, v2.ConditionTrue, "Healthy", "All firewall conditions have been met.")
+			r.Target.Status.Conditions.Set(cond)
+		}
 	}()
 
 	fws, err := c.firewallCache.Get(r.Ctx, r.Target)

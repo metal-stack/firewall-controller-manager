@@ -6,7 +6,6 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -43,19 +42,17 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 
 	return nil
 }
-
-func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
+func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
 	var result []*v2.Firewall
+	createTimeout := c.c.GetCreateTimeout()
+	healthTimeout := c.c.GetFirewallHealthTimeout()
 
 	for _, fw := range fws {
-		if fw.Status.Phase != v2.FirewallPhaseCreating {
-			continue
-		}
+		status := c.evaluateFirewallConditions(fw)
 
-		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-
-		if !connected && time.Since(fw.CreationTimestamp.Time) > c.c.GetCreateTimeout() {
-			r.Log.Info("firewall not getting ready, deleting from set", "firewall-name", fw.Name)
+		switch {
+		case (createTimeout > 0 && status.CreateTimeout) || (healthTimeout > 0 && status.HealthTimeout):
+			r.Log.Info("firewall health or creation timeout exceeded, deleting from set", "firewall-name", fw.Name)
 
 			err := c.deleteFirewalls(r, fw)
 			if err != nil {
@@ -64,7 +61,7 @@ func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws
 
 			result = append(result, fw)
 		}
-	}
 
+	}
 	return result, nil
 }
