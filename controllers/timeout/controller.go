@@ -2,7 +2,7 @@ package timeout
 
 import (
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -14,10 +14,10 @@ import (
 type controller struct {
 	c        *config.ControllerConfig
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
-func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
+func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
 	if c.GetFirewallHealthTimeout() <= 0 && c.GetCreateTimeout() <= 0 {
 		log.Info("not registering timeout controller because neither create nor health timeout configured")
 		return nil

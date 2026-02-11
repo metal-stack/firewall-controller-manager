@@ -49,7 +49,7 @@ func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallS
 				return err
 			}
 
-			c.recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s due to %s", fw.Name, status)
+			c.recorder.Eventf(fw, nil, "Normal", "Delete", "deleted firewall %s due to %s", fw.Name, status)
 
 		case v2.FirewallStatusUnhealthy:
 			if status.TimeoutIn != nil {

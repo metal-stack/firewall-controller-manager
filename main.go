@@ -283,7 +283,7 @@ func main() {
 	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorder("update-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup update controller: %v", err)
 	}
-	if err := timeout.SetupWithManager(ctrl.Log.WithName("controllers").WithName("timeout"), seedMgr.GetEventRecorderFor("timeout-controller"), seedMgr, cc); err != nil {
+	if err := timeout.SetupWithManager(ctrl.Log.WithName("controllers").WithName("timeout"), seedMgr.GetEventRecorder("timeout-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup timeout controller: %v", err)
 	}
 
