@@ -51,7 +51,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 			return err
 		}
 
-		// requeueing in order to continue checking progression
+		// requeuing in order to continue checking progression
 		return controllers.RequeueAfter(10*time.Second, "firewall creation is progressing")
 	case 1:
 		f = fws[0]
@@ -114,7 +114,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	default:
 		var ids []string
 		for _, fw := range fws {
-			fw := fw
 			ids = append(ids, pointer.SafeDeref(fw.ID))
 		}
 
@@ -134,10 +133,9 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		}
 	)
 	for _, n := range r.Target.Spec.Networks {
-		n := n
 		network := &models.V1MachineAllocationNetwork{
 			Networkid:   &n,
-			Autoacquire: pointer.Pointer(true),
+			Autoacquire: new(true),
 		}
 		networks = append(networks, network)
 	}
@@ -176,7 +174,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
+	c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
 
 	return resp.Payload, nil
 }

@@ -221,8 +221,6 @@ func GetOwnedResources[O client.ObjectList, E metav1.Object](ctx context.Context
 	}
 
 	for _, o := range getter(list) {
-		o := o
-
 		if !metav1.IsControlledBy(o, owner) {
 			if metav1.GetControllerOf(o) == nil {
 				orphaned = append(orphaned, o)

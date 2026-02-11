@@ -13,7 +13,6 @@ import (
 	"github.com/metal-stack/metal-go/api/client/image"
 	"github.com/metal-stack/metal-go/api/models"
 	metaltestclient "github.com/metal-stack/metal-go/test/client"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -114,7 +113,7 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 				Image: func(mock *mock.Mock) {
 					mock.On("FindLatestImage", image.NewFindLatestImageParams().WithID("firewall-ubuntu-3.0").WithContext(ctx), nil).Return(&image.FindLatestImageOK{
 						Payload: &models.V1ImageResponse{
-							ID: pointer.Pointer("firewall-ubuntu-3.0.20240503"),
+							ID: new("firewall-ubuntu-3.0.20240503"),
 						},
 					}, nil)
 				},
@@ -170,7 +169,7 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 				Image: func(mock *mock.Mock) {
 					mock.On("FindLatestImage", image.NewFindLatestImageParams().WithID("firewall-ubuntu-3.0").WithContext(ctx), nil).Return(&image.FindLatestImageOK{
 						Payload: &models.V1ImageResponse{
-							ID: pointer.Pointer("firewall-ubuntu-3.0.20240503"),
+							ID: new("firewall-ubuntu-3.0.20240503"),
 						},
 					}, nil)
 				},

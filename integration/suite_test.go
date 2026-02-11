@@ -139,7 +139,7 @@ var _ = BeforeSuite(func() {
 
 	err = deployment.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("deployment"),
-		mgr.GetEventRecorderFor("firewall-deployment-controller"),
+		mgr.GetEventRecorder("firewall-deployment-controller"),
 		mgr,
 		cc,
 	)
@@ -147,7 +147,7 @@ var _ = BeforeSuite(func() {
 
 	err = set.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("set"),
-		mgr.GetEventRecorderFor("firewall-set-controller"),
+		mgr.GetEventRecorder("firewall-set-controller"),
 		mgr,
 		cc,
 	)
@@ -155,7 +155,7 @@ var _ = BeforeSuite(func() {
 
 	err = firewall.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("firewall"),
-		mgr.GetEventRecorderFor("firewall-controller"),
+		mgr.GetEventRecorder("firewall-controller"),
 		mgr,
 		cc,
 	)
@@ -163,7 +163,7 @@ var _ = BeforeSuite(func() {
 
 	err = update.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("update"),
-		mgr.GetEventRecorderFor("update-controller"),
+		mgr.GetEventRecorder("update-controller"),
 		mgr,
 		cc,
 	)

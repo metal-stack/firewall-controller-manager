@@ -99,8 +99,6 @@ var _ = Context("firewall set controller", Ordered, func() {
 
 			var newest *v2.Firewall
 			for _, fw := range fws.Items {
-				fw := fw
-
 				_, _ = fmt.Fprintf(GinkgoWriter, "Having %s with creation timestamp: %s\n", fw.Name, fw.CreationTimestamp.String())
 
 				if newest == nil {

@@ -2,6 +2,7 @@ package set
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
@@ -89,7 +90,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
-			c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
+			c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s", fw.Name)
 
 			ownedFirewalls = append(ownedFirewalls, fw)
 		}
@@ -145,10 +146,8 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")),
 	}
 
-	for k, v := range r.Target.Labels {
-		// inheriting labels from the firewall set to the firewall
-		meta.Labels[k] = v
-	}
+	// inheriting labels from the firewall set to the firewall
+	maps.Copy(meta.Labels, r.Target.Labels)
 
 	if v, err := semver.NewVersion(r.Target.Spec.Template.Spec.ControllerVersion); err == nil && v.LessThan(semver.MustParse("v2.0.0")) {
 		if meta.Annotations == nil {
@@ -184,8 +183,6 @@ func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*
 	var adoptions []*v2.Firewall
 
 	for _, fw := range fws {
-		fw := fw
-
 		ok, err := c.adoptFirewall(r, fw)
 		if err != nil {
 			return nil, err

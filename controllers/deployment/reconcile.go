@@ -217,7 +217,7 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", set.Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
+	c.recorder.Eventf(set, nil, "Normal", "Update", "updated firewallset %s", set.Name)
 
 	return nil
 }

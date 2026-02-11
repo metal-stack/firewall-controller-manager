@@ -21,8 +21,6 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) error {
 	for _, fw := range fws {
-		fw := fw
-
 		if fw.DeletionTimestamp != nil {
 			r.Log.Info("deletion timestamp on firewall already set", "firewall-name", fw.Name)
 			continue
@@ -35,7 +33,7 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 
 		r.Log.Info("set deletion timestamp on firewall", "firewall-name", fw.Name)
 
-		c.recorder.Eventf(fw, "Normal", "Delete", "deleted firewall %s", fw.Name)
+		c.recorder.Eventf(fw, nil, "Normal", "Delete", "deleted firewall %s", fw.Name)
 	}
 
 	if len(fws) > 0 {
