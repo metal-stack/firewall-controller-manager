@@ -123,7 +123,7 @@ var _ = BeforeSuite(func() {
 
 	err = set.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("set"),
-		mgr.GetEventRecorderFor("firewall-set-controller"),
+		mgr.GetEventRecorder("firewall-set-controller"),
 		mgr,
 		cc,
 	)

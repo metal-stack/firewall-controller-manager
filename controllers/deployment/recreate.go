@@ -6,7 +6,6 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
 // recreateStrategy first deletes the existing firewall sets and then creates a new one
@@ -15,13 +14,13 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 		r.Log.Info("significant changes detected in the spec, create new scaled down firewall set, then cleaning up old sets")
 
 		set, err := c.createNextFirewallSet(r, latestSet, &setOverrides{
-			replicas: pointer.Pointer(0),
+			replicas: new(0),
 		})
 		if err != nil {
 			return err
 		}
 
-		c.recorder.Eventf(set, "Normal", "Recreate", "recreated firewallset old: %s new: %s", latestSet.Name, set.Name)
+		c.recorder.Eventf(set, nil, "Normal", "Recreate", "recreated firewallset old: %s new: %s", latestSet.Name, set.Name)
 
 		latestSet = set
 	}

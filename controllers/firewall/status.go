@@ -92,7 +92,6 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 	var result []v2.FirewallNetwork
 
 	for _, n := range f.Allocation.Networks {
-		n := n
 		if n.Networkid == nil {
 			continue
 		}

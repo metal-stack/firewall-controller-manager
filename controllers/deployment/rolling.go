@@ -20,7 +20,7 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 			return err
 		}
 
-		c.recorder.Eventf(newSet, "Normal", "Create", "created firewallset %s", newSet.Name)
+		c.recorder.Eventf(newSet, nil, "Normal", "Create", "created firewallset %s", newSet.Name)
 
 		ownedSets = append(ownedSets, newSet)
 

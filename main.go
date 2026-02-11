@@ -267,19 +267,19 @@ func main() {
 		log.Fatalf("unable to create controller config %v", err)
 	}
 
-	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorderFor("firewall-deployment-controller"), seedMgr, cc); err != nil {
+	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorder("firewall-deployment-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup deployment controller: %v", err)
 	}
-	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorderFor("firewall-set-controller"), seedMgr, cc); err != nil {
+	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorder("firewall-set-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup set controller: %v", err)
 	}
-	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorderFor("firewall-controller"), seedMgr, cc); err != nil {
+	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorder("firewall-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup firewall controller: %v", err)
 	}
 	if err := monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), shootMgr, cc); err != nil {
 		log.Fatalf("unable to setup monitor controller: %v", err)
 	}
-	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorderFor("update-controller"), seedMgr, cc); err != nil {
+	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorder("update-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup update controller: %v", err)
 	}
 

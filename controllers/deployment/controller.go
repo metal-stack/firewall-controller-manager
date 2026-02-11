@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -20,10 +20,10 @@ type controller struct {
 	c               *config.ControllerConfig
 	log             logr.Logger
 	lastSetCreation map[string]time.Time
-	recorder        record.EventRecorder
+	recorder        events.EventRecorder
 }
 
-func SetupWithManager(log logr.Logger, recorder record.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
+func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
 	g := controllers.NewGenericController(log, c.GetSeedClient(), c.GetSeedNamespace(), &controller{
 		c:               c,
 		log:             log,
@@ -68,8 +68,7 @@ func SetupWebhookWithManager(log logr.Logger, mgr ctrl.Manager, c *config.Contro
 		return err
 	}
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&v2.FirewallDeployment{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v2.FirewallDeployment{}).
 		WithDefaulter(defaulter).
 		WithValidator(validation.NewFirewallDeploymentValidator(log.WithName("validating-webhook"))).
 		Complete()
