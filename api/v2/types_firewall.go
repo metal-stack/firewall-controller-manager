@@ -400,7 +400,9 @@ func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Dura
 
 			for _, ct := range cts {
 				cond := fw.Status.Conditions.Get(ct)
-				if cond == nil || cond.Status != ConditionTrue {
+				if cond == nil {
+					res = append(res, &Condition{Type: ct})
+				} else if cond.Status != ConditionTrue {
 					res = append(res, cond)
 				}
 			}

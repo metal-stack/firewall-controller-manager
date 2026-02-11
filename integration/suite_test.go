@@ -169,6 +169,14 @@ var _ = BeforeSuite(func() {
 	)
 	Expect(err).ToNot(HaveOccurred())
 
+	// err = timeout.SetupWithManager(
+	// 	ctrl.Log.WithName("controllers").WithName("timeout"),
+	// 	mgr.GetEventRecorder("timeout-controller"),
+	// 	mgr,
+	// 	cc,
+	// )
+	// Expect(err).ToNot(HaveOccurred())
+
 	err = deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)
 	Expect(err).ToNot(HaveOccurred())
 	err = set.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), mgr, cc)

@@ -8,8 +8,10 @@ import (
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -90,7 +92,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
-			c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s", fw.Name)
+			c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Create", "creating firewall", "created firewall %s", fw.Name)
 
 			ownedFirewalls = append(ownedFirewalls, fw)
 		}

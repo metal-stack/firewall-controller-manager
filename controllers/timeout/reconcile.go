@@ -6,6 +6,8 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -49,7 +51,7 @@ func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallS
 				return err
 			}
 
-			c.recorder.Eventf(fw, nil, "Normal", "Delete", "deleted firewall %s due to %s", fw.Name, status)
+			c.recorder.Eventf(fw, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s due to %s", fw.Name, status)
 
 		case v2.FirewallStatusUnhealthy:
 			if status.TimeoutIn != nil {
