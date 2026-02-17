@@ -91,7 +91,7 @@ func (c *controller) deleteIfUnhealthyOrTimeout(ctx context.Context, fws ...*v2.
 			in          = *nextTimeout.status.TimeoutIn
 		)
 
-		c.log.Info("scheduled check for next health timeout", "firewall-name", nextTimeout.firewall, "reason", nextTimeout.status.Reason, "in", in.String())
+		c.log.Info("scheduled check for next health timeout", "firewall-name", nextTimeout.firewall.Name, "reason", nextTimeout.status.Reason, "in", in.String())
 
 		return ctrl.Result{
 			RequeueAfter: in,
