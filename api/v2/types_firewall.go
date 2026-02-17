@@ -1,8 +1,10 @@
 package v2
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -185,7 +187,7 @@ const (
 	FirewallDistanceConfigured ConditionType = "Distance"
 	// FirewallProvisioned indicates that all health conditions have been met at least once.
 	// Once set to true, it stays true and is used to detect condition degradation.
-	FirewallHealthy ConditionType = "Healthy"
+	FirewallProvisioned ConditionType = "Provisioned"
 )
 
 // ShootAccess contains secret references to construct a shoot client in the firewall-controller to update its firewall monitor.
@@ -353,4 +355,170 @@ func SortFirewallsByImportance(fws []*Firewall) {
 		// prefer younger firewalls (these potentially run on a more up-to-date operating system image)
 		return !a.CreationTimestamp.Before(&b.CreationTimestamp)
 	})
+}
+
+type (
+	FirewallStatusResult string
+
+	FirewallStatusEvalResult struct {
+		Result    FirewallStatusResult
+		Reason    string
+		TimeoutIn *time.Duration
+	}
+)
+
+const (
+	FirewallStatusReady         FirewallStatusResult = "ready"
+	FirewallStatusProgressing   FirewallStatusResult = "progressing"
+	FirewallStatusUnhealthy     FirewallStatusResult = "unhealthy"
+	FirewallStatusHealthTimeout FirewallStatusResult = "health-timeout"
+	FirewallStatusCreateTimeout FirewallStatusResult = "create-timeout"
+)
+
+func EvaluateFirewallStatus(fw *Firewall, createTimeout, healthTimeout time.Duration) *FirewallStatusEvalResult {
+	var (
+		checkForTimeout = func(fw *Firewall, condition ConditionType, timeout time.Duration) (time.Duration, bool) {
+			if timeout == 0 {
+				return 0, false
+			}
+
+			var (
+				cond           = pointer.SafeDeref(fw.Status.Conditions.Get(condition))
+				transitionTime = cond.LastTransitionTime.Time
+				deadline       = time.Until(transitionTime.Add(timeout))
+			)
+
+			if deadline < 0 {
+				return 0, true
+			}
+
+			return deadline, false
+		}
+
+		collectUnhealthyConditions = func(cts ...ConditionType) []*Condition {
+			var res []*Condition
+
+			for _, ct := range cts {
+				cond := fw.Status.Conditions.Get(ct)
+				if cond == nil {
+					res = append(res, &Condition{Type: ct})
+				} else if cond.Status != ConditionTrue {
+					res = append(res, cond)
+				}
+			}
+
+			return res
+		}
+
+		unhealthyTypes []string
+		timeoutIn      *time.Duration
+	)
+
+	switch fw.Status.Phase {
+	case FirewallPhaseCreating, FirewallPhaseCrashing:
+		unhealthyConds := collectUnhealthyConditions(
+			FirewallCreated,
+			FirewallReady,
+			FirewallProvisioned,
+		)
+
+		if len(unhealthyConds) == 0 {
+			return &FirewallStatusEvalResult{
+				Result: FirewallStatusReady,
+				Reason: "",
+			}
+		}
+
+		if createTimeout > 0 {
+			if t, ok := checkForTimeout(fw, FirewallReady, createTimeout); ok {
+				return &FirewallStatusEvalResult{
+					Result: FirewallStatusCreateTimeout,
+					Reason: fmt.Sprintf("%s create timeout exceeded, firewall not provisioned in time", createTimeout.String()),
+				}
+			} else if createTimeout != 0 {
+				timeoutIn = &t
+			}
+		}
+
+		for _, c := range unhealthyConds {
+			unhealthyTypes = append(unhealthyTypes, string(c.Type))
+		}
+
+		return &FirewallStatusEvalResult{
+			Result:    FirewallStatusProgressing,
+			Reason:    fmt.Sprintf("not all health conditions are true: %v", unhealthyTypes),
+			TimeoutIn: timeoutIn,
+		}
+
+	case FirewallPhaseRunning:
+		fallthrough
+
+	default:
+		unhealthyConds := collectUnhealthyConditions(
+			FirewallCreated,
+			FirewallReady,
+			FirewallProvisioned,
+			FirewallControllerConnected,
+			FirewallControllerSeedConnected,
+			FirewallDistanceConfigured,
+		)
+
+		if len(unhealthyConds) == 0 {
+			return &FirewallStatusEvalResult{
+				Result: FirewallStatusReady,
+				Reason: "",
+			}
+		}
+
+		var (
+			ready         = pointer.SafeDeref(fw.Status.Conditions.Get(FirewallReady)).Status == ConditionTrue
+			provisioned   = pointer.SafeDeref(fw.Status.Conditions.Get(FirewallProvisioned)).Status == ConditionTrue
+			connected     = pointer.SafeDeref(fw.Status.Conditions.Get(FirewallControllerConnected)).Status == ConditionTrue
+			seedConnected = pointer.SafeDeref(fw.Status.Conditions.Get(FirewallControllerSeedConnected)).Status == ConditionTrue
+		)
+
+		if provisioned {
+			switch {
+			case !seedConnected:
+				if t, ok := checkForTimeout(fw, FirewallControllerSeedConnected, healthTimeout); ok {
+					return &FirewallStatusEvalResult{
+						Result: FirewallStatusHealthTimeout,
+						Reason: fmt.Sprintf("%s health timeout exceeded, seed connection lost", healthTimeout.String()),
+					}
+				} else if healthTimeout != 0 {
+					timeoutIn = &t
+				}
+
+			case !connected:
+				if t, ok := checkForTimeout(fw, FirewallControllerConnected, healthTimeout); ok {
+					return &FirewallStatusEvalResult{
+						Result: FirewallStatusHealthTimeout,
+						Reason: fmt.Sprintf("%s health timeout exceeded, firewall monitor not reconciled anymore", healthTimeout.String()),
+					}
+				} else if healthTimeout != 0 {
+					timeoutIn = &t
+				}
+
+			case !ready:
+				if t, ok := checkForTimeout(fw, FirewallReady, healthTimeout); ok {
+					return &FirewallStatusEvalResult{
+						Result: FirewallStatusHealthTimeout,
+						Reason: fmt.Sprintf("%s health timeout exceeded, firewall is not ready from perspective of the metal-api", healthTimeout.String()),
+					}
+				} else if healthTimeout != 0 {
+					timeoutIn = &t
+				}
+			}
+		}
+
+		for _, c := range unhealthyConds {
+			unhealthyTypes = append(unhealthyTypes, string(c.Type))
+		}
+
+		return &FirewallStatusEvalResult{
+			Result:    FirewallStatusUnhealthy,
+			Reason:    fmt.Sprintf("not all health conditions are true: %v", unhealthyTypes),
+			TimeoutIn: timeoutIn,
+		}
+	}
 }

@@ -6,6 +6,8 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // recreateStrategy first deletes the existing firewall sets and then creates a new one
@@ -20,7 +22,7 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 			return err
 		}
 
-		c.recorder.Eventf(set, nil, "Normal", "Recreate", "recreated firewallset old: %s new: %s", latestSet.Name, set.Name)
+		c.recorder.Eventf(set, nil, corev1.EventTypeNormal, "Recreate", "recreating set", "recreated firewall set, old: %s new: %s", latestSet.Name, set.Name)
 
 		latestSet = set
 	}

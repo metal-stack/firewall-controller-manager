@@ -12,6 +12,8 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -30,11 +32,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		}
 
 		SetFirewallStatusFromMonitor(r.Target, mon)
-
-		if isAllConditionsMet(r.Target) {
-			cond := v2.NewCondition(v2.FirewallHealthy, v2.ConditionTrue, "Healthy", "All firewall conditions have been met.")
-			r.Target.Status.Conditions.Set(cond)
-		}
 	}()
 
 	fws, err := c.firewallCache.Get(r.Ctx, r.Target)
@@ -58,6 +55,11 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
 		r.Target.Status.Conditions.Set(cond)
+
+		// this is mainly for tests when the firewall is already present
+		if r.Target.Status.Phase == v2.FirewallPhase("") {
+			r.Target.Status.Phase = v2.FirewallPhaseCreating
+		}
 
 		var currentStatus *v2.MachineStatus
 		currentStatus, err = getMachineStatus(f)
@@ -174,7 +176,7 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(r.Target, nil, "Normal", "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
+	c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Create", "created firewall %s id %s", "creating firewall", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
 
 	return resp.Payload, nil
 }
@@ -194,6 +196,7 @@ func isFirewallProgressing(status *v2.MachineStatus) bool {
 	if status.LastEvent.Event != "Phoned Home" {
 		return true
 	}
+
 	return false
 }
 
@@ -212,6 +215,7 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	if status.LastEvent.Event == "Phoned Home" {
 		return true
 	}
+
 	return false
 }
 

@@ -6,6 +6,8 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -33,7 +35,7 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 
 		r.Log.Info("set deletion timestamp on firewall", "firewall-name", fw.Name)
 
-		c.recorder.Eventf(fw, nil, "Normal", "Delete", "deleted firewall %s", fw.Name)
+		c.recorder.Eventf(fw, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s", fw.Name)
 	}
 
 	if len(fws) > 0 {
@@ -41,27 +43,4 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 	}
 
 	return nil
-}
-func (c *controller) deleteIfUnhealthyOrTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
-	var result []*v2.Firewall
-	createTimeout := c.c.GetCreateTimeout()
-	healthTimeout := c.c.GetFirewallHealthTimeout()
-
-	for _, fw := range fws {
-		status := c.evaluateFirewallConditions(fw)
-
-		switch {
-		case (createTimeout > 0 && status.CreateTimeout) || (healthTimeout > 0 && status.HealthTimeout):
-			r.Log.Info("firewall health or creation timeout exceeded, deleting from set", "firewall-name", fw.Name)
-
-			err := c.deleteFirewalls(r, fw)
-			if err != nil {
-				return nil, err
-			}
-
-			result = append(result, fw)
-		}
-
-	}
-	return result, nil
 }

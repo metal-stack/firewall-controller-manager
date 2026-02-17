@@ -32,6 +32,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 )
 
@@ -75,8 +76,8 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager")
 	flag.StringVar(&namespace, "namespace", "", "the namespace this controller is running")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 10*time.Minute, "duration after which a resource is getting reconciled at minimum")
-	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
-	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
+	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 0*time.Minute, "duration after a created firewall not getting ready is considered dead")
+	flag.DurationVar(&createTimeout, "create-timeout", 0*time.Minute, "duration after which a firewall in the creation phase will be recreated")
 	flag.DurationVar(&safetyBackoff, "safety-backoff", 10*time.Second, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&progressDeadline, "progress-deadline", 15*time.Minute, "time after which a deployment is considered unhealthy instead of progressing (informational)")
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
@@ -281,6 +282,9 @@ func main() {
 	}
 	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorder("update-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup update controller: %v", err)
+	}
+	if err := timeout.SetupWithManager(ctrl.Log.WithName("controllers").WithName("timeout"), seedMgr.GetEventRecorder("timeout-controller"), seedMgr, cc); err != nil {
+		log.Fatalf("unable to setup timeout controller: %v", err)
 	}
 
 	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {

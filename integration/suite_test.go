@@ -16,6 +16,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -32,9 +33,9 @@ import (
 )
 
 const (
-	namespaceName          = "test"
-	firewallHealthTimeout  = 19 * 24 * time.Hour
-	firewallCreateTimeout  = 19 * 24 * time.Hour
+	namespaceName         = "test"
+	firewallHealthTimeout = 19 * 24 * time.Hour
+	firewallCreateTimeout = 19 * 24 * time.Hour
 )
 
 var (
@@ -164,6 +165,14 @@ var _ = BeforeSuite(func() {
 	err = update.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("update"),
 		mgr.GetEventRecorder("update-controller"),
+		mgr,
+		cc,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = timeout.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("timeout"),
+		mgr.GetEventRecorder("timeout-controller"),
 		mgr,
 		cc,
 	)
