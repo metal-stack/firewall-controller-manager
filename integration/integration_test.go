@@ -176,7 +176,6 @@ var _ = Context("integration test", Ordered, func() {
 					},
 					Machine: func(m *mock.Mock) {
 						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
 					},
 					Image: func(m *mock.Mock) {
 						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
