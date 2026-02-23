@@ -1753,12 +1753,15 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should adopt the existing firewall", func() {
-				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
-					return l.GetItems()
-				}, 10*time.Second)
+				Eventually(func() []metav1.OwnerReference {
+					fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+						return l.GetItems()
+					}, 10*time.Second)
+
+					return fw.OwnerReferences
+				}, 5*time.Second, interval).To((HaveLen(1)))
 
 				Expect(fw.Name).To(Equal("test"))
-				Expect(fw.OwnerReferences).To(HaveLen(1))
 
 				Expect(fw.OwnerReferences[0].UID).To(Equal(set.UID))
 			})
@@ -2039,7 +2042,7 @@ var _ = Context("integration test", Ordered, func() {
 					if fw.Status.ControllerStatus == nil {
 						fw.Status.ControllerStatus = &v2.ControllerConnection{}
 					}
-					//add a fake concile so the unhealty firewall gets deleted
+					// add a fake reconcile so the unhealthy firewall gets deleted
 					fw.Status.ControllerStatus.SeedUpdated.Time = time.Now().Add(-(firewallHealthTimeout + time.Minute))
 					err = k8sClient.Status().Update(ctx, &fw)
 					if err != nil {
