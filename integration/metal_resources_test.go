@@ -310,6 +310,92 @@ var (
 		Vrf:       50,
 		Vrfshared: true,
 	}
+	firewall3 = &models.V1FirewallResponse{
+		Allocation: &models.V1MachineAllocation{
+			BootInfo: &models.V1BootInfo{
+				Bootloaderid: new("bootloaderid"),
+				Cmdline:      new("cmdline"),
+				ImageID:      new("imageid"),
+				Initrd:       new("initrd"),
+				Kernel:       new("kernel"),
+				OsPartition:  new("ospartition"),
+				PrimaryDisk:  new("primarydisk"),
+			},
+			Created:          new(strfmt.DateTime(testTime.Add(-20 * 24 * time.Hour))),
+			Creator:          new("creator"),
+			Description:      "firewall allocation 3",
+			Filesystemlayout: fsl1,
+			Hostname:         new("firewall-hostname-3"),
+			Image:            image1,
+			Name:             new("firewall-3"),
+			Networks: []*models.V1MachineNetwork{
+				{
+					Asn:                 new(int64(200)),
+					Destinationprefixes: []string{"2.2.2.2"},
+					Ips:                 []string{"1.1.1.1"},
+					Nat:                 new(false),
+					Networkid:           new("private"),
+					Networktype:         pointer.Pointer(net.PrivatePrimaryUnshared),
+					Prefixes:            []string{"prefixes"},
+					Private:             new(true),
+					Underlay:            new(false),
+					Vrf:                 new(int64(100)),
+				},
+			},
+			Project:    new("project-1"),
+			Reinstall:  new(false),
+			Role:       pointer.Pointer(models.V1MachineAllocationRoleFirewall),
+			SSHPubKeys: []string{"sshpubkey"},
+			Succeeded:  new(true),
+			UserData:   "---userdata---",
+		},
+		Bios: &models.V1MachineBIOS{
+			Date:    new("biosdata"),
+			Vendor:  new("biosvendor"),
+			Version: new("biosversion"),
+		},
+		Description: "firewall 1",
+		Events: &models.V1MachineRecentProvisioningEvents{
+			CrashLoop:            new(true),
+			FailedMachineReclaim: new(true),
+			LastErrorEvent: &models.V1MachineProvisioningEvent{
+				Event:   new("Crashed"),
+				Message: "crash",
+				Time:    strfmt.DateTime(testTime.Add(-10 * 24 * time.Hour)),
+			},
+			LastEventTime: strfmt.DateTime(testTime.Add(-7 * 24 * time.Hour)),
+			Log: []*models.V1MachineProvisioningEvent{
+				{
+					Event:   new("Phoned Home"),
+					Message: "phoning home",
+					Time:    strfmt.DateTime(testTime.Add(-7 * 24 * time.Hour)),
+				},
+			},
+		},
+		Hardware: &models.V1MachineHardware{
+			CPUCores: new(int32(16)),
+			Disks:    []*models.V1MachineBlockDevice{},
+			Memory:   new(int64(32)),
+			Nics:     []*models.V1MachineNic{},
+		},
+		ID: new("3"),
+		Ledstate: &models.V1ChassisIdentifyLEDState{
+			Description: new(""),
+			Value:       new(""),
+		},
+		Liveliness: new("Unhealthy"),
+		Name:       "firewall-3",
+		Partition:  partition1,
+		Rackid:     "rack-1",
+		Size:       size1,
+		State: &models.V1MachineState{
+			Description:        new("state"),
+			Issuer:             "issuer",
+			MetalHammerVersion: new("version"),
+			Value:              new(""),
+		},
+		Tags: []string{"a"},
+	}
 )
 
 // we are sharing a client for the tests, so we need to make sure we do not run contradicting tests in parallel

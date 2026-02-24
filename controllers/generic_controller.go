@@ -103,8 +103,7 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Info("reconciling resource deletion flow")
 			err := g.reconciler.Delete(rctx)
 			if err != nil {
-				var requeueErr *requeueError
-				if errors.As(err, &requeueErr) {
+				if requeueErr, ok := errors.AsType[*requeueError](err); ok {
 					log.Info(requeueErr.Error())
 					return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
 				}
@@ -192,16 +191,13 @@ func (g GenericController[O]) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	err := g.reconciler.Reconcile(rctx)
 	if err != nil {
-		var requeueErr *requeueError
-
-		switch {
-		case errors.As(err, &requeueErr):
+		if requeueErr, ok := errors.AsType[*requeueError](err); ok {
 			log.Info(requeueErr.Error())
 			return ctrl.Result{RequeueAfter: requeueErr.after}, nil //nolint:nilerr we need to return nil such that the requeue works
-		default:
-			log.Error(err, "error during reconcile")
-			return ctrl.Result{}, err
 		}
+
+		log.Error(err, "error during reconcile")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, statusErr
