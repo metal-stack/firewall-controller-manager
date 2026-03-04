@@ -32,6 +32,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 )
 
@@ -52,6 +53,7 @@ func main() {
 		shootTokenSecret        string
 		shootTokenPath          string
 		sshKeySecret            string
+		sshKeySecretNamespace   string
 		namespace               string
 		gracefulShutdownTimeout time.Duration
 		reconcileInterval       time.Duration
@@ -72,10 +74,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager")
-	flag.StringVar(&namespace, "namespace", "default", "the namespace this controller is running")
+	flag.StringVar(&namespace, "namespace", "", "the namespace this controller is running")
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 10*time.Minute, "duration after which a resource is getting reconciled at minimum")
-	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 20*time.Minute, "duration after a created firewall not getting ready is considered dead")
-	flag.DurationVar(&createTimeout, "create-timeout", 10*time.Minute, "duration after which a firewall in the creation phase will be recreated")
+	flag.DurationVar(&firewallHealthTimeout, "firewall-health-timeout", 0*time.Minute, "duration after a created firewall not getting ready is considered dead")
+	flag.DurationVar(&createTimeout, "create-timeout", 0*time.Minute, "duration after which a firewall in the creation phase will be recreated")
 	flag.DurationVar(&safetyBackoff, "safety-backoff", 10*time.Second, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&progressDeadline, "progress-deadline", 15*time.Minute, "time after which a deployment is considered unhealthy instead of progressing (informational)")
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
@@ -88,9 +90,14 @@ func main() {
 	flag.StringVar(&shootKubeconfigSecret, "shoot-kubeconfig-secret-name", "", "the secret name of the generic kubeconfig for shoot access")
 	flag.StringVar(&shootTokenSecret, "shoot-token-secret-name", "", "the secret name of the token for shoot access")
 	flag.StringVar(&sshKeySecret, "ssh-key-secret-name", "", "the secret name of the ssh key for machine access")
+	flag.StringVar(&sshKeySecretNamespace, "ssh-key-secret-namespace", "", "the secret name of the ssh key for machine access")
 	flag.StringVar(&shootTokenPath, "shoot-token-path", "", "the path where to store the token file for shoot access")
 
 	flag.Parse()
+
+	if sshKeySecretNamespace == "" {
+		sshKeySecretNamespace = namespace
+	}
 
 	slogHandler, err := controllers.NewLogger(logLevel)
 	if err != nil {
@@ -130,6 +137,7 @@ func main() {
 		LeaderElectionID:        "firewall-controller-manager-leader-election",
 		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 	})
+
 	if err != nil {
 		log.Fatalf("unable to setup firewall-controller-manager %v", err)
 	}
@@ -196,7 +204,7 @@ func main() {
 		//     secret for this controller and expose the access secrets through the firewall
 		//     status resource, which can be read by the firewall-controller
 		//   - the firewall-controller can then create a client from these secrets but
-		//     it has to contiuously update the token file because the token will expire
+		//     it has to continuously update the token file because the token will expire
 		//   - we can re-use the same approach for this controller as well and do not have
 		//     to do any additional mounts for the deployment of the controller
 		//
@@ -247,7 +255,7 @@ func main() {
 		ShootAPIServerURL:     shootApiURL,
 		ShootAccess:           externalShootAccess,
 		SSHKeySecretName:      sshKeySecret,
-		SSHKeySecretNamespace: namespace,
+		SSHKeySecretNamespace: sshKeySecretNamespace,
 		ShootAccessHelper:     internalShootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
@@ -260,20 +268,23 @@ func main() {
 		log.Fatalf("unable to create controller config %v", err)
 	}
 
-	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorderFor("firewall-deployment-controller"), seedMgr, cc); err != nil {
+	if err := deployment.SetupWithManager(ctrl.Log.WithName("controllers").WithName("deployment"), seedMgr.GetEventRecorder("firewall-deployment-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup deployment controller: %v", err)
 	}
-	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorderFor("firewall-set-controller"), seedMgr, cc); err != nil {
+	if err := set.SetupWithManager(ctrl.Log.WithName("controllers").WithName("set"), seedMgr.GetEventRecorder("firewall-set-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup set controller: %v", err)
 	}
-	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorderFor("firewall-controller"), seedMgr, cc); err != nil {
+	if err := firewall.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall"), seedMgr.GetEventRecorder("firewall-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup firewall controller: %v", err)
 	}
 	if err := monitor.SetupWithManager(ctrl.Log.WithName("controllers").WithName("firewall-monitor"), shootMgr, cc); err != nil {
 		log.Fatalf("unable to setup monitor controller: %v", err)
 	}
-	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorderFor("update-controller"), seedMgr, cc); err != nil {
+	if err := update.SetupWithManager(ctrl.Log.WithName("controllers").WithName("update"), seedMgr.GetEventRecorder("update-controller"), seedMgr, cc); err != nil {
 		log.Fatalf("unable to setup update controller: %v", err)
+	}
+	if err := timeout.SetupWithManager(ctrl.Log.WithName("controllers").WithName("timeout"), seedMgr.GetEventRecorder("timeout-controller"), seedMgr, cc); err != nil {
+		log.Fatalf("unable to setup timeout controller: %v", err)
 	}
 
 	if err := deployment.SetupWebhookWithManager(ctrl.Log.WithName("defaulting-webhook"), seedMgr, cc); err != nil {

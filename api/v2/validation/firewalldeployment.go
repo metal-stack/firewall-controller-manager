@@ -1,31 +1,68 @@
 package validation
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-type firewallDeploymentValidator struct{}
-
-func NewFirewallDeploymentValidator(log logr.Logger) *genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator] {
-	return &genericValidator[*v2.FirewallDeployment, *firewallDeploymentValidator]{log: log}
+type firewallDeploymentValidator struct {
+	log logr.Logger
 }
 
-func (v *firewallDeploymentValidator) ValidateCreate(log logr.Logger, f *v2.FirewallDeployment) field.ErrorList {
+func NewFirewallDeploymentValidator(log logr.Logger) admission.Validator[*v2.FirewallDeployment] {
+	return &firewallDeploymentValidator{
+		log: log,
+	}
+}
+
+func (v *firewallDeploymentValidator) ValidateCreate(ctx context.Context, f *v2.FirewallDeployment) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpec(log, &f.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessor(&f.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, v.validateSpec(&f.Spec, field.NewPath("spec"))...)
 
-	return allErrs
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
+
+	return nil, apierrors.NewInvalid(
+		f.GetObjectKind().GroupVersionKind().GroupKind(),
+		f.GetName(),
+		allErrs,
+	)
 }
 
-func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
+func (v *firewallDeploymentValidator) ValidateUpdate(ctx context.Context, oldF, newF *v2.FirewallDeployment) (admission.Warnings, error) {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaAccessorUpdate(&newF.ObjectMeta, &oldF.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, v.validateSpecUpdate(v.log, &oldF.Spec, &newF.Spec, &newF.Status, field.NewPath("spec"))...)
+
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
+
+	return nil, apierrors.NewInvalid(
+		newF.GetObjectKind().GroupVersionKind().GroupKind(),
+		newF.GetName(),
+		allErrs,
+	)
+}
+
+func (v *firewallDeploymentValidator) ValidateDelete(ctx context.Context, f *v2.FirewallDeployment) (warnings admission.Warnings, err error) {
+	return nil, nil
+}
+
+func (*firewallDeploymentValidator) validateSpec(f *v2.FirewallDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	switch f.Strategy {
@@ -59,15 +96,7 @@ func (*firewallDeploymentValidator) validateSpec(log logr.Logger, f *v2.Firewall
 		}
 	}
 
-	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpec(&f.Template.Spec, fldPath.Child("template").Child("spec"))...)
-
-	return allErrs
-}
-
-func (v *firewallDeploymentValidator) ValidateUpdate(log logr.Logger, oldF, newF *v2.FirewallDeployment) field.ErrorList {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, v.validateSpecUpdate(log, &oldF.Spec, &newF.Spec, &newF.Status, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateFirewallSpec(&f.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
 	return allErrs
 }
@@ -75,9 +104,9 @@ func (v *firewallDeploymentValidator) ValidateUpdate(log logr.Logger, oldF, newF
 func (v *firewallDeploymentValidator) validateSpecUpdate(log logr.Logger, oldF, newF *v2.FirewallDeploymentSpec, status *v2.FirewallDeploymentStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, v.validateSpec(log, newF, fldPath)...)
+	allErrs = append(allErrs, v.validateSpec(newF, fldPath)...)
 
-	allErrs = append(allErrs, NewFirewallValidator(log).Instance().validateSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
+	allErrs = append(allErrs, validateFirewallSpecUpdate(&oldF.Template.Spec, &newF.Template.Spec, fldPath.Child("template").Child("spec"))...)
 
 	// TODO: theoretically, the selector or metadata should be changeable, but we need to think it through... let's simplify for now and just not support it.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newF.Selector, oldF.Selector, fldPath.Child("selector"))...)

@@ -9,6 +9,8 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-go/api/client/machine"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,8 +35,6 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 	}
 
 	for _, f := range fws {
-		f := f
-
 		if f.ID == nil {
 			continue
 		}
@@ -48,7 +48,7 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 
 		r.Log.Info("deleted firewall", "firewall-name", f.Name, "id", *resp.Payload.ID)
 
-		c.recorder.Eventf(r.Target, "Normal", "Delete", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
+		c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
 	}
 
 	return nil

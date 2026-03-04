@@ -43,7 +43,7 @@ kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
 
 ## Development
 
-Most of the functionality is developed with the help of the [intgration](integration) test suite.
+Most of the functionality is developed with the help of the [integration](integration) test suite.
 
 To play with the FCM, you can also run this controller inside the [mini-lab](https://github.com/metal-stack/mini-lab) and without a running Gardener installation:
 
@@ -51,4 +51,4 @@ To play with the FCM, you can also run this controller inside the [mini-lab](htt
 1. Deploy the FCM into the mini-lab with `make deploy`
 1. Adapt the example [firewalldeployment.yaml](config/examples/firewalldeployment.yaml) and apply with `kubectl apply -f config/examples/firewalldeployment.yaml`
 1. Note that the firewall-controller will not be able to connect to the mini-lab due to network restrictions, so the firewall will not get ready.
-   - You can make the firewall become ready anyway by setting the annotation `kubectl annotate fw <fw-nsme> firewall.metal-stack.io/no-controller-connection=true`
+   - You can make the firewall become ready anyway by setting the annotation `kubectl annotate fw <fw-nsme> -n firewall firewall.metal-stack.io/no-controller-connection=true`

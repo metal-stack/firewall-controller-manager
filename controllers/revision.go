@@ -46,8 +46,6 @@ func MaxRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	}
 
 	for _, set := range sets {
-		set := set
-
 		if v, err := Revision(set); err != nil {
 			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
 		} else if v > max {
@@ -79,8 +77,6 @@ func MinRevisionOf(sets []*v2.FirewallSet) (*v2.FirewallSet, error) {
 	}
 
 	for _, set := range sets {
-		set := set
-
 		if v, err := Revision(set); err != nil {
 			return nil, fmt.Errorf("couldn't parse revision for firewall set: %w", err)
 		} else if v < min {
@@ -96,16 +92,12 @@ func Except[O client.Object](sets []O, except ...O) []O {
 	var result []O
 
 	for _, s := range sets {
-		s := s
-
 		if reflect.ValueOf(s).IsNil() {
 			continue
 		}
 
 		found := false
 		for _, e := range except {
-			e := e
-
 			if reflect.ValueOf(e).IsNil() {
 				continue
 			}

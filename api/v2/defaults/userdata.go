@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/flatcar/container-linux-config-transpiler/config/types"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
 const (
@@ -24,12 +23,12 @@ func renderUserdata(kubeconfig, seedKubeconfig []byte) (string, error) {
 					{
 						Name:    fmt.Sprintf("%s.service", FirewallControllerName),
 						Enable:  true,
-						Enabled: pointer.Pointer(true),
+						Enabled: new(true),
 					},
 					{
 						Name:    fmt.Sprintf("%s.service", DroptailerClientName),
 						Enable:  true,
-						Enabled: pointer.Pointer(true),
+						Enabled: new(true),
 					},
 				},
 			},

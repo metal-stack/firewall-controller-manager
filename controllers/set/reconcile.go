@@ -2,13 +2,16 @@ package set
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -89,7 +92,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 
 			r.Log.Info("firewall created", "firewall-name", fw.Name)
 
-			c.recorder.Eventf(r.Target, "Normal", "Create", "created firewall %s", fw.Name)
+			c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Create", "creating firewall", "created firewall %s", fw.Name)
 
 			ownedFirewalls = append(ownedFirewalls, fw)
 		}
@@ -108,13 +111,6 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallSet]) error {
 			}
 		}
 	}
-
-	deletedFws, err := c.deleteAfterTimeout(r, ownedFirewalls...)
-	if err != nil {
-		return err
-	}
-
-	ownedFirewalls = controllers.Except(ownedFirewalls, deletedFws...)
 
 	err = c.setStatus(r, ownedFirewalls)
 	if err != nil {
@@ -145,16 +141,23 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.FirewallSet]) (*v2.Fi
 		*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallSet")),
 	}
 
-	for k, v := range r.Target.Labels {
-		// inheriting labels from the firewall set to the firewall
-		meta.Labels[k] = v
-	}
+	// inheriting labels from the firewall set to the firewall
+	maps.Copy(meta.Labels, r.Target.Labels)
 
 	if v, err := semver.NewVersion(r.Target.Spec.Template.Spec.ControllerVersion); err == nil && v.LessThan(semver.MustParse("v2.0.0")) {
 		if meta.Annotations == nil {
 			meta.Annotations = map[string]string{}
 		}
 		meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = "true"
+	}
+
+	if r.Target.Annotations != nil {
+		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			if meta.Annotations == nil {
+				meta.Annotations = map[string]string{}
+			}
+			meta.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
+		}
 	}
 
 	fw := &v2.Firewall{
@@ -175,8 +178,6 @@ func (c *controller) adoptFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws []*
 	var adoptions []*v2.Firewall
 
 	for _, fw := range fws {
-		fw := fw
-
 		ok, err := c.adoptFirewall(r, fw)
 		if err != nil {
 			return nil, err

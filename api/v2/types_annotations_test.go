@@ -217,10 +217,6 @@ func TestAddAnnotation(t *testing.T) {
 			value:   "true",
 			wantErr: nil,
 			want: &Firewall{
-				TypeMeta: v1.TypeMeta{
-					Kind:       "Firewall",
-					APIVersion: "firewall.metal-stack.io/v2",
-				},
 				ObjectMeta: v1.ObjectMeta{
 					Name:            "test",
 					ResourceVersion: "1",
@@ -279,10 +275,6 @@ func TestRemoveAnnotation(t *testing.T) {
 			key:     "test",
 			wantErr: nil,
 			want: &Firewall{
-				TypeMeta: v1.TypeMeta{
-					Kind:       "Firewall",
-					APIVersion: "firewall.metal-stack.io/v2",
-				},
 				ObjectMeta: v1.ObjectMeta{
 					Name:            "test",
 					ResourceVersion: "1",
@@ -348,7 +340,6 @@ func Test_annotationWasRemoved(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := annotationWasRemoved(event.UpdateEvent{
 				ObjectOld: &Firewall{
@@ -406,7 +397,6 @@ func Test_annotationWasAdded(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := annotationWasAdded(event.UpdateEvent{
 				ObjectOld: &Firewall{

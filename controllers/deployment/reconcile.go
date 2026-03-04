@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
@@ -166,6 +167,12 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 		},
 	}
 
+	if r.Target.Annotations != nil {
+		if val, ok := r.Target.Annotations[v2.FirewallNoControllerConnectionAnnotation]; ok {
+			set.Annotations[v2.FirewallNoControllerConnectionAnnotation] = val
+		}
+	}
+
 	err = c.c.GetSeedClient().Create(r.Ctx, set, &client.CreateOptions{})
 	if err != nil {
 		cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "FirewallSetCreateError", fmt.Sprintf("Error creating firewall set: %s.", err))
@@ -211,7 +218,7 @@ func (c *controller) syncFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment],
 	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "FirewallSetUpdated", fmt.Sprintf("Updated firewall set %q.", set.Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(set, "Normal", "Update", "updated firewallset %s", set.Name)
+	c.recorder.Eventf(set, nil, corev1.EventTypeNormal, "Update", "updating set", "updated firewall set %s", set.Name)
 
 	return nil
 }

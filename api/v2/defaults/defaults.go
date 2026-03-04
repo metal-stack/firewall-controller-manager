@@ -10,7 +10,6 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -26,21 +25,21 @@ type (
 	}
 	firewallSetDefaulter struct {
 		c   *config.ControllerConfig
-		fd  *firewallDefaulter
+		fd  admission.Defaulter[*v2.Firewall]
 		log logr.Logger
 	}
 	firewallDeploymentDefaulter struct {
 		c   *config.ControllerConfig
-		fd  *firewallDefaulter
+		fd  admission.Defaulter[*v2.Firewall]
 		log logr.Logger
 	}
 )
 
-func NewFirewallDefaulter(log logr.Logger, c *config.ControllerConfig) (*firewallDefaulter, error) {
+func NewFirewallDefaulter(log logr.Logger, c *config.ControllerConfig) (admission.Defaulter[*v2.Firewall], error) {
 	return &firewallDefaulter{log: log, c: c}, nil
 }
 
-func NewFirewallSetDefaulter(log logr.Logger, c *config.ControllerConfig) (admission.CustomDefaulter, error) {
+func NewFirewallSetDefaulter(log logr.Logger, c *config.ControllerConfig) (admission.Defaulter[*v2.FirewallSet], error) {
 	fd, err := NewFirewallDefaulter(log, c)
 	if err != nil {
 		return nil, err
@@ -49,7 +48,7 @@ func NewFirewallSetDefaulter(log logr.Logger, c *config.ControllerConfig) (admis
 	return &firewallSetDefaulter{log: log, c: c, fd: fd}, nil
 }
 
-func NewFirewallDeploymentDefaulter(log logr.Logger, c *config.ControllerConfig) (admission.CustomDefaulter, error) {
+func NewFirewallDeploymentDefaulter(log logr.Logger, c *config.ControllerConfig) (admission.Defaulter[*v2.FirewallDeployment], error) {
 	fd, err := NewFirewallDefaulter(log, c)
 	if err != nil {
 		return nil, err
@@ -58,12 +57,7 @@ func NewFirewallDeploymentDefaulter(log logr.Logger, c *config.ControllerConfig)
 	return &firewallDeploymentDefaulter{log: log, c: c, fd: fd}, nil
 }
 
-func (r *firewallDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	f, ok := obj.(*v2.Firewall)
-	if !ok {
-		return fmt.Errorf("mutator received unexpected type: %T", obj)
-	}
-
+func (r *firewallDefaulter) Default(ctx context.Context, f *v2.Firewall) error {
 	r.log.Info("defaulting firewall resource", "name", f.GetName(), "namespace", f.GetNamespace())
 
 	defaultFirewallSpec(&f.Spec)
@@ -71,12 +65,7 @@ func (r *firewallDefaulter) Default(ctx context.Context, obj runtime.Object) err
 	return nil
 }
 
-func (r *firewallSetDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	f, ok := obj.(*v2.FirewallSet)
-	if !ok {
-		return fmt.Errorf("mutator received unexpected type: %T", obj)
-	}
-
+func (r *firewallSetDefaulter) Default(ctx context.Context, f *v2.FirewallSet) error {
 	r.log.Info("defaulting firewallset resource", "name", f.GetName(), "namespace", f.GetNamespace())
 
 	if f.Spec.Selector == nil {
@@ -88,12 +77,7 @@ func (r *firewallSetDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	return nil
 }
 
-func (r *firewallDeploymentDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	f, ok := obj.(*v2.FirewallDeployment)
-	if !ok {
-		return fmt.Errorf("mutator received unexpected type: %T", obj)
-	}
-
+func (r *firewallDeploymentDefaulter) Default(ctx context.Context, f *v2.FirewallDeployment) error {
 	r.log.Info("defaulting firewalldeployment resource", "name", f.GetName(), "namespace", f.GetNamespace())
 
 	if f.Spec.Strategy == "" {

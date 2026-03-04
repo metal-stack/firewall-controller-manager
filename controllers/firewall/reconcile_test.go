@@ -53,7 +53,6 @@ func Test_ensureTag(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := ensureTag(tt.currentTags, tt.key, tt.value)
 			if diff := cmp.Diff(got, tt.want); diff != "" {

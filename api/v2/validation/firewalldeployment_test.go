@@ -85,7 +85,6 @@ func Test_firewallDeploymentValidator_ValidateCreate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallDeploymentValidator(testr.New(t))
 
@@ -169,7 +168,7 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.selector: Invalid value: map[string]string{"purpose":"shoot-firewall"}: field is immutable`,
+					Message: ` "firewall" is invalid: spec.selector: Invalid value: {"purpose":"shoot-firewall"}: field is immutable`,
 				},
 			},
 		},
@@ -188,7 +187,6 @@ func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallDeploymentValidator(testr.New(t))
 

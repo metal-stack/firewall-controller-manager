@@ -92,7 +92,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
+					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: {"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
 				},
 			},
 		},
@@ -106,7 +106,7 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
+					Message: ` "firewall" is invalid: spec.template.metadata.labels: Invalid value: {"purpose":"shoot-firewall"}: ` + "`selector` does not match template `labels`",
 				},
 			},
 		},
@@ -124,7 +124,6 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallSetValidator(testr.New(t))
 
@@ -207,7 +206,7 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 			},
 			wantErr: &apierrors.StatusError{
 				ErrStatus: metav1.Status{
-					Message: ` "firewall" is invalid: spec.selector: Invalid value: map[string]string{"purpose":"shoot-firewall"}: field is immutable`,
+					Message: ` "firewall" is invalid: spec.selector: Invalid value: {"purpose":"shoot-firewall"}: field is immutable`,
 				},
 			},
 		},
@@ -226,7 +225,6 @@ func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewFirewallSetValidator(testr.New(t))
 

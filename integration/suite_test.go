@@ -16,6 +16,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/monitor"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
+	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
@@ -32,7 +33,9 @@ import (
 )
 
 const (
-	namespaceName = "test"
+	namespaceName         = "test"
+	firewallHealthTimeout = 19 * 24 * time.Hour
+	firewallCreateTimeout = 19 * 24 * time.Hour
 )
 
 var (
@@ -130,14 +133,14 @@ var _ = BeforeSuite(func() {
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, "cluster-a"),
 		SafetyBackoff:         10 * time.Second,
 		ProgressDeadline:      10 * time.Minute,
-		FirewallHealthTimeout: 20 * time.Minute,
-		CreateTimeout:         10 * time.Minute,
+		FirewallHealthTimeout: firewallHealthTimeout,
+		CreateTimeout:         firewallCreateTimeout,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
 	err = deployment.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("deployment"),
-		mgr.GetEventRecorderFor("firewall-deployment-controller"),
+		mgr.GetEventRecorder("firewall-deployment-controller"),
 		mgr,
 		cc,
 	)
@@ -145,7 +148,7 @@ var _ = BeforeSuite(func() {
 
 	err = set.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("set"),
-		mgr.GetEventRecorderFor("firewall-set-controller"),
+		mgr.GetEventRecorder("firewall-set-controller"),
 		mgr,
 		cc,
 	)
@@ -153,7 +156,7 @@ var _ = BeforeSuite(func() {
 
 	err = firewall.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("firewall"),
-		mgr.GetEventRecorderFor("firewall-controller"),
+		mgr.GetEventRecorder("firewall-controller"),
 		mgr,
 		cc,
 	)
@@ -161,7 +164,15 @@ var _ = BeforeSuite(func() {
 
 	err = update.SetupWithManager(
 		ctrl.Log.WithName("controllers").WithName("update"),
-		mgr.GetEventRecorderFor("update-controller"),
+		mgr.GetEventRecorder("update-controller"),
+		mgr,
+		cc,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = timeout.SetupWithManager(
+		ctrl.Log.WithName("controllers").WithName("timeout"),
+		mgr.GetEventRecorder("timeout-controller"),
 		mgr,
 		cc,
 	)
