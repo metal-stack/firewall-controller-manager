@@ -6,7 +6,8 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallSet]) error {
@@ -34,7 +35,7 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 
 		r.Log.Info("set deletion timestamp on firewall", "firewall-name", fw.Name)
 
-		c.recorder.Eventf(fw, nil, "Normal", "Delete", "deleted firewall %s", fw.Name)
+		c.recorder.Eventf(fw, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s", fw.Name)
 	}
 
 	if len(fws) > 0 {
@@ -42,29 +43,4 @@ func (c *controller) deleteFirewalls(r *controllers.Ctx[*v2.FirewallSet], fws ..
 	}
 
 	return nil
-}
-
-func (c *controller) deleteAfterTimeout(r *controllers.Ctx[*v2.FirewallSet], fws ...*v2.Firewall) ([]*v2.Firewall, error) {
-	var result []*v2.Firewall
-
-	for _, fw := range fws {
-		if fw.Status.Phase != v2.FirewallPhaseCreating {
-			continue
-		}
-
-		connected := pointer.SafeDeref(fw.Status.Conditions.Get(v2.FirewallControllerConnected)).Status == v2.ConditionTrue
-
-		if !connected && time.Since(fw.CreationTimestamp.Time) > c.c.GetCreateTimeout() {
-			r.Log.Info("firewall not getting ready, deleting from set", "firewall-name", fw.Name)
-
-			err := c.deleteFirewalls(r, fw)
-			if err != nil {
-				return nil, err
-			}
-
-			result = append(result, fw)
-		}
-	}
-
-	return result, nil
 }

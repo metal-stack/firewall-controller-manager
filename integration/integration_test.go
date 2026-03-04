@@ -314,6 +314,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.Reason).To(Equal("Connected"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.String())))
 				})
+
 				It("should have the firewall-controller connected to seed condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
@@ -324,6 +325,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.Reason).To(Equal("Connected"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.String())))
 				})
+
 				It("should have configured the distance", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
@@ -333,6 +335,13 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Configured"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller has configured the specified distance %d.", v2.FirewallShortestDistance)))
+				})
+
+				It("should be in the running phase", func() {
+					Eventually(func() v2.FirewallPhase {
+						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+						return fw.Status.Phase
+					}, 5*time.Second, interval).Should(Equal(v2.FirewallPhaseRunning))
 				})
 			})
 
@@ -577,6 +586,13 @@ var _ = Context("integration test", Ordered, func() {
 						}, v2.FirewallControllerConnected, v2.ConditionFalse, 15*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
+					})
+
+					It("should be in the creating phase", func() {
+						Eventually(func() v2.FirewallPhase {
+							Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+							return fw.Status.Phase
+						}, 5*time.Second, interval).Should(Equal(v2.FirewallPhaseCreating))
 					})
 
 					It("should have firewall networks populated", func() {
@@ -1005,6 +1021,17 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
 				})
 
+				It("should have the provisioned condition true", func() {
+					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+						return fd.Status.Conditions
+					}, v2.FirewallProvisioned, v2.ConditionTrue, 15*time.Second)
+
+					Expect(cond.LastTransitionTime).NotTo(BeZero())
+					Expect(cond.LastUpdateTime).NotTo(BeZero())
+					Expect(cond.Reason).To(Equal("Provisioned"))
+					Expect(cond.Message).To(Equal("All firewall conditions have been met."))
+				})
+
 				It("should have the monitor condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
@@ -1026,6 +1053,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.Reason).To(Equal("Connected"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled shoot at %s.", mon.ControllerStatus.Updated.String())))
 				})
+
 				It("should have the firewall-controller connected to seed condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
@@ -1036,6 +1064,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.Reason).To(Equal("Connected"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller reconciled firewall at %s.", mon.ControllerStatus.SeedUpdated.String())))
 				})
+
 				It("should have configured the distance", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 						return fd.Status.Conditions
@@ -1045,6 +1074,13 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Configured"))
 					Expect(cond.Message).To(Equal(fmt.Sprintf("Controller has configured the specified distance %d.", v2.FirewallShortestDistance)))
+				})
+
+				It("should be in the running phase", func() {
+					Eventually(func() v2.FirewallPhase {
+						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+						return fw.Status.Phase
+					}, 5*time.Second, interval).Should(Equal(v2.FirewallPhaseRunning))
 				})
 			})
 
@@ -1371,6 +1407,17 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Ready"))
 						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *readyFirewall.Allocation.Name)))
+					})
+
+					It("should have the provisioned condition true", func() {
+						cond := testcommon.WaitForCondition(k8sClient, ctx, newFw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+							return fd.Status.Conditions
+						}, v2.FirewallProvisioned, v2.ConditionTrue, 15*time.Second)
+
+						Expect(cond.LastTransitionTime).NotTo(BeZero())
+						Expect(cond.LastUpdateTime).NotTo(BeZero())
+						Expect(cond.Reason).To(Equal("Provisioned"))
+						Expect(cond.Message).To(Equal("All firewall conditions have been met."))
 					})
 
 					It("should have the monitor condition true", func() {
@@ -1705,12 +1752,15 @@ var _ = Context("integration test", Ordered, func() {
 			})
 
 			It("should adopt the existing firewall", func() {
-				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
-					return l.GetItems()
-				}, 10*time.Second)
+				Eventually(func() []metav1.OwnerReference {
+					fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+						return l.GetItems()
+					}, 10*time.Second)
+
+					return fw.OwnerReferences
+				}, 5*time.Second, interval).To((HaveLen(1)))
 
 				Expect(fw.Name).To(Equal("test"))
-				Expect(fw.OwnerReferences).To(HaveLen(1))
 
 				Expect(fw.OwnerReferences[0].UID).To(Equal(set.UID))
 			})
@@ -1767,6 +1817,17 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
 			})
 
+			It("should have the provisioned condition true", func() {
+				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
+					return fd.Status.Conditions
+				}, v2.FirewallProvisioned, v2.ConditionTrue, 15*time.Second)
+
+				Expect(cond.LastTransitionTime).NotTo(BeZero())
+				Expect(cond.LastUpdateTime).NotTo(BeZero())
+				Expect(cond.Reason).To(Equal("Provisioned"))
+				Expect(cond.Message).To(Equal("All firewall conditions have been met."))
+			})
+
 			It("should have the monitor condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, fw.DeepCopy(), func(fd *v2.Firewall) v2.Conditions {
 					return fd.Status.Conditions
@@ -1787,6 +1848,13 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
 				Expect(cond.Reason).To(Equal("NotChecking"))
 				Expect(cond.Message).To(Equal("Not checking controller connection due to firewall annotation."))
+			})
+
+			It("should be in the running phase", func() {
+				Eventually(func() v2.FirewallPhase {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+					return fw.Status.Phase
+				}, 5*time.Second, interval).Should(Equal(v2.FirewallPhaseRunning))
 			})
 		})
 
@@ -1910,5 +1978,7 @@ var _ = Context("integration test", Ordered, func() {
 				})
 			})
 		})
+
 	})
+
 })

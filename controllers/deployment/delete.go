@@ -6,6 +6,7 @@ import (
 
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.FirewallDeployment]) error {
@@ -33,7 +34,7 @@ func (c *controller) deleteFirewallSets(r *controllers.Ctx[*v2.FirewallDeploymen
 
 		r.Log.Info("set deletion timestamp on firewall set", "set-name", set.Name)
 
-		c.recorder.Eventf(set, nil, "Normal", "Delete", "deleted firewallset %s", set.Name)
+		c.recorder.Eventf(set, nil, corev1.EventTypeNormal, "Delete", "deleting set", "deleted firewall set %s", set.Name)
 	}
 
 	if len(sets) > 0 {
