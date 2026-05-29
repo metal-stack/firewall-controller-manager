@@ -441,6 +441,48 @@ var _ = Context("integration test", Ordered, func() {
 			})
 		})
 
+		When("the firewall gets annotated with a systemd service restart annotation", Ordered, func() {
+			var (
+				fw  *v2.Firewall
+				mon *v2.FirewallMonitor
+			)
+
+			BeforeEach(func() {
+				fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
+					return l.GetItems()
+				}, 2*time.Second)
+				mon = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
+					return l.GetItems()
+				}, 2*time.Second)
+			})
+
+			It("setting the annotation works", func() {
+				fw.Annotations = map[string]string{
+					v2.FirewallRestartSystemdServicesAnnotation: "droptailer",
+				}
+				Expect(k8sClient.Update(ctx, fw)).To(Succeed())
+			})
+
+			It("the annotation gets removed from the firewall", func() {
+				Eventually(func() map[string]string {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(fw), fw)).To(Succeed())
+					return fw.Annotations
+				}, 5*time.Second, interval).Should(Not(HaveKey(v2.FirewallRestartSystemdServicesAnnotation)), "systemd service restart annotation was not removed")
+			})
+
+			It("the annotation was added to the firewall monitor", func() {
+				Eventually(func() map[string]string {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed())
+					return mon.Annotations
+				}, 5*time.Second, interval).Should(HaveKey(v2.FirewallRestartSystemdServicesAnnotation), "systemd service restart annotation was not added to the firewall monitor")
+			})
+
+			It("removing the annotation from the monitor works", func() {
+				mon.Annotations = nil
+				Expect(k8sClient.Update(ctx, mon)).To(Succeed())
+			})
+		})
+
 		When("a significant change occurs", Ordered, func() {
 			var (
 				installingFirewall = firewall2("Installing", "is installing")
