@@ -41,6 +41,23 @@ A user can initiate rolling the latest firewall set by annotating a monitor in t
 kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/roll-set=true
 ```
 
+## Restarting a systemd-service on the Firewall through Annotation
+
+A user can initiate the restart of a systemd service through annotating the `FirewallMonitor`:
+
+```bash
+kubectl annotate fwmon <firewall-name> firewall.metal-stack.io/restart-systemd-services=tailscale
+```
+
+The firewall-controller imeplements a whitelist of allowed services to restart.
+
+In addition, operators can overwrite this whitelist and also initiate a service restart by annotating the `Firewall` resource instead of the `FirewallMonitor`:
+
+```bash
+kubectl annotate fw <firewall-name> firewall.metal-stack.io/restart-systemd-services-whitelist=tailscale,frr
+kubectl annotate fw <firewall-name> firewall.metal-stack.io/restart-systemd-services=frr
+```
+
 ## Development
 
 Most of the functionality is developed with the help of the [integration](integration) test suite.
