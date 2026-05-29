@@ -41,14 +41,14 @@ func (c *controller) recreateStrategy(r *controllers.Ctx[*v2.FirewallDeployment]
 		r.Log.Info("set replicas are not yet ready")
 
 		if time.Since(latestSet.CreationTimestamp.Time) > c.c.GetProgressDeadline() {
-			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", latestSet.Name))
+			cond := v2.NewCondition(v2.FirewallDeploymentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", latestSet.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}
 
 		return nil
 	}
 
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", latestSet.Name))
+	cond := v2.NewCondition(v2.FirewallDeploymentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", latestSet.Name))
 	r.Target.Status.Conditions.Set(cond)
 
 	return nil

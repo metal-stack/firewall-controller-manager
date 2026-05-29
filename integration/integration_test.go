@@ -393,7 +393,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the rbac condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
+					}, v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -404,7 +404,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the available condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
+					}, v2.FirewallDeploymentAvailable, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -415,7 +415,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the progress condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
+					}, v2.FirewallDeploymentProgressing, v2.ConditionTrue, 15*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -727,7 +727,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the rbac condition true", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
+						}, v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -738,7 +738,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the available condition false", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentAvailable, v2.ConditionFalse, 5*time.Second)
+						}, v2.FirewallDeploymentAvailable, v2.ConditionFalse, 5*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -749,7 +749,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the progress condition true", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
+						}, v2.FirewallDeploymentProgressing, v2.ConditionTrue, 15*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1174,7 +1174,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the rbac condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
+					}, v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1185,7 +1185,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the available condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
+					}, v2.FirewallDeploymentAvailable, v2.ConditionTrue, 5*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1196,7 +1196,7 @@ var _ = Context("integration test", Ordered, func() {
 				It("should have the progress condition true", func() {
 					cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 						return fd.Status.Conditions
-					}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
+					}, v2.FirewallDeploymentProgressing, v2.ConditionTrue, 15*time.Second)
 
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1584,7 +1584,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the rbac condition true", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
+						}, v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1595,7 +1595,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the available condition true", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
+						}, v2.FirewallDeploymentAvailable, v2.ConditionTrue, 5*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1606,7 +1606,7 @@ var _ = Context("integration test", Ordered, func() {
 					It("should have the progress condition true", func() {
 						cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 							return fd.Status.Conditions
-						}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 15*time.Second)
+						}, v2.FirewallDeploymentProgressing, v2.ConditionTrue, 15*time.Second)
 
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1924,7 +1924,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the rbac condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, 5*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1935,7 +1935,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the available condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentAvailable, v2.ConditionTrue, 5*time.Second)
+				}, v2.FirewallDeploymentAvailable, v2.ConditionTrue, 5*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
@@ -1946,7 +1946,7 @@ var _ = Context("integration test", Ordered, func() {
 			It("should have the progress condition true", func() {
 				cond := testcommon.WaitForCondition(k8sClient, ctx, deployment(), func(fd *v2.FirewallDeployment) v2.Conditions {
 					return fd.Status.Conditions
-				}, v2.FirewallDeplomentProgressing, v2.ConditionTrue, 30*time.Second)
+				}, v2.FirewallDeploymentProgressing, v2.ConditionTrue, 30*time.Second)
 
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())

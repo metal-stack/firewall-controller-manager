@@ -16,13 +16,13 @@ func (c *controller) ensureFirewallControllerRBAC(r *controllers.Ctx[*v2.Firewal
 		if err != nil {
 			r.Log.Error(err, "unable to ensure firewall controller rbac")
 
-			cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionFalse, "Error", fmt.Sprintf("RBAC resources could not be provisioned %s", err))
+			cond := v2.NewCondition(v2.FirewallDeploymentRBACProvisioned, v2.ConditionFalse, "Error", fmt.Sprintf("RBAC resources could not be provisioned %s", err))
 			r.Target.Status.Conditions.Set(cond)
 
 			return
 		}
 
-		cond := v2.NewCondition(v2.FirewallDeplomentRBACProvisioned, v2.ConditionTrue, "Provisioned", "RBAC provisioned successfully.")
+		cond := v2.NewCondition(v2.FirewallDeploymentRBACProvisioned, v2.ConditionTrue, "Provisioned", "RBAC provisioned successfully.")
 		r.Target.Status.Conditions.Set(cond)
 	}()
 

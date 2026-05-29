@@ -37,14 +37,14 @@ func (c *controller) rollingUpdateStrategy(r *controllers.Ctx[*v2.FirewallDeploy
 		r.Log.Info("set replicas are not yet ready")
 
 		if time.Since(latestSet.CreationTimestamp.Time) > c.c.GetProgressDeadline() {
-			cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", latestSet.Name))
+			cond := v2.NewCondition(v2.FirewallDeploymentProgressing, v2.ConditionFalse, "ProgressDeadlineExceeded", fmt.Sprintf("FirewallSet %q has timed out progressing.", latestSet.Name))
 			r.Target.Status.Conditions.Set(cond)
 		}
 
 		return c.cleanupIntermediateSets(r, ownedSets)
 	}
 
-	cond := v2.NewCondition(v2.FirewallDeplomentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", latestSet.Name))
+	cond := v2.NewCondition(v2.FirewallDeploymentProgressing, v2.ConditionTrue, "NewFirewallSetAvailable", fmt.Sprintf("FirewallSet %q has successfully progressed.", latestSet.Name))
 	r.Target.Status.Conditions.Set(cond)
 
 	r.Log.Info("ensuring old sets are cleaned up")
