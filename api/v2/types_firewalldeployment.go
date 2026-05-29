@@ -80,12 +80,12 @@ type FirewallDeploymentStatus struct {
 }
 
 const (
-	// FirewallDeplomentAvailable indicates whether the deployment has reached the desired amount of replicas or not.
-	FirewallDeplomentAvailable ConditionType = "Available"
-	// FirewallDeplomentAvailable indicates whether the deployment has reached the desired amount of replicas or not.
-	FirewallDeplomentProgressing ConditionType = "Progressing"
-	// FirewallDeplomentRBACProvisioned indicates whether the rbac permissions for the firewall-controller to communicate with the api server were provisioned.
-	FirewallDeplomentRBACProvisioned ConditionType = "RBACProvisioned"
+	// FirewallDeploymentAvailable indicates whether the deployment has reached the desired amount of replicas or not.
+	FirewallDeploymentAvailable ConditionType = "Available"
+	// FirewallDeploymentProgressing indicates whether the deployment has reached the desired amount of replicas or not.
+	FirewallDeploymentProgressing ConditionType = "Progressing"
+	// FirewallDeploymentRBACProvisioned indicates whether the rbac permissions for the firewall-controller to communicate with the api server were provisioned.
+	FirewallDeploymentRBACProvisioned ConditionType = "RBACProvisioned"
 )
 
 // FirewallDeploymentList contains a list of firewalls deployments
