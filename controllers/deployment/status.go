@@ -25,10 +25,10 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.FirewallDeployment], owned
 	}
 
 	if r.Target.Status.ReadyReplicas >= r.Target.Spec.Replicas {
-		cond := v2.NewCondition(v2.FirewallDeplomentAvailable, v2.ConditionTrue, "MinimumReplicasAvailable", "Deployment has minimum availability.")
+		cond := v2.NewCondition(v2.FirewallDeploymentAvailable, v2.ConditionTrue, "MinimumReplicasAvailable", "Deployment has minimum availability.")
 		r.Target.Status.Conditions.Set(cond)
 	} else {
-		cond := v2.NewCondition(v2.FirewallDeplomentAvailable, v2.ConditionFalse, "MinimumReplicasUnavailable", "Deployment does not have minimum availability.")
+		cond := v2.NewCondition(v2.FirewallDeploymentAvailable, v2.ConditionFalse, "MinimumReplicasUnavailable", "Deployment does not have minimum availability.")
 		r.Target.Status.Conditions.Set(cond)
 	}
 
