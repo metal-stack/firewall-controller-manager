@@ -12,14 +12,42 @@ import (
 	"github.com/metal-stack/metal-go/api/client/machine"
 	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Reconciler must always return either an error or requeue to ensure that it detects if a firewall get lost etc.
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
+	if services, ok := r.Target.GetAnnotations()[v2.FirewallRestartSystemdServicesAnnotation]; ok {
+		mon := &v2.FirewallMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      r.Target.Name,
+				Namespace: c.c.GetShootNamespace(),
+			},
+		}
+
+		err := c.c.GetShootClient().Get(r.Ctx, client.ObjectKeyFromObject(mon), mon)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("unable to get firewall monitor: %w", err)
+		}
+
+		if err == nil {
+			if err := v2.AddAnnotation(r.Ctx, c.c.GetShootClient(), mon, v2.FirewallRestartSystemdServicesAnnotation, services); err != nil {
+				return fmt.Errorf("unable to pass systemd service restart annotation to the firewall monitor: %w", err)
+			}
+		}
+
+		if err := v2.RemoveAnnotation(r.Ctx, c.c.GetSeedClient(), r.Target, v2.FirewallRestartSystemdServicesAnnotation); err != nil {
+			return fmt.Errorf("unable to remove systemd service restart annotation from firewall: %w", err)
+		}
+
+		return controllers.RequeueAfter(0*time.Second, "removed systemd service restart annotation, requeue for regular reconcile")
+	}
+
 	var f *models.V1FirewallResponse
 	defer func() {
 		if err := c.setStatus(r, f); err != nil {
