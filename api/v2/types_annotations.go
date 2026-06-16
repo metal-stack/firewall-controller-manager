@@ -36,6 +36,13 @@ const (
 	// Defaults to 0 if no annotation is present. Negative values are allowed.
 	FirewallWeightAnnotation = "firewall.metal-stack.io/weight"
 
+	// FirewallRestartSystemdServicesAnnotation can be used to restart a whitelisted set of systemd services running on the firewall.
+	// Services must be passed comma-separated.
+	FirewallRestartSystemdServicesAnnotation = "firewall.metal-stack.io/restart-systemd-services"
+	// FirewallSystemdServicesWhitelistAnnotation can be used to overwrite the default systemd service whitelisted. This allows operators
+	// to temporarily allow restarts of services like FRR, which might not be desired to be allowed permanently for platform users.
+	FirewallRestartSystemdServicesWhitelistAnnotation = "firewall.metal-stack.io/restart-systemd-services-whitelist"
+
 	// FirewallControllerSetAnnotation is a tag added to the firewall entity indicating to which set a firewall belongs to.
 	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
 )
