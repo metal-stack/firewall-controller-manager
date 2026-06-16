@@ -54,7 +54,7 @@ The firewall-controller imeplements a whitelist of allowed services to restart.
 In addition, operators can overwrite this whitelist and also initiate a service restart by annotating the `Firewall` resource instead of the `FirewallMonitor`:
 
 ```bash
-kubectl annotate fw <firewall-name> firewall.metal-stack.io/restart-systemd-services-whitelist=tailscale,frr
+kubectl annotate fw <firewall-name> firewall.metal-stack.io/restart-systemd-services-whitelist=tailscale.service,frr.service
 kubectl annotate fw <firewall-name> firewall.metal-stack.io/restart-systemd-services=frr
 ```
 
