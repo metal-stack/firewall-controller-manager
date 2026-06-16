@@ -114,6 +114,64 @@ func Test_firewallValidator_ValidateCreate(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			name: "invalid egress protocol in initial rule set",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				f.Spec.InitialRuleSet = &v2.InitialRuleSet{
+					Egress: []v2.EgressRule{
+						{
+							Protocol: v2.NetworkProtocol("foo"),
+						},
+					},
+				}
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall-123" is invalid: spec.initialRuleSet.egress.rule.protocol: Invalid value: "foo": protocol not supported: foo`,
+				},
+			},
+		},
+		{
+			name: "invalid egress port range in initial rule set",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				f.Spec.InitialRuleSet = &v2.InitialRuleSet{
+					Egress: []v2.EgressRule{
+						{
+							Protocol: v2.NetworkProtocolTCP,
+							Ports:    []int32{65536},
+						},
+					},
+				}
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall-123" is invalid: spec.initialRuleSet.egress.rule.ports: Invalid value: 65536: port is out of range: 65536`,
+				},
+			},
+		},
+		{
+			name: "invalid egress cidr in initial rule set",
+			mutateFn: func(f *v2.Firewall) *v2.Firewall {
+				f.Spec.InitialRuleSet = &v2.InitialRuleSet{
+					Egress: []v2.EgressRule{
+						{
+							Protocol: v2.NetworkProtocolTCP,
+							Ports:    []int32{1234},
+							To:       []string{"1.2.3.4", "3.4.5.6/32"},
+						},
+					},
+				}
+				return f
+			},
+			wantErr: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Message: ` "firewall-123" is invalid: spec.initialRuleSet.egress.rule.to: Invalid value: "1.2.3.4": invalid cidr: netip.ParsePrefix("1.2.3.4"): no '/'`,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
