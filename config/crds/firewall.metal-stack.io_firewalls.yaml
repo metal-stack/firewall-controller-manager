@@ -325,6 +325,9 @@ spec:
                       items:
                         type: string
                       type: array
+                    project:
+                      description: Project of this network
+                      type: string
                     vrf:
                       description: Vrf is vrf id of this network.
                       format: int64
@@ -334,6 +337,7 @@ spec:
                   - nat
                   - networkID
                   - networkType
+                  - project
                   - vrf
                   type: object
                 type: array

@@ -263,6 +263,8 @@ type FirewallNetwork struct {
 	Prefixes []string `json:"prefixes,omitempty"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
+	// Project of this network
+	Project *string `json:"project"`
 }
 
 // FirewallList contains a list of firewalls

@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"testing/synctest"
@@ -190,7 +189,7 @@ func Test_EvaluateFirewallStatus(t *testing.T) {
 			want: &FirewallStatusEvalResult{
 				Result:    FirewallStatusUnhealthy,
 				Reason:    "not all health conditions are true: [SeedConnected]",
-				TimeoutIn: pointer.Pointer(5 * time.Minute),
+				TimeoutIn: new(5 * time.Minute),
 			},
 		},
 		{
@@ -219,7 +218,7 @@ func Test_EvaluateFirewallStatus(t *testing.T) {
 			want: &FirewallStatusEvalResult{
 				Result:    FirewallStatusProgressing,
 				Reason:    "not all health conditions are true: [Provisioned]",
-				TimeoutIn: pointer.Pointer(5 * time.Minute),
+				TimeoutIn: new(5 * time.Minute),
 			},
 		},
 	}

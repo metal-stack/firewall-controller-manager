@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/metal-stack/api/go/enum"
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/models"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse) error {
+func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *apiv2.Machine) error {
 	var errs []error
 
 	err := setMachineStatus(r.Target, f)
@@ -30,7 +30,7 @@ func (c *controller) setStatus(r *controllers.Ctx[*v2.Firewall], f *models.V1Fir
 	return errors.Join(errs...)
 }
 
-func setMachineStatus(fw *v2.Firewall, f *models.V1FirewallResponse) error {
+func setMachineStatus(fw *v2.Firewall, f *apiv2.Machine) error {
 	if f == nil {
 		return nil
 	}
@@ -45,35 +45,44 @@ func setMachineStatus(fw *v2.Firewall, f *models.V1FirewallResponse) error {
 	return nil
 }
 
-func getMachineStatus(f *models.V1FirewallResponse) (*v2.MachineStatus, error) {
-	if f.ID == nil || f.Allocation == nil || f.Allocation.Created == nil || f.Liveliness == nil || f.Allocation.Image == nil {
+func getMachineStatus(f *apiv2.Machine) (*v2.MachineStatus, error) {
+	if f.Allocation == nil || f.Allocation.Meta == nil || f.Allocation.Meta.CreatedAt == nil || f.Allocation.Image == nil || f.Status == nil {
 		return nil, fmt.Errorf("firewall entity from metal-api is missing essential fields")
 	}
 
+	liveliness, err := enum.GetStringValue(f.Status.Liveliness)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &v2.MachineStatus{
-		MachineID:           *f.ID,
-		AllocationTimestamp: metav1.NewTime(time.Time(*f.Allocation.Created)),
-		Liveliness:          *f.Liveliness,
-		ImageID:             pointer.SafeDeref(f.Allocation.Image.ID),
+		MachineID:           f.Uuid,
+		AllocationTimestamp: metav1.NewTime(f.Allocation.Meta.CreatedAt.AsTime()),
+		Liveliness:          *liveliness,
+		ImageID:             f.Allocation.Image.Id,
 	}
 
-	if f.Events != nil && f.Events.CrashLoop != nil {
-		result.CrashLoop = *f.Events.CrashLoop
+	if f.RecentProvisioningEvents != nil && f.RecentProvisioningEvents.State == apiv2.MachineProvisioningEventState_MACHINE_PROVISIONING_EVENT_STATE_CRASHLOOP {
+		result.CrashLoop = true
 	}
-	if f.Events != nil && len(f.Events.Log) > 0 && f.Events.Log[0].Event != nil {
-		log := f.Events.Log[0]
 
+	if f.RecentProvisioningEvents != nil && len(f.RecentProvisioningEvents.Events) > 0 {
+		event := f.RecentProvisioningEvents.Events[0]
+		eventType, err := enum.GetStringValue(event.Event)
+		if err != nil {
+			return nil, err
+		}
 		result.LastEvent = &v2.MachineLastEvent{
-			Event:     *log.Event,
-			Timestamp: metav1.NewTime(time.Time(log.Time)),
-			Message:   log.Message,
+			Event:     *eventType,
+			Timestamp: metav1.NewTime(event.Time.AsTime()),
+			Message:   event.Message,
 		}
 	}
 
 	return result, nil
 }
 
-func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *models.V1FirewallResponse) error {
+func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *apiv2.Machine) error {
 	// check whether network prefixes were updated in metal-api
 	// prefixes in the firewall machine allocation are just a snapshot when the firewall was created.
 	// -> when changing prefixes in the referenced network the firewall does not know about any prefix changes.
@@ -92,24 +101,28 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 	var result []v2.FirewallNetwork
 
 	for _, n := range f.Allocation.Networks {
-		if n.Networkid == nil {
-			continue
-		}
-
-		nw, err := c.networkCache.Get(r.Ctx, *n.Networkid)
+		nw, err := c.networkCache.Get(r.Ctx, n.Network)
 		if err != nil {
 			return err
 		}
+		networkType, err := enum.GetStringValue(n.NetworkType)
+		if err != nil {
+			return err
+		}
+		var nat bool
+		if n.NatType == apiv2.NATType_NAT_TYPE_IPV4_MASQUERADE {
+			nat = true
+		}
 
 		result = append(result, v2.FirewallNetwork{
-			ASN:                 n.Asn,
-			DestinationPrefixes: n.Destinationprefixes,
+			ASN:                 new(int64(n.Asn)),
+			DestinationPrefixes: n.DestinationPrefixes,
 			IPs:                 n.Ips,
-			Nat:                 n.Nat,
-			NetworkID:           n.Networkid,
-			NetworkType:         n.Networktype,
+			Nat:                 &nat,
+			NetworkID:           &n.Network,
+			NetworkType:         networkType,
 			Prefixes:            nw.Prefixes,
-			Vrf:                 n.Vrf,
+			Vrf:                 new(int64(n.Vrf)),
 		})
 	}
 
