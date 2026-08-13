@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metal-stack/api/go/enum"
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/client/machine"
-	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 		return controllers.RequeueAfter(0*time.Second, "removed systemd service restart annotation, requeue for regular reconcile")
 	}
 
-	var f *models.V1FirewallResponse
+	var f *apiv2.Machine
 	defer func() {
 		if err := c.setStatus(r, f); err != nil {
 			r.Log.Error(err, "unable to set firewall status")
@@ -81,7 +81,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	case 1:
 		f = fws[0]
 
-		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
+		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(f.Allocation).Name))
 		r.Target.Status.Conditions.Set(cond)
 
 		// this is mainly for tests when the firewall is already present
@@ -98,9 +98,9 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 
 		if isFirewallReady(currentStatus) {
 
-			r.Log.Info("firewall reconciled successfully", "id", pointer.SafeDeref(f.ID))
+			r.Log.Info("firewall reconciled successfully", "id", f.Uuid)
 
-			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionTrue, "Ready", fmt.Sprintf("Firewall %q is phoning home and alive.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
+			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionTrue, "Ready", fmt.Sprintf("Firewall %q is phoning home and alive.", pointer.SafeDeref(f.Allocation).Name))
 			r.Target.Status.Conditions.Set(cond)
 
 			r.Target.Status.Phase = v2.FirewallPhaseRunning
@@ -115,27 +115,27 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 				return controllers.RequeueAfter(10*time.Second, "error syncing firewall ssh keys, backing off")
 			}
 
-			// to make the controller always sync the status with the metal-api, we requeue
+			// to make the controller always sync the status with the metal-apiserver, we requeue
 			return controllers.RequeueAfter(2*time.Minute, "firewall is running, continue probing regularly for status sync")
 
 		} else if isFirewallProgressing(currentStatus) {
 
-			r.Log.Info("firewall is progressing", "id", pointer.SafeDeref(f.ID))
+			r.Log.Info("firewall is progressing", "id", f.Uuid)
 
-			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotReady", fmt.Sprintf("Firewall %q is not ready.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
+			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotReady", fmt.Sprintf("Firewall %q is not ready.", pointer.SafeDeref(f.Allocation).Name))
 			r.Target.Status.Conditions.Set(cond)
 
 			return controllers.RequeueAfter(10*time.Second, "firewall creation is progressing")
 
 		} else {
 
-			r.Log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", pointer.SafeDeref(f.ID))
+			r.Log.Error(fmt.Errorf("firewall is not finishing the provisioning"), "please investigate", "id", f.Uuid)
 
 			if pointer.SafeDeref(currentStatus).CrashLoop {
 				r.Target.Status.Phase = v2.FirewallPhaseCrashing
 			}
 
-			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotFinishing", fmt.Sprintf("Firewall %q is not finishing the provisioning procedure.", pointer.SafeDeref(pointer.SafeDeref(f.Allocation).Name)))
+			cond := v2.NewCondition(v2.FirewallReady, v2.ConditionFalse, "NotFinishing", fmt.Sprintf("Firewall %q is not finishing the provisioning procedure.", pointer.SafeDeref(f.Allocation).Name))
 			r.Target.Status.Conditions.Set(cond)
 
 			return controllers.RequeueAfter(1*time.Minute, "firewall creation is not finishing, proceed probing")
@@ -144,7 +144,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	default:
 		var ids []string
 		for _, fw := range fws {
-			ids = append(ids, pointer.SafeDeref(fw.ID))
+			ids = append(ids, fw.Uuid)
 		}
 
 		cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionFalse, "MultipleFirewalls", fmt.Sprintf("Found multiple firewalls with the same name: %s", strings.Join(ids, ", ")))
@@ -154,18 +154,17 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	}
 }
 
-func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V1FirewallResponse, error) {
+func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*apiv2.Machine, error) {
 	var (
-		networks []*models.V1MachineAllocationNetwork
+		networks []*apiv2.MachineAllocationNetwork
 		tags     = []string{
 			c.c.GetClusterTag(),
 			v2.FirewallManagedByTag(),
 		}
 	)
 	for _, n := range r.Target.Spec.Networks {
-		network := &models.V1MachineAllocationNetwork{
-			Networkid:   &n,
-			Autoacquire: new(true),
+		network := &apiv2.MachineAllocationNetwork{
+			Network: n,
 		}
 		networks = append(networks, network)
 	}
@@ -175,21 +174,24 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		tags = append(tags, v2.FirewallSetTag(ref.Name))
 	}
 
-	createRequest := &models.V1FirewallCreateRequest{
-		Description: "created by firewall-controller-manager",
-		Name:        r.Target.Name,
-		Hostname:    r.Target.Name,
-		Sizeid:      &r.Target.Spec.Size,
-		Projectid:   &r.Target.Spec.Project,
-		Partitionid: &r.Target.Spec.Partition,
-		Imageid:     &r.Target.Spec.Image,
-		SSHPubKeys:  r.Target.Spec.SSHPublicKeys,
-		Networks:    networks,
-		UserData:    r.Target.Spec.Userdata,
-		Tags:        tags,
+	createRequest := &apiv2.MachineServiceCreateRequest{
+		Project:        r.Target.Spec.Project,
+		Name:           r.Target.Name,
+		Hostname:       &r.Target.Name,
+		Description:    new("created by firewall-controller-manager"),
+		Size:           &r.Target.Spec.Size,
+		Partition:      &r.Target.Spec.Partition,
+		Image:          r.Target.Spec.Image,
+		SshPublicKeys:  r.Target.Spec.SSHPublicKeys,
+		Networks:       networks,
+		Userdata:       &r.Target.Spec.Userdata,
+		AllocationType: apiv2.MachineAllocationType_MACHINE_ALLOCATION_TYPE_FIREWALL,
+		Labels: &apiv2.Labels{
+			Labels: controllers.ToLabels(tags),
+		},
 	}
 
-	resp, err := c.c.GetMetal().Firewall().AllocateFirewall(firewall.NewAllocateFirewallParams().WithBody(createRequest).WithContext(r.Ctx), nil)
+	resp, err := c.c.GetMetal().Apiv2().Machine().Create(r.Ctx, createRequest)
 	if err != nil {
 		r.Log.Error(err, "error creating firewall")
 
@@ -199,14 +201,14 @@ func (c *controller) createFirewall(r *controllers.Ctx[*v2.Firewall]) (*models.V
 		return nil, controllers.RequeueAfter(30*time.Second, "error creating firewall, backing off")
 	}
 
-	r.Log.Info("firewall created", "id", pointer.SafeDeref(resp.Payload.ID))
+	r.Log.Info("firewall created", "id", resp.Machine.Uuid)
 
-	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(pointer.SafeDeref(resp.Payload.Allocation).Name)))
+	cond := v2.NewCondition(v2.FirewallCreated, v2.ConditionTrue, "Created", fmt.Sprintf("Firewall %q created successfully.", pointer.SafeDeref(resp.Machine.Allocation).Name))
 	r.Target.Status.Conditions.Set(cond)
 
-	c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Create", "created firewall %s id %s", r.Target.Name, pointer.SafeDeref(resp.Payload.ID))
+	c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Create", "created firewall %s id %s", r.Target.Name, resp.Machine.Uuid)
 
-	return resp.Payload, nil
+	return resp.Machine, nil
 }
 
 func isFirewallProgressing(status *v2.MachineStatus) bool {
@@ -216,12 +218,10 @@ func isFirewallProgressing(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
-	// TODO replace with models.V1LivelinessAlive once merged
-	if status.Liveliness != "Alive" {
+	if status.Liveliness != mustStringValue(apiv2.MachineLiveliness_MACHINE_LIVELINESS_ALIVE) {
 		return false
 	}
-	// TODO replace with models.V1LivelinessPhonedHome once merged
-	if status.LastEvent.Event != "Phoned Home" {
+	if status.LastEvent.Event != mustStringValue(apiv2.MachineProvisioningEventType_MACHINE_PROVISIONING_EVENT_TYPE_PHONED_HOME) {
 		return true
 	}
 
@@ -235,37 +235,53 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
-	// TODO replace with models.V1LivelinessAlive once merged
-	if status.Liveliness != "Alive" {
+	if status.Liveliness != mustStringValue(apiv2.MachineLiveliness_MACHINE_LIVELINESS_ALIVE) {
 		return false
 	}
-	// TODO replace with models.V1LivelinessPhonedHome once merged
-	if status.LastEvent.Event == "Phoned Home" {
+	if status.LastEvent.Event == mustStringValue(apiv2.MachineProvisioningEventType_MACHINE_PROVISIONING_EVENT_TYPE_PHONED_HOME) {
 		return true
 	}
 
 	return false
 }
 
-func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
+func mustStringValue[E protoreflect.Enum](e E) string {
+	val, err := enum.GetStringValue(e)
+	if err != nil {
+		panic(err)
+	}
+
+	return *val
+}
+
+func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *apiv2.Machine) error {
+
 	var (
 		newTags []string
 		ref     = metav1.GetControllerOf(r.Target)
 	)
 
-	newTags = ensureTag(m.Tags, v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager)
+	mtags := controllers.ToTags(pointer.SafeDeref(pointer.SafeDeref(m.Meta).Labels).Labels)
+
+	newTags = ensureTag(mtags, v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager)
 	if ref != nil {
 		newTags = ensureTag(newTags, v2.FirewallControllerSetAnnotation, ref.Name)
 	}
 
-	if sets.NewString(newTags...).Equal(sets.NewString(m.Tags...)) {
+	if sets.NewString(newTags...).Equal(sets.NewString(mtags...)) {
 		return nil
 	}
 
-	_, err := c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
-		ID:   m.ID,
-		Tags: newTags,
-	}).WithContext(r.Ctx), nil)
+	_, err := c.c.GetMetal().Apiv2().Machine().Update(r.Ctx, &apiv2.MachineServiceUpdateRequest{
+		Uuid: m.Uuid,
+		Labels: &apiv2.UpdateLabels{
+			Strategy: &apiv2.UpdateLabels_Replace{
+				Replace: &apiv2.Labels{
+					Labels: controllers.ToLabels(newTags),
+				},
+			},
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -303,19 +319,20 @@ func ensureTag(currentTags []string, key, value string) []string {
 	return newTags
 }
 
-func (c *controller) syncSSHPubKey(r *controllers.Ctx[*v2.Firewall], m *models.V1FirewallResponse) error {
+func (c *controller) syncSSHPubKey(r *controllers.Ctx[*v2.Firewall], m *apiv2.Machine) error {
 	if m.Allocation == nil {
 		return fmt.Errorf("firewall has no allocation in metal-api")
 	}
 
-	if slices.Equal(m.Allocation.SSHPubKeys, r.Target.Spec.SSHPublicKeys) {
+	if slices.Equal(m.Allocation.SshPublicKeys, r.Target.Spec.SSHPublicKeys) {
 		return nil
 	}
 
-	_, err := c.c.GetMetal().Machine().UpdateMachine(machine.NewUpdateMachineParams().WithBody(&models.V1MachineUpdateRequest{
-		ID:         m.ID,
-		SSHPubKeys: r.Target.Spec.SSHPublicKeys,
-	}).WithContext(r.Ctx), nil)
+	_, err := c.c.GetMetal().Apiv2().Machine().Update(r.Ctx, &apiv2.MachineServiceUpdateRequest{
+		Uuid:          m.Uuid,
+		Project:       c.c.GetProject(),
+		SshPublicKeys: r.Target.Spec.SSHPublicKeys,
+	})
 	if err != nil {
 		return fmt.Errorf("unable to update ssh public keys: %w", err)
 	}

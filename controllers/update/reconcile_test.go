@@ -7,15 +7,13 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/image"
-	"github.com/metal-stack/metal-go/api/models"
-	metaltestclient "github.com/metal-stack/metal-go/test/client"
+	"github.com/metal-stack/firewall-controller-manager/internal/test"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +29,7 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		metalMocks        *metaltestclient.MetalMockFns
+		latestImage       *apiv2.Image
 		fwDeploy          *v2.FirewallDeployment
 		existingFws       []v2.Firewall
 		postTestFn        func(t *testing.T, c client.Client)
@@ -109,14 +107,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 				},
 			},
 			withinMaintenance: true,
-			metalMocks: &metaltestclient.MetalMockFns{
-				Image: func(mock *mock.Mock) {
-					mock.On("FindLatestImage", image.NewFindLatestImageParams().WithID("firewall-ubuntu-3.0").WithContext(ctx), nil).Return(&image.FindLatestImageOK{
-						Payload: &models.V1ImageResponse{
-							ID: new("firewall-ubuntu-3.0.20240503"),
-						},
-					}, nil)
-				},
+			latestImage: &apiv2.Image{
+				Id: "firewall-ubuntu-3.0.20240503",
 			},
 			existingFws: []v2.Firewall{
 				{
@@ -165,14 +157,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 				},
 			},
 			withinMaintenance: true,
-			metalMocks: &metaltestclient.MetalMockFns{
-				Image: func(mock *mock.Mock) {
-					mock.On("FindLatestImage", image.NewFindLatestImageParams().WithID("firewall-ubuntu-3.0").WithContext(ctx), nil).Return(&image.FindLatestImageOK{
-						Payload: &models.V1ImageResponse{
-							ID: new("firewall-ubuntu-3.0.20240503"),
-						},
-					}, nil)
-				},
+			latestImage: &apiv2.Image{
+				Id: "firewall-ubuntu-3.0.20240503",
 			},
 			existingFws: []v2.Firewall{
 				{
@@ -205,7 +191,10 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, mc := metaltestclient.NewMetalMockClient(t, tt.metalMocks)
+			mm := test.New(t)
+			mm.OnImageLatest = func(_ context.Context, _ *apiv2.ImageServiceLatestRequest) (*apiv2.ImageServiceLatestResponse, error) {
+				return &apiv2.ImageServiceLatestResponse{Image: tt.latestImage}, nil
+			}
 
 			latestSet := v2.FirewallSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -238,7 +227,7 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 
 			c := &controller{
 				c:          cc,
-				imageCache: newImageCache(mc),
+				imageCache: newImageCache(mm.Client()),
 			}
 
 			r := &controllers.Ctx[*v2.FirewallDeployment]{

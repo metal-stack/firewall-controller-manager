@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	apiv2client "github.com/metal-stack/api/go/client"
+
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
-	metalgo "github.com/metal-stack/metal-go"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -47,9 +48,11 @@ type NewControllerConfig struct {
 	SSHKeySecretName string
 
 	// Metal is the metal client for accessing the metal-api.
-	Metal metalgo.Client
+	Metal apiv2client.Client
 	// ClusterTag is the tag used in the metal-api for new firewalls to associate them with the cluster.
 	ClusterTag string
+	// Project of this cluster
+	Project string
 
 	// SafetyBackoff is used for guarding the metal-api when it comes to creating new firewalls.
 	SafetyBackoff time.Duration
@@ -83,8 +86,9 @@ type ControllerConfig struct {
 	sshKeySecretNamespace string
 	sshKeySecretName      string
 
-	metal      metalgo.Client
+	metal      apiv2client.Client
 	clusterTag string
+	project    string
 
 	safetyBackoff         time.Duration
 	progressDeadline      time.Duration
@@ -117,6 +121,7 @@ func New(c *NewControllerConfig) (*ControllerConfig, error) {
 		shootAccessHelper:     helper,
 		metal:                 c.Metal,
 		clusterTag:            c.ClusterTag,
+		project:               c.Project,
 		safetyBackoff:         c.SafetyBackoff,
 		progressDeadline:      c.ProgressDeadline,
 		firewallHealthTimeout: c.FirewallHealthTimeout,
@@ -248,14 +253,16 @@ func (c *ControllerConfig) GetSSHKeySecretNamespace() string {
 	return c.sshKeySecretNamespace
 }
 
-func (c *ControllerConfig) GetMetal() metalgo.Client {
+func (c *ControllerConfig) GetMetal() apiv2client.Client {
 	return c.metal
 }
 
 func (c *ControllerConfig) GetClusterTag() string {
 	return c.clusterTag
 }
-
+func (c *ControllerConfig) GetProject() string {
+	return c.project
+}
 func (c *ControllerConfig) GetSafetyBackoff() time.Duration {
 	return c.safetyBackoff
 }

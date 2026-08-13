@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/machine"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,20 +35,19 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 	}
 
 	for _, f := range fws {
-		if f.ID == nil {
-			continue
-		}
-
-		resp, err := c.c.GetMetal().Machine().FreeMachine(machine.NewFreeMachineParams().WithID(*f.ID).WithContext(r.Ctx), nil)
+		resp, err := c.c.GetMetal().Apiv2().Machine().Delete(r.Ctx, &apiv2.MachineServiceDeleteRequest{
+			Uuid:    f.Uuid,
+			Project: c.c.GetProject(),
+		})
 		if err != nil {
 			r.Log.Error(err, "firewall deletion failed")
 
 			return controllers.RequeueAfter(5*time.Second, "firewall deletion failed, retrying")
 		}
 
-		r.Log.Info("deleted firewall", "firewall-name", f.Name, "id", *resp.Payload.ID)
+		r.Log.Info("deleted firewall", "firewall-name", f.Allocation.Name, "id", resp.Machine.Uuid)
 
-		c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s id %s", r.Target.Name, *resp.Payload.ID)
+		c.recorder.Eventf(r.Target, nil, corev1.EventTypeNormal, "Delete", "deleting firewall", "deleted firewall %s id %s", r.Target.Name, resp.Machine.Uuid)
 	}
 
 	return nil
