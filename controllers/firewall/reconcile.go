@@ -6,10 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metal-stack/api/go/enum"
 	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/metal-lib/pkg/pointer"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
@@ -113,7 +115,7 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 				return controllers.RequeueAfter(10*time.Second, "error syncing firewall ssh keys, backing off")
 			}
 
-			// to make the controller always sync the status with the metal-api, we requeue
+			// to make the controller always sync the status with the metal-apiserver, we requeue
 			return controllers.RequeueAfter(2*time.Minute, "firewall is running, continue probing regularly for status sync")
 
 		} else if isFirewallProgressing(currentStatus) {
@@ -216,12 +218,10 @@ func isFirewallProgressing(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
-	// TODO replace with models.V1LivelinessAlive once merged
-	if status.Liveliness != "Alive" {
+	if status.Liveliness != mustStringValue(apiv2.MachineLiveliness_MACHINE_LIVELINESS_ALIVE) {
 		return false
 	}
-	// TODO replace with models.V1LivelinessPhonedHome once merged
-	if status.LastEvent.Event != "Phoned Home" {
+	if status.LastEvent.Event != mustStringValue(apiv2.MachineProvisioningEventType_MACHINE_PROVISIONING_EVENT_TYPE_PHONED_HOME) {
 		return true
 	}
 
@@ -235,16 +235,23 @@ func isFirewallReady(status *v2.MachineStatus) bool {
 	if status.CrashLoop {
 		return false
 	}
-	// TODO replace with models.V1LivelinessAlive once merged
-	if status.Liveliness != "Alive" {
+	if status.Liveliness != mustStringValue(apiv2.MachineLiveliness_MACHINE_LIVELINESS_ALIVE) {
 		return false
 	}
-	// TODO replace with models.V1LivelinessPhonedHome once merged
-	if status.LastEvent.Event == "Phoned Home" {
+	if status.LastEvent.Event == mustStringValue(apiv2.MachineProvisioningEventType_MACHINE_PROVISIONING_EVENT_TYPE_PHONED_HOME) {
 		return true
 	}
 
 	return false
+}
+
+func mustStringValue[E protoreflect.Enum](e E) string {
+	val, err := enum.GetStringValue(e)
+	if err != nil {
+		panic(err)
+	}
+
+	return *val
 }
 
 func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *apiv2.Machine) error {
@@ -254,7 +261,7 @@ func (c *controller) syncTags(r *controllers.Ctx[*v2.Firewall], m *apiv2.Machine
 		ref     = metav1.GetControllerOf(r.Target)
 	)
 
-	mtags := controllers.ToTags(m.Meta.Labels.Labels)
+	mtags := controllers.ToTags(pointer.SafeDeref(pointer.SafeDeref(m.Meta).Labels).Labels)
 
 	newTags = ensureTag(mtags, v2.FirewallControllerManagedByAnnotation, v2.FirewallControllerManager)
 	if ref != nil {

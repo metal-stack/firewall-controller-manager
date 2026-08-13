@@ -123,6 +123,7 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *ap
 			NetworkType:         networkType,
 			Prefixes:            nw.Prefixes,
 			Vrf:                 new(int64(n.Vrf)),
+			Project:             n.Project,
 		})
 	}
 

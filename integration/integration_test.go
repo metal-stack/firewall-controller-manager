@@ -260,7 +260,7 @@ var _ = Context("integration test", Ordered, func() {
 
 					Expect(status.MachineID).To(Equal(firewall1.Uuid))
 					Expect(status.CrashLoop).To(Equal(false))
-					Expect(status.Liveliness).To(Equal("Alive"))
+					Expect(status.Liveliness).To(Equal("alive"))
 					Expect(status.LastEvent).NotTo(BeNil())
 					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 					Expect(status.LastEvent.Message).To(Equal("phoning home"))
@@ -557,7 +557,7 @@ var _ = Context("integration test", Ordered, func() {
 
 						Expect(status.MachineID).To(Equal(installingFirewall.Uuid))
 						Expect(status.CrashLoop).To(Equal(false))
-						Expect(status.Liveliness).To(Equal("Alive"))
+						Expect(status.Liveliness).To(Equal("alive"))
 						Expect(status.LastEvent).NotTo(BeNil())
 						Expect(status.LastEvent.Event).To(Equal("Installing"))
 						Expect(status.LastEvent.Message).To(Equal("is installing"))
@@ -991,7 +991,7 @@ var _ = Context("integration test", Ordered, func() {
 
 					Expect(status.MachineID).To(Equal(firewall1.Uuid))
 					Expect(status.CrashLoop).To(Equal(false))
-					Expect(status.Liveliness).To(Equal("Alive"))
+					Expect(status.Liveliness).To(Equal("alive"))
 					Expect(status.LastEvent).NotTo(BeNil())
 					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 					Expect(status.LastEvent.Message).To(Equal("phoning home"))
@@ -1351,7 +1351,7 @@ var _ = Context("integration test", Ordered, func() {
 
 						Expect(status.MachineID).To(Equal(readyFirewall.Uuid))
 						Expect(status.CrashLoop).To(Equal(false))
-						Expect(status.Liveliness).To(Equal("Alive"))
+						Expect(status.Liveliness).To(Equal("alive"))
 						Expect(status.LastEvent).NotTo(BeNil())
 						Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 						Expect(status.LastEvent.Message).To(Equal("is phoning home"))
@@ -1740,7 +1740,7 @@ var _ = Context("integration test", Ordered, func() {
 
 				Expect(status.MachineID).To(Equal(firewall1.Uuid))
 				Expect(status.CrashLoop).To(Equal(false))
-				Expect(status.Liveliness).To(Equal("Alive"))
+				Expect(status.Liveliness).To(Equal("alive"))
 				Expect(status.LastEvent).NotTo(BeNil())
 				Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 				Expect(status.LastEvent.Message).To(Equal("phoning home"))
