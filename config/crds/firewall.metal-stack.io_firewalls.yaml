@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: firewalls.firewall.metal-stack.io
 spec:
   group: firewall.metal-stack.io
@@ -311,20 +311,32 @@ spec:
                         type: string
                       type: array
                     nat:
-                      description: Nat specifies whether the outgoing traffic is natted
-                        or not.
+                      description: |-
+                        Nat specifies whether the outgoing traffic is natted or not.
+                        Deprecated will be superseded by NATTypeV2
                       type: boolean
+                    natTypeV2:
+                      description: NATTypeV2 is the nat type of this network.
+                      type: string
                     networkID:
                       description: NetworkID is the id of this network.
                       type: string
                     networkType:
-                      description: NetworkType is the type of this network.
+                      description: |-
+                        NetworkType is the type of this network.
+                        Deprecated will be superseded by NetworkTypeV2
+                      type: string
+                    networkTypeV2:
+                      description: NetworkTypeV2 is the type of this network.
                       type: string
                     prefixes:
                       description: Prefixes are the network prefixes of this network.
                       items:
                         type: string
                       type: array
+                    project:
+                      description: Project of this network
+                      type: string
                     vrf:
                       description: Vrf is vrf id of this network.
                       format: int64
@@ -332,8 +344,10 @@ spec:
                   required:
                   - asn
                   - nat
+                  - natTypeV2
                   - networkID
                   - networkType
+                  - networkTypeV2
                   - vrf
                   type: object
                 type: array

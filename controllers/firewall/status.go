@@ -106,10 +106,13 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 			DestinationPrefixes: n.Destinationprefixes,
 			IPs:                 n.Ips,
 			Nat:                 n.Nat,
+			NATTypeV2:           n.Nattypev2,
 			NetworkID:           n.Networkid,
 			NetworkType:         n.Networktype,
+			NetworkTypeV2:       n.Networktypev2,
 			Prefixes:            nw.Prefixes,
 			Vrf:                 n.Vrf,
+			Project:             n.Projectid,
 		})
 	}
 

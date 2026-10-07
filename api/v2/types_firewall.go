@@ -254,15 +254,23 @@ type FirewallNetwork struct {
 	// IPs are the ip addresses used in this network.
 	IPs []string `json:"ips,omitempty"`
 	// Nat specifies whether the outgoing traffic is natted or not.
+	// Deprecated will be superseded by NATTypeV2
 	Nat *bool `json:"nat"`
 	// NetworkID is the id of this network.
 	NetworkID *string `json:"networkID"`
 	// NetworkType is the type of this network.
+	// Deprecated will be superseded by NetworkTypeV2
 	NetworkType *string `json:"networkType"`
 	// Prefixes are the network prefixes of this network.
 	Prefixes []string `json:"prefixes,omitempty"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
+	// Project of this network
+	Project *string `json:"project,omitempty"`
+	// NetworkTypeV2 is the type of this network.
+	NetworkTypeV2 *string `json:"networkTypeV2"`
+	// NATTypeV2 is the nat type of this network.
+	NATTypeV2 *string `json:"natTypeV2"`
 }
 
 // FirewallList contains a list of firewalls
