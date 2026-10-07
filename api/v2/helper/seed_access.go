@@ -9,7 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	configlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	configv1 "k8s.io/client-go/tools/clientcmd/api/v1"
@@ -36,22 +35,16 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 	var (
 		name           = seedAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: deploy.Namespace,
-			},
+			Name:      name,
+			Namespace: deploy.Namespace,
 		}
 		role = &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: deploy.Namespace,
-			},
+			Name:      name,
+			Namespace: deploy.Namespace,
 		}
 		roleBinding = &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: deploy.Namespace,
-			},
+			Name:      name,
+			Namespace: deploy.Namespace,
 		}
 	)
 
@@ -73,10 +66,8 @@ func ensureSeedRBAC(ctx context.Context, seedConfig *rest.Config, deploy *v2.Fir
 	}
 
 	serviceAccountSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: deploy.Namespace,
-		},
+		Name:      name,
+		Namespace: deploy.Namespace,
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, seed, serviceAccountSecret, func() error {
@@ -149,20 +140,14 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 	var (
 		name           = shootAccessResourceName(deploy)
 		serviceAccount = &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: shootNamespace,
-			},
+			Name:      name,
+			Namespace: shootNamespace,
 		}
 		clusterRole = &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 		}
 		clusterRoleBinding = &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+			Name: name,
 		}
 	)
 
@@ -181,10 +166,8 @@ func ensureShootRBAC(ctx context.Context, shootConfig *rest.Config, shootNamespa
 	}
 
 	serviceAccountSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: shootNamespace,
-		},
+		Name:      name,
+		Namespace: shootNamespace,
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, shoot, serviceAccountSecret, func() error {
@@ -307,10 +290,8 @@ func GetAccessKubeconfig(c *AccessConfig) ([]byte, error) {
 	}
 
 	saSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: c.Namespace,
-		},
+		Name:      name,
+		Namespace: c.Namespace,
 	}
 	err = cl.Get(c.Ctx, controllerclient.ObjectKeyFromObject(saSecret), saSecret, &controllerclient.GetOptions{})
 	if err != nil {

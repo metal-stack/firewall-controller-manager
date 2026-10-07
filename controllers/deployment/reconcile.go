@@ -149,17 +149,15 @@ func (c *controller) createFirewallSet(r *controllers.Ctx[*v2.FirewallDeployment
 	}
 
 	set := &v2.FirewallSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: r.Target.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallDeployment")),
-			},
-			Annotations: map[string]string{
-				v2.RevisionAnnotation: strconv.Itoa(revision),
-			},
-			Labels: r.Target.Labels,
+		Name:      name,
+		Namespace: r.Target.Namespace,
+		OwnerReferences: []metav1.OwnerReference{
+			*metav1.NewControllerRef(r.Target, v2.GroupVersion.WithKind("FirewallDeployment")),
 		},
+		Annotations: map[string]string{
+			v2.RevisionAnnotation: strconv.Itoa(revision),
+		},
+		Labels: r.Target.Labels,
 		Spec: v2.FirewallSetSpec{
 			Replicas: replicas,
 			Template: r.Target.Spec.Template,

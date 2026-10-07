@@ -11,7 +11,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
@@ -55,10 +54,8 @@ func (c *controller) Delete(r *controllers.Ctx[*v2.Firewall]) error {
 
 func (c *controller) deleteFirewallMonitor(ctx context.Context, fw *v2.Firewall) error {
 	mon := &v2.FirewallMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fw.Name,
-			Namespace: c.c.GetShootNamespace(),
-		},
+		Name:      fw.Name,
+		Namespace: c.c.GetShootNamespace(),
 	}
 
 	err := c.c.GetShootClient().Delete(ctx, mon)

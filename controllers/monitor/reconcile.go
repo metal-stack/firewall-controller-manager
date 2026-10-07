@@ -35,10 +35,8 @@ func (c *controller) Reconcile(r *controllers.Ctx[*v2.FirewallMonitor]) error {
 
 func (c *controller) updateFirewallStatus(r *controllers.Ctx[*v2.FirewallMonitor]) (*v2.Firewall, error) {
 	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Target.Name,
-			Namespace: c.c.GetSeedNamespace(),
-		},
+		Name:      r.Target.Name,
+		Namespace: c.c.GetSeedNamespace(),
 	}
 	err := c.c.GetSeedClient().Get(r.Ctx, client.ObjectKeyFromObject(fw), fw)
 	if err != nil {
@@ -70,10 +68,8 @@ func (c *controller) rollSetAnnotation(r *controllers.Ctx[*v2.FirewallMonitor]) 
 	r.Log.Info("initiating firewall set roll as requested by user annotation")
 
 	fw := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Target.Name,
-			Namespace: c.c.GetSeedNamespace(),
-		},
+		Name:      r.Target.Name,
+		Namespace: c.c.GetSeedNamespace(),
 	}
 
 	set, err := findCorrespondingSet(r.Ctx, c.c.GetSeedClient(), fw)
@@ -106,10 +102,8 @@ func findCorrespondingSet(ctx context.Context, c client.Client, fw *v2.Firewall)
 	}
 
 	set := &v2.FirewallSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ref.Name,
-			Namespace: fw.Namespace,
-		},
+		Name:      ref.Name,
+		Namespace: fw.Namespace,
 	}
 	err = c.Get(ctx, client.ObjectKeyFromObject(set), set)
 	if err != nil {

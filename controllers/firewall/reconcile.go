@@ -22,10 +22,8 @@ import (
 func (c *controller) Reconcile(r *controllers.Ctx[*v2.Firewall]) error {
 	if services, ok := r.Target.GetAnnotations()[v2.FirewallRestartSystemdServicesAnnotation]; ok {
 		mon := &v2.FirewallMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.Target.Name,
-				Namespace: c.c.GetShootNamespace(),
-			},
+			Name:      r.Target.Name,
+			Namespace: c.c.GetShootNamespace(),
 		}
 
 		err := c.c.GetShootClient().Get(r.Ctx, client.ObjectKeyFromObject(mon), mon)
