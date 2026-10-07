@@ -1,0 +1,43 @@
+---
+name: metal-stack component release
+
+on:
+  pull_request:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  push:
+    branches:
+      - main
+
+jobs:
+  draft:
+    uses: metal-stack/actions-common/.github/workflows/release-drafter.yaml@v1
+
+  go-build:
+    uses: metal-stack/actions-common/.github/workflows/go-build.yaml@v1
+    secrets: inherit
+    with:
+      build-command: make manager
+      test: false
+
+  go-test:
+    name: (Integration) Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Setup Go
+      uses: actions/setup-go@v7
+      with:
+        go-version-file: 'go.mod'
+        cache: false
+
+    - name: Run tests
+      run: |
+        make setup-envtest
+        make test
