@@ -17,10 +17,8 @@ import (
 
 var (
 	sshSecret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ssh-secret",
-			Namespace: namespaceName,
-		},
+		Name:      "ssh-secret",
+		Namespace: namespaceName,
 		StringData: map[string]string{
 			"id_rsa":     "private",
 			"id_rsa.pub": "public",
@@ -31,10 +29,8 @@ var (
 var _ = Context("firewall set controller", Ordered, func() {
 	var (
 		set = &v2.FirewallSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: namespaceName,
-			},
+			Name:      "test",
+			Namespace: namespaceName,
 			Spec: v2.FirewallSetSpec{
 				Template: v2.FirewallTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{

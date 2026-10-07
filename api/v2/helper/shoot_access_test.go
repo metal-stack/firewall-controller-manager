@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -32,10 +31,8 @@ func TestNewShootConfig(t *testing.T) {
 				APIServerURL:                "https://shoot-name",
 			},
 			seed: fake.NewClientBuilder().WithObjects(&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "generic-token-kubeconfig",
-					Namespace: "shoot-namespace",
-				},
+				Name:      "generic-token-kubeconfig",
+				Namespace: "shoot-namespace",
 				Data: map[string][]byte{
 					"kubeconfig": []byte(`apiVersion: v1
 clusters:

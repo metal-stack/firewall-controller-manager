@@ -15,10 +15,8 @@ import (
 
 func Test_firewallDeploymentValidator_ValidateCreate(t *testing.T) {
 	valid := &v2.FirewallDeployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall",
-			Namespace: "default",
-		},
+		Name:      "firewall",
+		Namespace: "default",
 		Spec: v2.FirewallDeploymentSpec{
 			Strategy: v2.StrategyRollingUpdate,
 			Selector: map[string]string{
@@ -98,10 +96,8 @@ func Test_firewallDeploymentValidator_ValidateCreate(t *testing.T) {
 
 func Test_firewallDeploymentValidator_ValidateUpdate(t *testing.T) {
 	valid := &v2.FirewallDeployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall",
-			Namespace: "default",
-		},
+		Name:      "firewall",
+		Namespace: "default",
 		Spec: v2.FirewallDeploymentSpec{
 			Strategy: v2.StrategyRollingUpdate,
 			Selector: map[string]string{

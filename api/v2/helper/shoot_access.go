@@ -10,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,10 +82,8 @@ func (s *ShootAccessHelper) Config(ctx context.Context) (*configv1.Config, error
 	}
 
 	kubeconfigTemplate := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.access.GenericKubeconfigSecretName,
-			Namespace: s.access.Namespace,
-		},
+		Name:      s.access.GenericKubeconfigSecretName,
+		Namespace: s.access.Namespace,
 	}
 
 	err := s.seed.Get(ctx, controllerclient.ObjectKeyFromObject(kubeconfigTemplate), kubeconfigTemplate)
@@ -178,10 +175,8 @@ func (s *ShootAccessHelper) Client(ctx context.Context) (controllerclient.Client
 
 func (s *ShootAccessHelper) readTokenSecret(ctx context.Context) (string, error) {
 	tokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.access.TokenSecretName,
-			Namespace: s.access.Namespace,
-		},
+		Name:      s.access.TokenSecretName,
+		Namespace: s.access.Namespace,
 	}
 
 	err := s.seed.Get(ctx, controllerclient.ObjectKeyFromObject(tokenSecret), tokenSecret)

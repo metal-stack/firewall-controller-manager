@@ -9,7 +9,6 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/helper"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -151,10 +150,8 @@ func defaultFirewallSpec(f *v2.FirewallSpec) {
 
 func getSSHPublicKey(ctx context.Context, seedClient client.Client, secretName, namespace string) (string, error) {
 	sshSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-		},
+		Name:      secretName,
+		Namespace: namespace,
 	}
 
 	err := seedClient.Get(ctx, client.ObjectKeyFromObject(sshSecret), sshSecret)

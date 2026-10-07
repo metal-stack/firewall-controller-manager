@@ -15,10 +15,8 @@ import (
 
 func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 	valid := &v2.FirewallSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall",
-			Namespace: "default",
-		},
+		Name:      "firewall",
+		Namespace: "default",
 		Spec: v2.FirewallSetSpec{
 			Selector: map[string]string{
 				"purpose": "shoot-firewall",
@@ -137,10 +135,8 @@ func Test_firewalSetValidator_ValidateCreate(t *testing.T) {
 
 func Test_firewallSetValidator_ValidateUpdate(t *testing.T) {
 	valid := &v2.FirewallSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall",
-			Namespace: "default",
-		},
+		Name:      "firewall",
+		Namespace: "default",
 		Spec: v2.FirewallSetSpec{
 			Selector: map[string]string{
 				"purpose": "shoot-firewall",

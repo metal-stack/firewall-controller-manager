@@ -15,13 +15,11 @@ import (
 
 func Test_firewallValidator_ValidateCreate(t *testing.T) {
 	valid := &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-123",
-			Namespace: "default",
-			Annotations: map[string]string{
-				v2.FirewallWeightAnnotation:                 "100",
-				v2.FirewallNoControllerConnectionAnnotation: "true",
-			},
+		Name:      "firewall-123",
+		Namespace: "default",
+		Annotations: map[string]string{
+			v2.FirewallWeightAnnotation:                 "100",
+			v2.FirewallNoControllerConnectionAnnotation: "true",
 		},
 		Spec: v2.FirewallSpec{
 			Interval:                defaults.DefaultFirewallReconcileInterval,
@@ -137,13 +135,11 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 		{
 			name: "valid",
 			newF: &v2.Firewall{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "firewall-123",
-					Namespace:       "default",
-					ResourceVersion: "1",
-					Annotations: map[string]string{
-						v2.FirewallNoControllerConnectionAnnotation: "true",
-					},
+				Name:            "firewall-123",
+				Namespace:       "default",
+				ResourceVersion: "1",
+				Annotations: map[string]string{
+					v2.FirewallNoControllerConnectionAnnotation: "true",
 				},
 				Spec: v2.FirewallSpec{
 					Interval:                defaults.DefaultFirewallReconcileInterval,
@@ -172,10 +168,8 @@ func Test_firewallValidator_ValidateUpdate(t *testing.T) {
 				Distance: 0,
 			},
 			oldF: &v2.Firewall{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "firewall-123",
-					Namespace: "default",
-				},
+				Name:      "firewall-123",
+				Namespace: "default",
 				Spec: v2.FirewallSpec{
 					Interval:                defaults.DefaultFirewallReconcileInterval,
 					ControllerURL:           "https://metal-stack.io/controller.img",
