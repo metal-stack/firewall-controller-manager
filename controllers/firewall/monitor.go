@@ -6,7 +6,6 @@ import (
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -30,9 +29,7 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 	}()
 
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: c.c.GetShootNamespace(),
-		},
+		Name: c.c.GetShootNamespace(),
 	}
 	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), ns, func() error {
 		return nil
@@ -42,10 +39,8 @@ func (c *controller) ensureFirewallMonitor(r *controllers.Ctx[*v2.Firewall]) (*v
 	}
 
 	mon := &v2.FirewallMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Target.Name,
-			Namespace: c.c.GetShootNamespace(),
-		},
+		Name:      r.Target.Name,
+		Namespace: c.c.GetShootNamespace(),
 	}
 
 	_, err = controllerutil.CreateOrUpdate(r.Ctx, c.c.GetShootClient(), mon, func() error {

@@ -12,7 +12,6 @@ import (
 	"github.com/go-logr/logr"
 
 	metalgo "github.com/metal-stack/metal-go"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	"github.com/metal-stack/v"
 
@@ -238,7 +237,7 @@ func main() {
 				v2.FirewallShootNamespace: {},
 			},
 		},
-		GracefulShutdownTimeout: pointer.Pointer(time.Duration(0)),
+		GracefulShutdownTimeout: new(time.Duration(0)),
 	})
 	if err != nil {
 		log.Fatalf("unable to start firewall-controller-manager-monitor %v", err)

@@ -102,10 +102,8 @@ func newFirewall(name string, seedConnectedTransition time.Time, seedConnectedSt
 	}
 
 	return &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "test",
-		},
+		Name:      name,
+		Namespace: "test",
 		Status: v2.FirewallStatus{
 			Phase: v2.FirewallPhaseRunning,
 			Conditions: v2.Conditions{
@@ -127,10 +125,8 @@ func newCreatingFirewall(name string, readyTransition time.Time, readyStatus v2.
 	}
 
 	return &v2.Firewall{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "test",
-		},
+		Name:      name,
+		Namespace: "test",
 		Status: v2.FirewallStatus{
 			Phase: v2.FirewallPhaseCreating,
 			Conditions: v2.Conditions{

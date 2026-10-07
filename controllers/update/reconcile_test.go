@@ -93,10 +93,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 		{
 			name: "auto-update when using shorthand image notation",
 			fwDeploy: &v2.FirewallDeployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "deployment",
-					Namespace: "firewall",
-				},
+				Name:      "deployment",
+				Namespace: "firewall",
 				Spec: v2.FirewallDeploymentSpec{
 					Template: v2.FirewallTemplateSpec{
 						Spec: v2.FirewallSpec{
@@ -120,10 +118,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			},
 			existingFws: []v2.Firewall{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "a",
-						Namespace: "firewall",
-					},
+					Name:      "a",
+					Namespace: "firewall",
 					Status: v2.FirewallStatus{
 						MachineStatus: &v2.MachineStatus{
 							ImageID: "firewall-ubuntu-3.0.20240101",
@@ -133,10 +129,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			},
 			postTestFn: func(t *testing.T, c client.Client) {
 				fwdeploy := &v2.FirewallDeployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "deployment",
-						Namespace: "firewall",
-					},
+					Name:      "deployment",
+					Namespace: "firewall",
 				}
 				err := c.Get(context.Background(), client.ObjectKeyFromObject(fwdeploy), fwdeploy)
 				require.NoError(t, err)
@@ -149,10 +143,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 		{
 			name: "auto-update when using fully-qualified image notation",
 			fwDeploy: &v2.FirewallDeployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "deployment",
-					Namespace: "firewall",
-				},
+				Name:      "deployment",
+				Namespace: "firewall",
 				Spec: v2.FirewallDeploymentSpec{
 					Template: v2.FirewallTemplateSpec{
 						Spec: v2.FirewallSpec{
@@ -176,10 +168,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			},
 			existingFws: []v2.Firewall{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "a",
-						Namespace: "firewall",
-					},
+					Name:      "a",
+					Namespace: "firewall",
 					Status: v2.FirewallStatus{
 						MachineStatus: &v2.MachineStatus{
 							ImageID: "firewall-ubuntu-3.0.20230101",
@@ -189,10 +179,8 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			},
 			postTestFn: func(t *testing.T, c client.Client) {
 				fwdeploy := &v2.FirewallDeployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "deployment",
-						Namespace: "firewall",
-					},
+					Name:      "deployment",
+					Namespace: "firewall",
 				}
 				err := c.Get(context.Background(), client.ObjectKeyFromObject(fwdeploy), fwdeploy)
 				require.NoError(t, err)
@@ -208,11 +196,9 @@ func Test_controller_autoUpdateOS(t *testing.T) {
 			_, mc := metaltestclient.NewMetalMockClient(t, tt.metalMocks)
 
 			latestSet := v2.FirewallSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "firewall",
-					OwnerReferences: []metav1.OwnerReference{
-						*metav1.NewControllerRef(tt.fwDeploy, v2.GroupVersion.WithKind("FirewallDeployment")),
-					},
+				Namespace: "firewall",
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(tt.fwDeploy, v2.GroupVersion.WithKind("FirewallDeployment")),
 				},
 			}
 

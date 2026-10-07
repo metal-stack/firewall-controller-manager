@@ -7,7 +7,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -30,10 +29,8 @@ func TestIsAnnotationPresent(t *testing.T) {
 		{
 			name: "present",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "",
-					},
+				Annotations: map[string]string{
+					"a": "",
 				},
 			},
 			key:  "a",
@@ -65,10 +62,8 @@ func TestIsAnnotationIsTrue(t *testing.T) {
 		{
 			name: "not true",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "foo",
-					},
+				Annotations: map[string]string{
+					"a": "foo",
 				},
 			},
 			key:  "a",
@@ -77,10 +72,8 @@ func TestIsAnnotationIsTrue(t *testing.T) {
 		{
 			name: "true",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "true",
-					},
+				Annotations: map[string]string{
+					"a": "true",
 				},
 			},
 			key:  "a",
@@ -89,10 +82,8 @@ func TestIsAnnotationIsTrue(t *testing.T) {
 		{
 			name: "different variant of true is also allowed",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "1",
-					},
+				Annotations: map[string]string{
+					"a": "1",
 				},
 			},
 			key:  "a",
@@ -101,10 +92,8 @@ func TestIsAnnotationIsTrue(t *testing.T) {
 		{
 			name: "false",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "false",
-					},
+				Annotations: map[string]string{
+					"a": "false",
 				},
 			},
 			key:  "a",
@@ -136,10 +125,8 @@ func TestIsAnnotationIsFalse(t *testing.T) {
 		{
 			name: "not true",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "foo",
-					},
+				Annotations: map[string]string{
+					"a": "foo",
 				},
 			},
 			key:  "a",
@@ -148,10 +135,8 @@ func TestIsAnnotationIsFalse(t *testing.T) {
 		{
 			name: "true",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "true",
-					},
+				Annotations: map[string]string{
+					"a": "true",
 				},
 			},
 			key:  "a",
@@ -160,10 +145,8 @@ func TestIsAnnotationIsFalse(t *testing.T) {
 		{
 			name: "false",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "false",
-					},
+				Annotations: map[string]string{
+					"a": "false",
 				},
 			},
 			key:  "a",
@@ -172,10 +155,8 @@ func TestIsAnnotationIsFalse(t *testing.T) {
 		{
 			name: "different variant of false is also allowed",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{
-						"a": "0",
-					},
+				Annotations: map[string]string{
+					"a": "0",
 				},
 			},
 			key:  "a",
@@ -208,21 +189,17 @@ func TestAddAnnotation(t *testing.T) {
 		{
 			name: "add",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Name:            "test",
-					ResourceVersion: "0",
-				},
+				Name:            "test",
+				ResourceVersion: "0",
 			},
 			key:     "test",
 			value:   "true",
 			wantErr: nil,
 			want: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Name:            "test",
-					ResourceVersion: "1",
-					Annotations: map[string]string{
-						"test": "true",
-					},
+				Name:            "test",
+				ResourceVersion: "1",
+				Annotations: map[string]string{
+					"test": "true",
 				},
 			},
 		},
@@ -264,22 +241,18 @@ func TestRemoveAnnotation(t *testing.T) {
 		{
 			name: "remove",
 			o: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Name:            "test",
-					ResourceVersion: "0",
-					Annotations: map[string]string{
-						"test": "true",
-					},
+				Name:            "test",
+				ResourceVersion: "0",
+				Annotations: map[string]string{
+					"test": "true",
 				},
 			},
 			key:     "test",
 			wantErr: nil,
 			want: &Firewall{
-				ObjectMeta: v1.ObjectMeta{
-					Name:            "test",
-					ResourceVersion: "1",
-					Annotations:     nil,
-				},
+				Name:            "test",
+				ResourceVersion: "1",
+				Annotations:     nil,
 			},
 		},
 	}
@@ -343,14 +316,10 @@ func Test_annotationWasRemoved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := annotationWasRemoved(event.UpdateEvent{
 				ObjectOld: &Firewall{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: tt.o,
-					},
+					Annotations: tt.o,
 				},
 				ObjectNew: &Firewall{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: tt.n,
-					},
+					Annotations: tt.n,
 				},
 			}, tt.annotation); got != tt.want {
 				t.Errorf("annotationWasRemoved() = %v, want %v", got, tt.want)
@@ -400,14 +369,10 @@ func Test_annotationWasAdded(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := annotationWasAdded(event.UpdateEvent{
 				ObjectOld: &Firewall{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: tt.o,
-					},
+					Annotations: tt.o,
 				},
 				ObjectNew: &Firewall{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: tt.n,
-					},
+					Annotations: tt.n,
 				},
 			}, tt.annotation); got != tt.want {
 				t.Errorf("annotationWasAdded() = %v, want %v", got, tt.want)

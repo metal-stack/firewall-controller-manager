@@ -6,7 +6,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/metal-lib/pkg/testcommon"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -26,20 +25,16 @@ func TestMaxRevisionOf(t *testing.T) {
 			name: "single revision",
 			sets: []*v2.FirewallSet{
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "a",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "0",
-						},
-					},
-				},
-			},
-			want: &v2.FirewallSet{
-				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
 						v2.RevisionAnnotation: "0",
 					},
+				},
+			},
+			want: &v2.FirewallSet{
+				Name: "a",
+				Annotations: map[string]string{
+					v2.RevisionAnnotation: "0",
 				},
 			},
 		},
@@ -47,36 +42,28 @@ func TestMaxRevisionOf(t *testing.T) {
 			name: "max in the middle",
 			sets: []*v2.FirewallSet{
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "a",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "0",
-						},
+					Name: "a",
+					Annotations: map[string]string{
+						v2.RevisionAnnotation: "0",
 					},
 				},
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "c",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "2",
-						},
-					},
-				},
-				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "b",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "1",
-						},
-					},
-				},
-			},
-			want: &v2.FirewallSet{
-				ObjectMeta: v1.ObjectMeta{
 					Name: "c",
 					Annotations: map[string]string{
 						v2.RevisionAnnotation: "2",
 					},
+				},
+				{
+					Name: "b",
+					Annotations: map[string]string{
+						v2.RevisionAnnotation: "1",
+					},
+				},
+			},
+			want: &v2.FirewallSet{
+				Name: "c",
+				Annotations: map[string]string{
+					v2.RevisionAnnotation: "2",
 				},
 			},
 		},
@@ -110,20 +97,16 @@ func TestMinRevisionOf(t *testing.T) {
 			name: "single revision",
 			sets: []*v2.FirewallSet{
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "a",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "0",
-						},
-					},
-				},
-			},
-			want: &v2.FirewallSet{
-				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
 						v2.RevisionAnnotation: "0",
 					},
+				},
+			},
+			want: &v2.FirewallSet{
+				Name: "a",
+				Annotations: map[string]string{
+					v2.RevisionAnnotation: "0",
 				},
 			},
 		},
@@ -131,36 +114,28 @@ func TestMinRevisionOf(t *testing.T) {
 			name: "min in the middle",
 			sets: []*v2.FirewallSet{
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "c",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "2",
-						},
+					Name: "c",
+					Annotations: map[string]string{
+						v2.RevisionAnnotation: "2",
 					},
 				},
 				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "a",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "0",
-						},
-					},
-				},
-				{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "b",
-						Annotations: map[string]string{
-							v2.RevisionAnnotation: "1",
-						},
-					},
-				},
-			},
-			want: &v2.FirewallSet{
-				ObjectMeta: v1.ObjectMeta{
 					Name: "a",
 					Annotations: map[string]string{
 						v2.RevisionAnnotation: "0",
 					},
+				},
+				{
+					Name: "b",
+					Annotations: map[string]string{
+						v2.RevisionAnnotation: "1",
+					},
+				},
+			},
+			want: &v2.FirewallSet{
+				Name: "a",
+				Annotations: map[string]string{
+					v2.RevisionAnnotation: "0",
 				},
 			},
 		},
@@ -188,50 +163,50 @@ func TestExcept(t *testing.T) {
 		{
 			name: "exclude middle",
 			sets: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
+				{UID: types.UID("1")},
+				{UID: types.UID("2")},
+				{UID: types.UID("3")},
 			},
 			except: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
+				{UID: types.UID("2")},
 			},
 			want: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
+				{UID: types.UID("1")},
+				{UID: types.UID("3")},
 			},
 		},
 		{
 			name: "exclude two resources",
 			sets: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("4")}},
+				{UID: types.UID("1")},
+				{UID: types.UID("2")},
+				{UID: types.UID("3")},
+				{UID: types.UID("4")},
 			},
 			except: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("4")}},
+				{UID: types.UID("2")},
+				{UID: types.UID("4")},
 			},
 			want: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
+				{UID: types.UID("1")},
+				{UID: types.UID("3")},
 			},
 		},
 		{
 			name: "allow nil",
 			sets: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
+				{UID: types.UID("1")},
 				nil,
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
+				{UID: types.UID("2")},
+				{UID: types.UID("3")},
 			},
 			except: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("2")}},
+				{UID: types.UID("2")},
 				nil,
 			},
 			want: []*v2.FirewallSet{
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("1")}},
-				{ObjectMeta: v1.ObjectMeta{UID: types.UID("3")}},
+				{UID: types.UID("1")},
+				{UID: types.UID("3")},
 			},
 		},
 	}

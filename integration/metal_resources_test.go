@@ -8,7 +8,6 @@ import (
 	"github.com/metal-stack/metal-go/api/models"
 	metalclient "github.com/metal-stack/metal-go/test/client"
 	"github.com/metal-stack/metal-lib/pkg/net"
-	"github.com/metal-stack/metal-lib/pkg/pointer"
 )
 
 var (
@@ -40,7 +39,7 @@ var (
 					Ips:                 []string{"1.1.1.1"},
 					Nat:                 new(false),
 					Networkid:           new("private"),
-					Networktype:         pointer.Pointer(net.PrivatePrimaryUnshared),
+					Networktype:         new(net.PrivatePrimaryUnshared),
 					Prefixes:            []string{"prefixes"},
 					Private:             new(true),
 					Underlay:            new(false),
@@ -49,7 +48,7 @@ var (
 			},
 			Project:    new("project-1"),
 			Reinstall:  new(false),
-			Role:       pointer.Pointer(models.V1MachineAllocationRoleFirewall),
+			Role:       new(models.V1MachineAllocationRoleFirewall),
 			SSHPubKeys: []string{"sshpubkey"},
 			Succeeded:  new(true),
 			UserData:   "---userdata---",
@@ -127,7 +126,7 @@ var (
 						Ips:                 []string{"1.1.1.1"},
 						Nat:                 new(false),
 						Networkid:           new("private"),
-						Networktype:         pointer.Pointer(net.PrivatePrimaryUnshared),
+						Networktype:         new(net.PrivatePrimaryUnshared),
 						Prefixes:            []string{"prefixes"},
 						Private:             new(true),
 						Underlay:            new(false),
@@ -136,7 +135,7 @@ var (
 				},
 				Project:    new("project-1"),
 				Reinstall:  new(false),
-				Role:       pointer.Pointer(models.V1MachineAllocationRoleFirewall),
+				Role:       new(models.V1MachineAllocationRoleFirewall),
 				SSHPubKeys: []string{"sshpubkey"},
 				Succeeded:  new(true),
 				UserData:   "---userdata---",

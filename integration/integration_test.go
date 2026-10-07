@@ -30,16 +30,12 @@ var (
 	interval = 200 * time.Millisecond
 
 	namespace = &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
+		Name: namespaceName,
 	}
 
 	sshSecret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ssh-secret",
-			Namespace: namespaceName,
-		},
+		Name:      "ssh-secret",
+		Namespace: namespaceName,
 		StringData: map[string]string{
 			"id_rsa":     "private",
 			"id_rsa.pub": "public",
@@ -48,10 +44,8 @@ var (
 
 	genericKubeconfigSecret = func(apiCA, apiHost, apiCert, apiKey string) *corev1.Secret {
 		return &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kubeconfig-secret-name",
-				Namespace: namespaceName,
-			},
+			Name:      "kubeconfig-secret-name",
+			Namespace: namespaceName,
 			Data: map[string][]byte{
 				"kubeconfig": fmt.Appendf(nil, `apiVersion: v1
 clusters:
@@ -78,10 +72,8 @@ users:
 	}
 
 	shootTokenSecret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "token",
-			Namespace: namespaceName,
-		},
+		Name:      "token",
+		Namespace: namespaceName,
 		Data: map[string][]byte{
 			"token": []byte(`eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ`),
 		},
@@ -90,12 +82,10 @@ users:
 	// we need to fake the secret as there is no kube-controller-manager in the
 	// envtest setup which can issue a long-lived token for the secret
 	fakeTokenSecretSeed = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-seed-access-test",
-			Namespace: namespaceName,
-			Annotations: map[string]string{
-				"kubernetes.io/service-account.name": "firewall-controller-seed-access-test",
-			},
+		Name:      "firewall-controller-seed-access-test",
+		Namespace: namespaceName,
+		Annotations: map[string]string{
+			"kubernetes.io/service-account.name": "firewall-controller-seed-access-test",
 		},
 		StringData: map[string]string{
 			"token":  "a-token",
@@ -104,12 +94,10 @@ users:
 		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	fakeTokenSecretShoot = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "firewall-controller-shoot-access-test",
-			Namespace: namespaceName,
-			Annotations: map[string]string{
-				"kubernetes.io/service-account.name": "firewall-controller-shoot-access-test",
-			},
+		Name:      "firewall-controller-shoot-access-test",
+		Namespace: namespaceName,
+		Annotations: map[string]string{
+			"kubernetes.io/service-account.name": "firewall-controller-shoot-access-test",
 		},
 		StringData: map[string]string{
 			"token":  "a-token",
@@ -123,10 +111,8 @@ var _ = Context("integration test", Ordered, func() {
 	var (
 		deployment = func() *v2.FirewallDeployment {
 			return &v2.FirewallDeployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: namespaceName,
-				},
+				Name:      "test",
+				Namespace: namespaceName,
 				Spec: v2.FirewallDeploymentSpec{
 					Replicas: 1,
 					Template: v2.FirewallTemplateSpec{
@@ -1690,15 +1676,13 @@ var _ = Context("integration test", Ordered, func() {
 	Context("migration path", Ordered, func() {
 		var (
 			fw = &v2.Firewall{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: namespaceName,
-					Labels: map[string]string{
-						"purpose": "shoot-firewall",
-					},
-					Annotations: map[string]string{
-						v2.FirewallNoControllerConnectionAnnotation: "true",
-					},
+				Name:      "test",
+				Namespace: namespaceName,
+				Labels: map[string]string{
+					"purpose": "shoot-firewall",
+				},
+				Annotations: map[string]string{
+					v2.FirewallNoControllerConnectionAnnotation: "true",
 				},
 				Spec: v2.FirewallSpec{
 					Size:                    "n1-medium-x86",
@@ -1715,10 +1699,8 @@ var _ = Context("integration test", Ordered, func() {
 
 			deployment = func() *v2.FirewallDeployment {
 				return &v2.FirewallDeployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: namespaceName,
-					},
+					Name:      "test",
+					Namespace: namespaceName,
 					Spec: v2.FirewallDeploymentSpec{
 						Replicas: 1,
 						Template: v2.FirewallTemplateSpec{
