@@ -268,9 +268,9 @@ type FirewallNetwork struct {
 	// Project of this network
 	Project *string `json:"project,omitempty"`
 	// NetworkTypeV2 is the type of this network.
-	NetworkTypeV2 *string `json:"networkTypeV2"`
+	NetworkTypeV2 *string `json:"networkTypeV2,omitempty"`
 	// NATTypeV2 is the nat type of this network.
-	NATTypeV2 *string `json:"natTypeV2"`
+	NATTypeV2 *string `json:"natTypeV2,omitempty"`
 }
 
 // FirewallList contains a list of firewalls
