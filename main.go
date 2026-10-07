@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	metalgo "github.com/metal-stack/metal-go"
+	apiv2client "github.com/metal-stack/api/go/client"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	"github.com/metal-stack/v"
 
@@ -35,14 +35,12 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
 )
 
-const (
-	metalAuthHMACEnvVar = "METAL_AUTH_HMAC"
-)
-
 func main() {
 	var (
-		scheme   = helper.MustNewFirewallScheme()
-		metalURL string
+		scheme    = helper.MustNewFirewallScheme()
+		metalURL  string
+		tokenfile string
+		project   string
 
 		logLevel                string
 		metricsAddr             string
@@ -80,7 +78,9 @@ func main() {
 	flag.DurationVar(&safetyBackoff, "safety-backoff", 10*time.Second, "duration after which a resource is getting reconciled at minimum")
 	flag.DurationVar(&progressDeadline, "progress-deadline", 15*time.Minute, "time after which a deployment is considered unhealthy instead of progressing (informational)")
 	flag.DurationVar(&gracefulShutdownTimeout, "graceful-shutdown-timeout", -1, "grace period after which the controller shuts down")
-	flag.StringVar(&metalURL, "metal-api-url", "", "the url of the metal-stack api")
+	flag.StringVar(&metalURL, "metal-apiv2-url", "", "the url of the metal-stack apiserver")
+	flag.StringVar(&tokenfile, "token-file", "", "the path to the token file to authenticate against the metal-stack apiserver")
+	flag.StringVar(&project, "project", "", "project id of this cluster")
 	flag.StringVar(&clusterID, "cluster-id", "", "id of the cluster this controller is responsible for")
 	flag.StringVar(&shootApiURL, "shoot-api-url", "", "url of the shoot api server, if not provided falls back to single-cluster mode")
 	flag.StringVar(&internalShootApiURL, "internal-shoot-api-url", "", "url of the shoot api server used by this controller, not published in the shoot access status")
@@ -111,7 +111,7 @@ func main() {
 		stop = ctrl.SetupSignalHandler()
 	)
 
-	mclient, err := getMetalClient(metalURL)
+	mclient, err := getMetalClient(metalURL, tokenfile)
 	if err != nil {
 		log.Fatalf("unable to create metal client %v", err)
 	}
@@ -252,6 +252,7 @@ func main() {
 		ShootAccessHelper:     internalShootAccessHelper,
 		Metal:                 mclient,
 		ClusterTag:            fmt.Sprintf("%s=%s", tag.ClusterID, clusterID),
+		Project:               project,
 		SafetyBackoff:         safetyBackoff,
 		ProgressDeadline:      progressDeadline,
 		FirewallHealthTimeout: firewallHealthTimeout,
@@ -303,19 +304,21 @@ func main() {
 	}
 }
 
-func getMetalClient(url string) (metalgo.Client, error) {
-	hmac := os.Getenv(metalAuthHMACEnvVar)
-
+func getMetalClient(url, tokenfile string) (apiv2client.Client, error) {
 	if url == "" {
 		return nil, fmt.Errorf("metal api url is required")
 	}
-	if hmac == "" {
-		return nil, fmt.Errorf("environment variable %q is required", metalAuthHMACEnvVar)
+	if tokenfile == "" {
+		return nil, fmt.Errorf("tokenfile is required")
 	}
 
-	client, err := metalgo.NewDriver(url, "", hmac)
+	client, err := apiv2client.New(&apiv2client.DialConfig{
+		BaseURL:   url,
+		TokenFile: tokenfile,
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to initialize metal ccm:%w", err)
+		return nil, err
 	}
 
 	return client, nil

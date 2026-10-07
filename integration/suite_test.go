@@ -18,7 +18,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
 	"github.com/metal-stack/firewall-controller-manager/controllers/timeout"
 	"github.com/metal-stack/firewall-controller-manager/controllers/update"
-	metalclient "github.com/metal-stack/metal-go/test/client"
+	"github.com/metal-stack/firewall-controller-manager/internal/test"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -110,7 +110,8 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	metalClient, _ = metalclient.NewMetalMockClient(testingT, nil)
+	metalMock = test.New(testingT)
+	metalClient = metalMock.Client()
 
 	cc, err := controllerconfig.New(&controllerconfig.NewControllerConfig{
 		SeedClient:        k8sClient,

@@ -13,7 +13,7 @@ import (
 	"github.com/metal-stack/firewall-controller-manager/controllers"
 	"github.com/metal-stack/firewall-controller-manager/controllers/firewall"
 	"github.com/metal-stack/firewall-controller-manager/controllers/set"
-	metalclient "github.com/metal-stack/metal-go/test/client"
+	"github.com/metal-stack/firewall-controller-manager/internal/test"
 	"github.com/metal-stack/metal-lib/pkg/tag"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -93,7 +93,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	_, metalClient := metalclient.NewMetalMockClient(testingT, &metalclient.MetalMockFns{})
+	metalClient := test.New(testingT).Client()
 
 	cc, err := controllerconfig.New(&controllerconfig.NewControllerConfig{
 		SeedClient:        k8sClient,
