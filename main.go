@@ -178,15 +178,9 @@ func main() {
 		shootApiURL = seedMgr.GetConfig().Host
 
 		internalShootAccessHelper = helper.NewSingleClusterModeHelper(seedMgr.GetConfig())
-		if err != nil {
-			log.Fatalf("unable to create shoot helper %v", err)
-		}
 		l.Info("running in single-cluster mode")
 	} else {
 		internalShootAccessHelper = helper.NewShootAccessHelper(seedClient, internalShootAccess)
-		if err != nil {
-			log.Fatalf("unable to create shoot helper %v", err)
-		}
 		l.Info("running in split-cluster mode (seed and shoot client)")
 	}
 
