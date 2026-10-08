@@ -401,6 +401,20 @@ spec:
                 - liveliness
                 - machineID
                 type: object
+              nics:
+                description: Nics connected to the switches
+                items:
+                  description: Nic contains details of a network interface of this
+                    firewall.
+                  properties:
+                    mac:
+                      description: Mac the macaddress of this interface.
+                      type: string
+                    name:
+                      description: Name of this interface.
+                      type: string
+                  type: object
+                type: array
               phase:
                 description: Phase describes the firewall phase at the current time.
                 type: string

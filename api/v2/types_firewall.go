@@ -152,6 +152,8 @@ type FirewallStatus struct {
 	// The information is used by the firewall-controller in order to reconcile this firewall.
 	// See .spec.networks.
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
+	// Nics connected to the switches
+	Nics []Nic `json:"nics,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`
 	// Phase describes the firewall phase at the current time.
@@ -271,6 +273,14 @@ type FirewallNetwork struct {
 	NetworkTypeV2 *string `json:"networkTypeV2,omitempty"`
 	// NATTypeV2 is the nat type of this network.
 	NATTypeV2 *string `json:"natTypeV2,omitempty"`
+}
+
+// Nic contains details of a network interface of this firewall.
+type Nic struct {
+	// Mac the macaddress of this interface.
+	Mac string `json:"mac,omitempty"`
+	// Name of this interface.
+	Name string `json:"name,omitempty"`
 }
 
 // FirewallList contains a list of firewalls

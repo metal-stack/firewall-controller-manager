@@ -89,7 +89,23 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 		return fmt.Errorf("firewall entity is missing essential fields")
 	}
 
-	var result []v2.FirewallNetwork
+	var (
+		result []v2.FirewallNetwork
+		nics   []v2.Nic
+	)
+
+	if f.Hardware != nil {
+		for _, nic := range f.Hardware.Nics {
+			if len(nic.Neighbors) == 0 {
+				continue
+			}
+			nics = append(nics, v2.Nic{
+				Name: pointer.SafeDeref(nic.Name),
+				Mac:  pointer.SafeDeref(nic.Mac),
+			})
+		}
+		r.Target.Status.Nics = nics
+	}
 
 	for _, n := range f.Allocation.Networks {
 		if n.Networkid == nil {
