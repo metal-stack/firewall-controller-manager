@@ -443,6 +443,13 @@ spec:
                 - namespace
                 - tokenSecretName
                 type: object
+              vpn:
+                description: VPN configuration
+                properties:
+                  control_plane_address:
+                    description: Address of VPN control plane.
+                    type: string
+                type: object
             required:
             - conditions
             - phase

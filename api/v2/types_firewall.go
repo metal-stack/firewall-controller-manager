@@ -154,6 +154,8 @@ type FirewallStatus struct {
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
 	// Nics connected to the switches
 	Nics []Nic `json:"nics,omitempty"`
+	// VPN configuration
+	VPN *VPN `json:"vpn,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`
 	// Phase describes the firewall phase at the current time.
@@ -281,6 +283,12 @@ type Nic struct {
 	Mac string `json:"mac,omitempty"`
 	// Name of this interface.
 	Name string `json:"name,omitempty"`
+}
+
+// VPN Configuration of the firewall
+type VPN struct {
+	// Address of VPN control plane.
+	ControlPlaneAddress string `json:"control_plane_address,omitempty"`
 }
 
 // FirewallList contains a list of firewalls
