@@ -107,6 +107,12 @@ func (c *controller) setFirewallNetworks(r *controllers.Ctx[*v2.Firewall], f *mo
 		r.Target.Status.Nics = nics
 	}
 
+	if f.Allocation.Vpn != nil {
+		r.Target.Status.VPN = &v2.VPN{
+			ControlPlaneAddress: pointer.SafeDeref(f.Allocation.Vpn.Address),
+		}
+	}
+
 	for _, n := range f.Allocation.Networks {
 		if n.Networkid == nil {
 			continue
