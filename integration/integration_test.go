@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
+	"github.com/metal-stack/firewall-controller-manager/internal/test"
 	"github.com/metal-stack/metal-lib/httperrors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/mock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,13 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	testcommon "github.com/metal-stack/firewall-controller-manager/integration/common"
-
-	metalfirewall "github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/client/image"
-	"github.com/metal-stack/metal-go/api/client/machine"
-	"github.com/metal-stack/metal-go/api/client/network"
-	"github.com/metal-stack/metal-go/api/models"
-	metalclient "github.com/metal-stack/metal-go/test/client"
 )
 
 var (
@@ -151,21 +145,11 @@ var _ = Context("integration test", Ordered, func() {
 	Describe("the rolling update", Ordered, func() {
 		When("creating a firewall deployment", Ordered, func() {
 			It("the creation works", func() {
-				swapMetalClient(&metalclient.MetalMockFns{
-					Firewall: func(m *mock.Mock) {
-						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
-						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-					},
-					Network: func(m *mock.Mock) {
-						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-					},
-					Machine: func(m *mock.Mock) {
-						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-					},
-					Image: func(m *mock.Mock) {
-						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-					},
+				swapMetalClient(func(m *test.Client) {
+					mockMachine(m, firewall1)
+					mockMachineUpdate(m)
+					mockNetwork(m, network1)
+					mockImage(m, image1)
 				})
 
 				Expect(k8sClient.Create(ctx, deployment())).To(Succeed())
@@ -248,7 +232,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Created"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *firewall1.Allocation.Name)))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", firewall1.Allocation.Name)))
 				})
 
 				It("should populate the machine status", func() {
@@ -260,9 +244,9 @@ var _ = Context("integration test", Ordered, func() {
 						return status
 					}, 5*time.Second, interval).Should(Not(BeNil()))
 
-					Expect(status.MachineID).To(Equal(*firewall1.ID))
+					Expect(status.MachineID).To(Equal(firewall1.Uuid))
 					Expect(status.CrashLoop).To(Equal(false))
-					Expect(status.Liveliness).To(Equal("Alive"))
+					Expect(status.Liveliness).To(Equal("alive"))
 					Expect(status.LastEvent).NotTo(BeNil())
 					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 					Expect(status.LastEvent.Message).To(Equal("phoning home"))
@@ -276,7 +260,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Ready"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", firewall1.Allocation.Name)))
 				})
 
 				It("should have the monitor condition true", func() {
@@ -476,21 +460,11 @@ var _ = Context("integration test", Ordered, func() {
 
 			Context("the spec is updated", func() {
 				It("the update works", func() {
-					swapMetalClient(&metalclient.MetalMockFns{
-						Firewall: func(m *mock.Mock) {
-							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: installingFirewall}, nil).Maybe()
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: installingFirewall}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{installingFirewall}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Machine: func(m *mock.Mock) {
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, installingFirewall)
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					deploy := deployment()
@@ -555,7 +529,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Created"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *installingFirewall.Allocation.Name)))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", installingFirewall.Allocation.Name)))
 					})
 
 					It("should populate the machine status", func() {
@@ -567,9 +541,9 @@ var _ = Context("integration test", Ordered, func() {
 							return status
 						}, 5*time.Second, interval).Should(Not(BeNil()))
 
-						Expect(status.MachineID).To(Equal(*installingFirewall.ID))
+						Expect(status.MachineID).To(Equal(installingFirewall.Uuid))
 						Expect(status.CrashLoop).To(Equal(false))
-						Expect(status.Liveliness).To(Equal("Alive"))
+						Expect(status.Liveliness).To(Equal("alive"))
 						Expect(status.LastEvent).NotTo(BeNil())
 						Expect(status.LastEvent.Event).To(Equal("Installing"))
 						Expect(status.LastEvent.Message).To(Equal("is installing"))
@@ -583,7 +557,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("NotReady"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is not ready.", *installingFirewall.Allocation.Name)))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is not ready.", installingFirewall.Allocation.Name)))
 					})
 
 					It("should not yet have a distance configured", func() {
@@ -634,14 +608,14 @@ var _ = Context("integration test", Ordered, func() {
 
 						Expect(nws).To(BeComparableTo([]v2.FirewallNetwork{
 							{
-								ASN:                 installingFirewall.Allocation.Networks[0].Asn,
-								DestinationPrefixes: installingFirewall.Allocation.Networks[0].Destinationprefixes,
+								ASN:                 new(int64(installingFirewall.Allocation.Networks[0].Asn)),
+								DestinationPrefixes: installingFirewall.Allocation.Networks[0].DestinationPrefixes,
 								IPs:                 installingFirewall.Allocation.Networks[0].Ips,
-								Nat:                 installingFirewall.Allocation.Networks[0].Nat,
-								NetworkID:           installingFirewall.Allocation.Networks[0].Networkid,
-								NetworkType:         installingFirewall.Allocation.Networks[0].Networktype,
+								Nat:                 new(installingFirewall.Allocation.Networks[0].NatType == apiv2.NATType_NAT_TYPE_IPV4_MASQUERADE),
+								NetworkID:           new(installingFirewall.Allocation.Networks[0].Network),
+								NetworkType:         new("child"),
 								Prefixes:            network1.Prefixes,
-								Vrf:                 installingFirewall.Allocation.Networks[0].Vrf,
+								Vrf:                 new(int64(installingFirewall.Allocation.Networks[0].Vrf)),
 							},
 						}))
 					})
@@ -778,21 +752,12 @@ var _ = Context("integration test", Ordered, func() {
 
 			When("the firewall gets ready and the firewall-controller connects", Ordered, func() {
 				It("should allow an update of the firewall monitor", func() {
-					swapMetalClient(&metalclient.MetalMockFns{
-						Machine: func(m *mock.Mock) {
-							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Firewall: func(m *mock.Mock) {
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, readyFirewall)
+						mockMachineDelete(m, firewall1)
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mon), mon)).To(Succeed()) // refetch
@@ -827,14 +792,14 @@ var _ = Context("integration test", Ordered, func() {
 						mon := testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallMonitorList{}, func(l *v2.FirewallMonitorList) []*v2.FirewallMonitor {
 							return l.GetItems()
 						}, 15*time.Second)
-						Expect(mon.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
+						Expect(mon.MachineStatus.MachineID).To(Equal(readyFirewall.Uuid))
 					})
 
 					It("should delete the firewall", func() {
 						fw = testcommon.WaitForResourceAmount(k8sClient, ctx, namespaceName, 1, &v2.FirewallList{}, func(l *v2.FirewallList) []*v2.Firewall {
 							return l.GetItems()
 						}, 15*time.Second)
-						Expect(fw.Status.MachineStatus.MachineID).To(Equal(*readyFirewall.ID))
+						Expect(fw.Status.MachineStatus.MachineID).To(Equal(readyFirewall.Uuid))
 					})
 
 					It("should delete the firewall set", func() {
@@ -868,22 +833,12 @@ var _ = Context("integration test", Ordered, func() {
 		Describe("the deletion flow", Ordered, func() {
 			When("deleting the firewall deployment", func() {
 				It("the deletion finishes", func() {
-					swapMetalClient(&metalclient.MetalMockFns{
-						Firewall: func(m *mock.Mock) {
-							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Machine: func(m *mock.Mock) {
-							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, firewall1)
+						mockMachineDelete(m, firewall1)
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
@@ -919,21 +874,11 @@ var _ = Context("integration test", Ordered, func() {
 	Describe("the recreate update", Ordered, func() {
 		When("creating a firewall deployment", Ordered, func() {
 			It("the creation works", func() {
-				swapMetalClient(&metalclient.MetalMockFns{
-					Firewall: func(m *mock.Mock) {
-						m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
-						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-					},
-					Network: func(m *mock.Mock) {
-						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-					},
-					Machine: func(m *mock.Mock) {
-						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-					},
-					Image: func(m *mock.Mock) {
-						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-					},
+				swapMetalClient(func(m *test.Client) {
+					mockMachine(m, firewall1)
+					mockMachineUpdate(m)
+					mockNetwork(m, network1)
+					mockImage(m, image1)
 				})
 
 				deploy := deployment()
@@ -1018,7 +963,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Created"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *firewall1.Allocation.Name)))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", firewall1.Allocation.Name)))
 				})
 
 				It("should populate the machine status", func() {
@@ -1030,9 +975,9 @@ var _ = Context("integration test", Ordered, func() {
 						return status
 					}, 5*time.Second, interval).Should(Not(BeNil()))
 
-					Expect(status.MachineID).To(Equal(*firewall1.ID))
+					Expect(status.MachineID).To(Equal(firewall1.Uuid))
 					Expect(status.CrashLoop).To(Equal(false))
-					Expect(status.Liveliness).To(Equal("Alive"))
+					Expect(status.Liveliness).To(Equal("alive"))
 					Expect(status.LastEvent).NotTo(BeNil())
 					Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 					Expect(status.LastEvent.Message).To(Equal("phoning home"))
@@ -1046,7 +991,7 @@ var _ = Context("integration test", Ordered, func() {
 					Expect(cond.LastTransitionTime).NotTo(BeZero())
 					Expect(cond.LastUpdateTime).NotTo(BeZero())
 					Expect(cond.Reason).To(Equal("Ready"))
-					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
+					Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", firewall1.Allocation.Name)))
 				})
 
 				It("should have the provisioned condition true", func() {
@@ -1243,21 +1188,12 @@ var _ = Context("integration test", Ordered, func() {
 
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment()), deploy)).To(Succeed())
 
-					swapMetalClient(&metalclient.MetalMockFns{
-						Firewall: func(m *mock.Mock) {
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Machine: func(m *mock.Mock) {
-							m.On("FreeMachine", mock.Anything, nil).Return(nil, &machine.FreeMachineDefault{Payload: httperrors.Conflict(fmt.Errorf("deletion blocked"))}).Maybe()
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, readyFirewall)
+						mockMachineDeleteErr(m, httperrors.Conflict(fmt.Errorf("deletion blocked")))
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					deploy.Spec.Template.Spec.Networks = []string{"internet", "mpls"}
@@ -1281,22 +1217,12 @@ var _ = Context("integration test", Ordered, func() {
 
 				Context("the old generation disappears", Ordered, func() {
 					It("should delete the firewall set", func() {
-						swapMetalClient(&metalclient.MetalMockFns{
-							Firewall: func(m *mock.Mock) {
-								m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: readyFirewall}, nil).Maybe()
-								m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
-								m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
-							},
-							Network: func(m *mock.Mock) {
-								m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-							},
-							Machine: func(m *mock.Mock) {
-								m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
-								m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-							},
-							Image: func(m *mock.Mock) {
-								m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-							},
+						swapMetalClient(func(m *test.Client) {
+							mockMachine(m, readyFirewall)
+							mockMachineDelete(m, firewall1)
+							mockMachineUpdate(m)
+							mockNetwork(m, network1)
+							mockImage(m, image1)
 						})
 
 						Eventually(func() bool {
@@ -1351,20 +1277,11 @@ var _ = Context("integration test", Ordered, func() {
 
 				When("the firewall-controller connects", Ordered, func() {
 					It("should allow an update of the firewall monitor", func() {
-						swapMetalClient(&metalclient.MetalMockFns{
-							Machine: func(m *mock.Mock) {
-								m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-							},
-							Firewall: func(m *mock.Mock) {
-								m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: readyFirewall}, nil).Maybe()
-								m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{readyFirewall}}, nil).Maybe()
-							},
-							Network: func(m *mock.Mock) {
-								m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-							},
-							Image: func(m *mock.Mock) {
-								m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-							},
+						swapMetalClient(func(m *test.Client) {
+							mockMachine(m, readyFirewall)
+							mockMachineUpdate(m)
+							mockNetwork(m, network1)
+							mockImage(m, image1)
 						})
 
 						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(newMon), newMon)).To(Succeed()) // refetch
@@ -1406,7 +1323,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Created"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *readyFirewall.Allocation.Name)))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", readyFirewall.Allocation.Name)))
 					})
 
 					It("should populate the machine status", func() {
@@ -1418,9 +1335,9 @@ var _ = Context("integration test", Ordered, func() {
 							return status
 						}, 5*time.Second, interval).Should(Not(BeNil()))
 
-						Expect(status.MachineID).To(Equal(*readyFirewall.ID))
+						Expect(status.MachineID).To(Equal(readyFirewall.Uuid))
 						Expect(status.CrashLoop).To(Equal(false))
-						Expect(status.Liveliness).To(Equal("Alive"))
+						Expect(status.Liveliness).To(Equal("alive"))
 						Expect(status.LastEvent).NotTo(BeNil())
 						Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 						Expect(status.LastEvent.Message).To(Equal("is phoning home"))
@@ -1434,7 +1351,7 @@ var _ = Context("integration test", Ordered, func() {
 						Expect(cond.LastTransitionTime).NotTo(BeZero())
 						Expect(cond.LastUpdateTime).NotTo(BeZero())
 						Expect(cond.Reason).To(Equal("Ready"))
-						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *readyFirewall.Allocation.Name)))
+						Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", readyFirewall.Allocation.Name)))
 					})
 
 					It("should have the provisioned condition true", func() {
@@ -1492,14 +1409,14 @@ var _ = Context("integration test", Ordered, func() {
 
 						Expect(nws).To(BeComparableTo([]v2.FirewallNetwork{
 							{
-								ASN:                 readyFirewall.Allocation.Networks[0].Asn,
-								DestinationPrefixes: readyFirewall.Allocation.Networks[0].Destinationprefixes,
+								ASN:                 new(int64(readyFirewall.Allocation.Networks[0].Asn)),
+								DestinationPrefixes: readyFirewall.Allocation.Networks[0].DestinationPrefixes,
 								IPs:                 readyFirewall.Allocation.Networks[0].Ips,
-								Nat:                 readyFirewall.Allocation.Networks[0].Nat,
-								NetworkID:           readyFirewall.Allocation.Networks[0].Networkid,
-								NetworkType:         readyFirewall.Allocation.Networks[0].Networktype,
+								Nat:                 new(readyFirewall.Allocation.Networks[0].NatType == apiv2.NATType_NAT_TYPE_IPV4_MASQUERADE),
+								NetworkID:           new(readyFirewall.Allocation.Networks[0].Network),
+								NetworkType:         new("child"),
 								Prefixes:            network1.Prefixes,
-								Vrf:                 readyFirewall.Allocation.Networks[0].Vrf,
+								Vrf:                 new(int64(readyFirewall.Allocation.Networks[0].Vrf)),
 							},
 						}))
 					})
@@ -1625,22 +1542,12 @@ var _ = Context("integration test", Ordered, func() {
 		Describe("the deletion flow", Ordered, func() {
 			When("deleting the firewall deployment", func() {
 				It("the deletion finishes", func() {
-					swapMetalClient(&metalclient.MetalMockFns{
-						Firewall: func(m *mock.Mock) {
-							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Machine: func(m *mock.Mock) {
-							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, firewall1)
+						mockMachineDelete(m, firewall1)
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())
@@ -1728,20 +1635,11 @@ var _ = Context("integration test", Ordered, func() {
 
 		When("creating a firewall resource (for an existing firewall)", Ordered, func() {
 			It("the creation works", func() {
-				swapMetalClient(&metalclient.MetalMockFns{
-					Firewall: func(m *mock.Mock) {
-						m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-						m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-					},
-					Network: func(m *mock.Mock) {
-						m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-					},
-					Machine: func(m *mock.Mock) {
-						m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-					},
-					Image: func(m *mock.Mock) {
-						m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-					},
+				swapMetalClient(func(m *test.Client) {
+					mockMachine(m, firewall1)
+					mockMachineUpdate(m)
+					mockNetwork(m, network1)
+					mockImage(m, image1)
 				})
 
 				Expect(k8sClient.Create(ctx, fw)).To(Succeed())
@@ -1810,7 +1708,7 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
 				Expect(cond.Reason).To(Equal("Created"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", *firewall1.Allocation.Name)))
+				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q created successfully.", firewall1.Allocation.Name)))
 			})
 
 			It("should populate the machine status", func() {
@@ -1822,9 +1720,9 @@ var _ = Context("integration test", Ordered, func() {
 					return status
 				}, 5*time.Second, interval).Should(Not(BeNil()))
 
-				Expect(status.MachineID).To(Equal(*firewall1.ID))
+				Expect(status.MachineID).To(Equal(firewall1.Uuid))
 				Expect(status.CrashLoop).To(Equal(false))
-				Expect(status.Liveliness).To(Equal("Alive"))
+				Expect(status.Liveliness).To(Equal("alive"))
 				Expect(status.LastEvent).NotTo(BeNil())
 				Expect(status.LastEvent.Event).To(Equal("Phoned Home"))
 				Expect(status.LastEvent.Message).To(Equal("phoning home"))
@@ -1838,7 +1736,7 @@ var _ = Context("integration test", Ordered, func() {
 				Expect(cond.LastTransitionTime).NotTo(BeZero())
 				Expect(cond.LastUpdateTime).NotTo(BeZero())
 				Expect(cond.Reason).To(Equal("Ready"))
-				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", *firewall1.Allocation.Name)))
+				Expect(cond.Message).To(Equal(fmt.Sprintf("Firewall %q is phoning home and alive.", firewall1.Allocation.Name)))
 			})
 
 			It("should have the provisioned condition true", func() {
@@ -1956,22 +1854,12 @@ var _ = Context("integration test", Ordered, func() {
 		Describe("the deletion flow", Ordered, func() {
 			When("deleting the firewall deployment", func() {
 				It("the deletion finishes", func() {
-					swapMetalClient(&metalclient.MetalMockFns{
-						Firewall: func(m *mock.Mock) {
-							m.On("AllocateFirewall", mock.Anything, nil).Return(&metalfirewall.AllocateFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewall", mock.Anything, nil).Return(&metalfirewall.FindFirewallOK{Payload: firewall1}, nil).Maybe()
-							m.On("FindFirewalls", mock.Anything, nil).Return(&metalfirewall.FindFirewallsOK{Payload: []*models.V1FirewallResponse{firewall1}}, nil).Maybe()
-						},
-						Network: func(m *mock.Mock) {
-							m.On("FindNetwork", mock.Anything, nil).Return(&network.FindNetworkOK{Payload: network1}, nil).Maybe()
-						},
-						Machine: func(m *mock.Mock) {
-							m.On("FreeMachine", mock.Anything, nil).Return(&machine.FreeMachineOK{Payload: &models.V1MachineResponse{ID: firewall1.ID}}, nil).Maybe()
-							m.On("UpdateMachine", mock.Anything, nil).Return(&machine.UpdateMachineOK{Payload: &models.V1MachineResponse{}}, nil).Maybe()
-						},
-						Image: func(m *mock.Mock) {
-							m.On("FindLatestImage", mock.Anything, nil).Return(&image.FindLatestImageOK{Payload: image1}, nil).Maybe()
-						},
+					swapMetalClient(func(m *test.Client) {
+						mockMachine(m, firewall1)
+						mockMachineDelete(m, firewall1)
+						mockMachineUpdate(m)
+						mockNetwork(m, network1)
+						mockImage(m, image1)
 					})
 
 					Expect(k8sClient.Delete(ctx, deployment())).To(Succeed())

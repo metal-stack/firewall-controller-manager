@@ -2,9 +2,7 @@ package firewall
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -13,14 +11,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"github.com/metal-stack/api/go/errorutil"
+	apiv2 "github.com/metal-stack/api/go/metalstack/api/v2"
 	v2 "github.com/metal-stack/firewall-controller-manager/api/v2"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/config"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/defaults"
 	"github.com/metal-stack/firewall-controller-manager/api/v2/validation"
 	"github.com/metal-stack/firewall-controller-manager/controllers"
-	"github.com/metal-stack/metal-go/api/client/firewall"
-	"github.com/metal-stack/metal-go/api/client/network"
-	"github.com/metal-stack/metal-go/api/models"
 	"github.com/metal-stack/metal-lib/pkg/cache"
 )
 
@@ -28,8 +25,8 @@ type controller struct {
 	c             *config.ControllerConfig
 	log           logr.Logger
 	recorder      events.EventRecorder
-	networkCache  *cache.Cache[string, *models.V1NetworkResponse]
-	firewallCache *cache.Cache[*v2.Firewall, []*models.V1FirewallResponse]
+	networkCache  *cache.Cache[string, *apiv2.Network]
+	firewallCache *cache.Cache[*v2.Firewall, []*apiv2.Machine]
 }
 
 func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.Manager, c *config.ControllerConfig) error {
@@ -37,26 +34,32 @@ func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.M
 		log:      log,
 		recorder: recorder,
 		c:        c,
-		networkCache: cache.New(5*time.Minute, func(ctx context.Context, id string) (*models.V1NetworkResponse, error) {
-			resp, err := c.GetMetal().Network().FindNetwork(network.NewFindNetworkParams().WithID(id).WithContext(ctx), nil)
+		networkCache: cache.New(5*time.Minute, func(ctx context.Context, id string) (*apiv2.Network, error) {
+			resp, err := c.GetMetal().Apiv2().Network().Get(ctx, &apiv2.NetworkServiceGetRequest{Project: c.GetProject(), Id: id})
 			if err != nil {
 				return nil, fmt.Errorf("network find error: %w", err)
 			}
-			return resp.Payload, nil
+			return resp.Network, nil
 		}),
 		// the cache is only very short but on quickly repeated status updates, this should prevent the metal-api from being flooded
-		firewallCache: cache.New(5*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*models.V1FirewallResponse, error) {
-			searchFirewalls := func() ([]*models.V1FirewallResponse, error) {
-				resp, err := c.GetMetal().Firewall().FindFirewalls(firewall.NewFindFirewallsParams().WithBody(&models.V1FirewallFindRequest{
-					AllocationName:    fw.Name,
-					AllocationProject: fw.Spec.Project,
-					Tags:              []string{c.GetClusterTag()},
-				}).WithContext(ctx), nil)
+		firewallCache: cache.New(5*time.Second, func(ctx context.Context, fw *v2.Firewall) ([]*apiv2.Machine, error) {
+			searchFirewalls := func() ([]*apiv2.Machine, error) {
+				resp, err := c.GetMetal().Apiv2().Machine().List(ctx, &apiv2.MachineServiceListRequest{
+					Project: c.GetProject(),
+					Query: &apiv2.MachineQuery{
+						Allocation: &apiv2.MachineAllocationQuery{
+							Name: &fw.Name,
+							Labels: &apiv2.Labels{
+								Labels: controllers.ToLabels([]string{c.GetClusterTag()}),
+							},
+						},
+					},
+				})
 				if err != nil {
 					return nil, fmt.Errorf("firewall search error: %w", err)
 				}
 
-				return resp.Payload, nil
+				return resp.Machines, nil
 			}
 
 			// First try to find the firewall by machineID but check that allocation, project and hostname still matches
@@ -66,20 +69,20 @@ func SetupWithManager(log logr.Logger, recorder events.EventRecorder, mgr ctrl.M
 			// big enough that we agreed to do it. We still need to run the expensive lookup in the metal-api in case deriving
 			// the machine from the status field does not work.
 			if fw.Status.MachineStatus != nil && fw.Status.MachineStatus.MachineID != "" {
-				resp, err := c.GetMetal().Firewall().FindFirewall(firewall.NewFindFirewallParams().WithContext(ctx).WithID(fw.Status.MachineStatus.MachineID), nil)
+				resp, err := c.GetMetal().Apiv2().Machine().Get(ctx, &apiv2.MachineServiceGetRequest{Project: c.GetProject(), Uuid: fw.Status.MachineStatus.MachineID})
 				if err != nil {
-					var defaultErr *firewall.FindFirewallDefault
-					if errors.As(err, &defaultErr) && defaultErr.Code() == http.StatusNotFound {
+
+					if errorutil.IsNotFound(err) {
 						return searchFirewalls()
 					}
 
 					return nil, fmt.Errorf("firewall find error: %w", err)
 				}
 
-				if resp.Payload.Allocation != nil &&
-					*resp.Payload.Allocation.Project == fw.Spec.Project &&
-					*resp.Payload.Allocation.Hostname == fw.Name {
-					return []*models.V1FirewallResponse{resp.Payload}, nil
+				if resp.Machine.Allocation != nil &&
+					resp.Machine.Allocation.Project == fw.Spec.Project &&
+					resp.Machine.Allocation.Hostname == fw.Name {
+					return []*apiv2.Machine{resp.Machine}, nil
 				}
 			}
 

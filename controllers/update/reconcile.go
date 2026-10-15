@@ -48,7 +48,7 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 		return fmt.Errorf("unable to retrieve latest os image from metal-api: %w", err)
 	}
 
-	if image.ID == nil {
+	if image.Id == "" {
 		return fmt.Errorf("returned image from metal-api contains no id")
 	}
 
@@ -89,7 +89,7 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 
 	// finally, we can do the image comparison
 
-	if *image.ID == fw.Status.MachineStatus.ImageID {
+	if image.Id == fw.Status.MachineStatus.ImageID {
 		r.Log.Info("no new os version available, not triggering auto-update")
 		return nil
 	}
@@ -109,7 +109,7 @@ func (c *controller) autoUpdateOS(r *controllers.Ctx[*v2.FirewallDeployment]) er
 
 		refetched.Annotations[v2.RollSetAnnotation] = strconv.FormatBool(true)
 		if isFullyQualifiedImageNotation {
-			refetched.Spec.Template.Spec.Image = *image.ID
+			refetched.Spec.Template.Spec.Image = image.Id
 		}
 
 		err = c.c.GetSeedClient().Update(r.Ctx, refetched)
