@@ -135,6 +135,71 @@ spec:
                   Image is the os image of the firewall.
                   An update on this field requires the recreation of the physical firewall and can therefore lead to traffic interruption for the cluster.
                 type: string
+              initialRuleSet:
+                description: InitialRuleSet is the initial firewall ruleset applied
+                  before the firewall-controller starts running.
+                properties:
+                  egress:
+                    description: Egress rules to be deployed initially on the firewall.
+                    items:
+                      properties:
+                        comment:
+                          description: Comment provides a human readable description
+                            of this rule.
+                          type: string
+                        ports:
+                          description: Ports contains all affected network ports.
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        protocol:
+                          description: Protocol constraints the protocol this rule
+                            applies to.
+                          type: string
+                        to:
+                          description: To target addresses this rule applies to. May
+                            contain IPs or dns names.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - ports
+                      - protocol
+                      - to
+                      type: object
+                    type: array
+                  ingress:
+                    description: Ingress rules to be deployed initially on the firewall.
+                    items:
+                      properties:
+                        comment:
+                          description: Comment provides a human readable description
+                            of this rule.
+                          type: string
+                        from:
+                          description: From source addresses this rule applies to.
+                            May contain IPs or dns names.
+                          items:
+                            type: string
+                          type: array
+                        ports:
+                          description: Ports contains all affected network ports.
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        protocol:
+                          description: Protocol constraints the protocol this rule
+                            applies to.
+                          type: string
+                      required:
+                      - from
+                      - ports
+                      - protocol
+                      type: object
+                    type: array
+                type: object
               internalPrefixes:
                 description: |-
                   InternalPrefixes specify prefixes which are considered local to the partition or all regions. This is used for the traffic counters.
