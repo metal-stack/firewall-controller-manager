@@ -152,6 +152,10 @@ type FirewallStatus struct {
 	// The information is used by the firewall-controller in order to reconcile this firewall.
 	// See .spec.networks.
 	FirewallNetworks []FirewallNetwork `json:"firewallNetworks,omitempty"`
+	// Nics connected to the switches
+	Nics []Nic `json:"nics,omitempty"`
+	// VPN configuration
+	VPN *VPN `json:"vpn,omitempty"`
 	// Conditions contain the latest available observations of a firewall's current state.
 	Conditions Conditions `json:"conditions"`
 	// Phase describes the firewall phase at the current time.
@@ -254,15 +258,37 @@ type FirewallNetwork struct {
 	// IPs are the ip addresses used in this network.
 	IPs []string `json:"ips,omitempty"`
 	// Nat specifies whether the outgoing traffic is natted or not.
+	// Deprecated will be superseded by NATTypeV2
 	Nat *bool `json:"nat"`
 	// NetworkID is the id of this network.
 	NetworkID *string `json:"networkID"`
 	// NetworkType is the type of this network.
+	// Deprecated will be superseded by NetworkTypeV2
 	NetworkType *string `json:"networkType"`
 	// Prefixes are the network prefixes of this network.
 	Prefixes []string `json:"prefixes,omitempty"`
 	// Vrf is vrf id of this network.
 	Vrf *int64 `json:"vrf"`
+	// Project of this network
+	Project *string `json:"project,omitempty"`
+	// NetworkTypeV2 is the type of this network.
+	NetworkTypeV2 *string `json:"networkTypeV2,omitempty"`
+	// NATTypeV2 is the nat type of this network.
+	NATTypeV2 *string `json:"natTypeV2,omitempty"`
+}
+
+// Nic contains details of a network interface of this firewall.
+type Nic struct {
+	// Mac the macaddress of this interface.
+	Mac string `json:"mac,omitempty"`
+	// Name of this interface.
+	Name string `json:"name,omitempty"`
+}
+
+// VPN Configuration of the firewall
+type VPN struct {
+	// Address of VPN control plane.
+	ControlPlaneAddress string `json:"control_plane_address,omitempty"`
 }
 
 // FirewallList contains a list of firewalls
