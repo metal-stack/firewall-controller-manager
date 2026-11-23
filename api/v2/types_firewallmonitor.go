@@ -61,6 +61,7 @@ type ControllerStatus struct {
 	SeedUpdated             metav1.Time      `json:"lastRunAgainstSeed,omitempty"`
 	Distance                FirewallDistance `json:"distance,omitempty"`
 	DistanceSupported       bool             `json:"distanceSupported,omitempty"`
+	Suricata                SuricataStatus   `json:"suricata"`
 }
 
 // FirewallStats contains firewall statistics
@@ -102,6 +103,24 @@ type InterfaceStat struct {
 	Drop             int `json:"drop"`
 	InvalidChecksums int `json:"invalidChecksums"`
 	Packets          int `json:"packets"`
+}
+
+// SuricataStatus contains information on the suricata ids status
+type SuricataStatus struct {
+	// Running is true when suricata is currently running.
+	Running bool `json:"running"`
+	// Uptime shows how long the suricata service is running.
+	Uptime metav1.Duration `json:"uptime"`
+	// Version shows the current suricata version.
+	Version string `json:"version"`
+	// AvailableDetectionRulesets shows the available detection rule sets.
+	AvailableDetectionRulesets []string `json:"availableDetectionRulesets"`
+	// EnabledDetectionRulesets shows the configured detection rule sets.
+	EnabledDetectionRulesets []string `json:"enabledDetectionRulesets"`
+	// EveboxAgentRunning shows true when the evebox agent is running.
+	EveboxAgentRunning bool `json:"eveboxAgentRunning"`
+	// EveboxServerRunning shows true when the evebox server is running.
+	EveboxServerRunning bool `json:"eveboxServerRunning"`
 }
 
 // +kubebuilder:object:root=true

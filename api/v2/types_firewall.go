@@ -105,6 +105,9 @@ type FirewallSpec struct {
 	// The firewall-controller only enforces this setting in combination with NetworkAccessType set to forbidden.
 	// The node network is always allowed.
 	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
+
+	// Suricata provides configuration for running suricata ids on the firewall.
+	Suricata Suricata `json:"suricata"`
 }
 
 // AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is forbidden.
@@ -289,6 +292,34 @@ type Nic struct {
 type VPN struct {
 	// Address of VPN control plane.
 	ControlPlaneAddress string `json:"control_plane_address,omitempty"`
+}
+
+// SuricataListenMode sets the listen mode for suricata
+type SuricataListenMode string
+
+const (
+	// SuricataListenModeAfPacket configures suricata that it is sniffing traffic and emitting alerts (IDS).
+	SuricataListenModeAfPacket SuricataListenMode = "af-packet"
+	// SuricataListenModeNfqueue configures suricata that it can actively drop traffic (IPS).
+	SuricataListenModeNfqueue SuricataListenMode = "nfqueue"
+)
+
+// Suricata provides configuration for running suricata ids on the firewall.
+type Suricata struct {
+	// Enabled enables suricata. Enabled by default.
+	Enabled *bool `json:"enabled"`
+	// Evebox allows starting an evebox agent on the firewall that forwards it to an evebox server.
+	Evebox Evebox `json:"deployEvebox"`
+	// ListenMode configures the suricata listen mode. when set to nfqueue suricata will actively filter packets instead of just sniffing traffic.
+	ListenMode *SuricataListenMode `json:"listenMode,omitempty"`
+	// DetectionRulesets configures detection rulesets for suricata. The available values can be determined from the FirewallMonitor status.
+	DetectionRulesets []string `json:"detectionRulesets"`
+}
+
+// Evebox allows configuring evebox.
+type Evebox struct {
+	// Enabled enables the evebox forwarding.
+	Enabled bool `json:"enabled"`
 }
 
 // FirewallList contains a list of firewalls
