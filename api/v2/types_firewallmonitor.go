@@ -119,8 +119,6 @@ type SuricataStatus struct {
 	EnabledDetectionRulesets []string `json:"enabledDetectionRulesets,omitempty"`
 	// EveboxAgentRunning shows true when the evebox agent is running.
 	EveboxAgentRunning bool `json:"eveboxAgentRunning"`
-	// EveboxServerRunning shows true when the evebox server is running.
-	EveboxServerRunning bool `json:"eveboxServerRunning"`
 }
 
 // +kubebuilder:object:root=true
