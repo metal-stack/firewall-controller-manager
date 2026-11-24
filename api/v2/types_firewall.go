@@ -307,7 +307,7 @@ const (
 // Suricata provides configuration for running suricata ids on the firewall.
 type Suricata struct {
 	// Enabled enables suricata. Enabled by default.
-	Enabled *bool `json:"enabled"`
+	Enabled *bool `json:"enabled,omitempty"`
 	// Evebox allows starting an evebox agent on the firewall that forwards it to an evebox server.
 	Evebox Evebox `json:"deployEvebox"`
 	// ListenMode configures the suricata listen mode. when set to nfqueue suricata will actively filter packets instead of just sniffing traffic.

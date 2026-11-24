@@ -114,9 +114,9 @@ type SuricataStatus struct {
 	// Version shows the current suricata version.
 	Version string `json:"version"`
 	// AvailableDetectionRulesets shows the available detection rule sets.
-	AvailableDetectionRulesets []string `json:"availableDetectionRulesets"`
+	AvailableDetectionRulesets []string `json:"availableDetectionRulesets,omitempty"`
 	// EnabledDetectionRulesets shows the configured detection rule sets.
-	EnabledDetectionRulesets []string `json:"enabledDetectionRulesets"`
+	EnabledDetectionRulesets []string `json:"enabledDetectionRulesets,omitempty"`
 	// EveboxAgentRunning shows true when the evebox agent is running.
 	EveboxAgentRunning bool `json:"eveboxAgentRunning"`
 	// EveboxServerRunning shows true when the evebox server is running.
