@@ -61,7 +61,7 @@ type ControllerStatus struct {
 	SeedUpdated             metav1.Time      `json:"lastRunAgainstSeed,omitempty"`
 	Distance                FirewallDistance `json:"distance,omitempty"`
 	DistanceSupported       bool             `json:"distanceSupported,omitempty"`
-	Suricata                SuricataStatus   `json:"suricata"`
+	Suricata                SuricataStatus   `json:"suricata,omitempty"`
 }
 
 // FirewallStats contains firewall statistics
