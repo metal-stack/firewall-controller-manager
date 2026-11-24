@@ -43,6 +43,9 @@ const (
 	// to temporarily allow restarts of services like FRR, which might not be desired to be allowed permanently for platform users.
 	FirewallRestartSystemdServicesWhitelistAnnotation = "firewall.metal-stack.io/restart-systemd-services-whitelist"
 
+	// FirewallSuricataUpdateSourcesAnnotation updates suricata sources on the firewall.
+	FirewallSuricataUpdateSourcesAnnotation = "firewall.metal-stack.io/suricata-update-sources"
+
 	// FirewallControllerSetAnnotation is a tag added to the firewall entity indicating to which set a firewall belongs to.
 	FirewallControllerSetAnnotation = "firewall.metal.stack.io/set"
 )

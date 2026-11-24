@@ -312,14 +312,24 @@ type Suricata struct {
 	Evebox Evebox `json:"deployEvebox"`
 	// ListenMode configures the suricata listen mode. when set to nfqueue suricata will actively filter packets instead of just sniffing traffic.
 	ListenMode *SuricataListenMode `json:"listenMode,omitempty"`
-	// DetectionRulesets configures detection rulesets for suricata. The available values can be determined from the FirewallMonitor status.
-	DetectionRulesets []string `json:"detectionRulesets"`
+	// DetectionRulesets configures detection rulesets for suricata. The available values can be determined from the FirewallMonitor status. If this slice is nil, the default detection ruleset is used.
+	DetectionRulesets []string `json:"detectionRulesets,omitempty"`
 }
 
 // Evebox allows configuring evebox.
 type Evebox struct {
 	// Enabled enables the evebox forwarding.
 	Enabled bool `json:"enabled"`
+	// ServerURL is the URL to forward events to.
+	ServerURL string `json:"serverURL"`
+	// Key is the key of the evebox server.
+	Key string `json:"key"`
+	// TlsEnabled enables TLS for the client-server communication.
+	TlsEnabled bool `json:"tlsEnabled"`
+	// Certificate is the certificate used for TLS.
+	Certificate string `json:"certificate"`
+	// CertificateKey is the certificate key used for TLS.
+	CertificateKey string `json:"certificateKey"`
 }
 
 // FirewallList contains a list of firewalls
