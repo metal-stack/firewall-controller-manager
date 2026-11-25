@@ -314,6 +314,11 @@ type Suricata struct {
 	ListenMode *SuricataListenMode `json:"listenMode,omitempty"`
 	// DetectionRulesets configures detection rulesets for suricata. The available values can be determined from the FirewallMonitor status. If this slice is nil, the default detection ruleset is used.
 	DetectionRulesets []string `json:"detectionRulesets,omitempty"`
+	// DropRules selects rules whose action is converted from alert to drop. Every entry is a suricata-update
+	// rule matcher as used in drop.conf, e.g. a signature id ("2402000"), "group:emerging-drop.rules",
+	// "re:Dshield Block Listed Source" or "metadata:signature_severity major".
+	// Dropping only takes effect when the listen mode is nfqueue, in af-packet mode the rules only alert.
+	DropRules []string `json:"dropRules,omitempty"`
 }
 
 // Evebox allows configuring evebox.
