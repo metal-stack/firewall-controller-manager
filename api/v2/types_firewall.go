@@ -105,6 +105,9 @@ type FirewallSpec struct {
 	// The firewall-controller only enforces this setting in combination with NetworkAccessType set to forbidden.
 	// The node network is always allowed.
 	AllowedNetworks AllowedNetworks `json:"allowedNetworks,omitempty"`
+
+	// Suricata provides configuration for running suricata ids on the firewall.
+	Suricata Suricata `json:"suricata"`
 }
 
 // AllowedNetworks is a list of networks which are allowed to connect when NetworkAccessType is forbidden.
@@ -289,6 +292,49 @@ type Nic struct {
 type VPN struct {
 	// Address of VPN control plane.
 	ControlPlaneAddress string `json:"control_plane_address,omitempty"`
+}
+
+// SuricataListenMode sets the listen mode for suricata
+type SuricataListenMode string
+
+const (
+	// SuricataListenModeAfPacket configures suricata that it is sniffing traffic and emitting alerts (IDS).
+	SuricataListenModeAfPacket SuricataListenMode = "af-packet"
+	// SuricataListenModeNfqueue configures suricata that it can actively drop traffic (IPS).
+	SuricataListenModeNfqueue SuricataListenMode = "nfqueue"
+)
+
+// Suricata provides configuration for running suricata ids on the firewall.
+type Suricata struct {
+	// Enabled enables suricata. Enabled by default.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Evebox allows starting an evebox agent on the firewall that forwards it to an evebox server.
+	Evebox Evebox `json:"deployEvebox"`
+	// ListenMode configures the suricata listen mode. when set to nfqueue suricata will actively filter packets instead of just sniffing traffic.
+	ListenMode *SuricataListenMode `json:"listenMode,omitempty"`
+	// DetectionRulesets configures detection rulesets for suricata. The available values can be determined from the FirewallMonitor status. If this slice is nil, the default detection ruleset is used.
+	DetectionRulesets []string `json:"detectionRulesets,omitempty"`
+	// DropRules selects rules whose action is converted from alert to drop. Every entry is a suricata-update
+	// rule matcher as used in drop.conf, e.g. a signature id ("2402000"), "group:emerging-drop.rules",
+	// "re:Dshield Block Listed Source" or "metadata:signature_severity major".
+	// Dropping only takes effect when the listen mode is nfqueue, in af-packet mode the rules only alert.
+	DropRules []string `json:"dropRules,omitempty"`
+}
+
+// Evebox allows configuring evebox.
+type Evebox struct {
+	// Enabled enables the evebox forwarding.
+	Enabled bool `json:"enabled"`
+	// ServerURL is the URL to forward events to.
+	ServerURL string `json:"serverURL"`
+	// Key is the key of the evebox server.
+	Key string `json:"key"`
+	// TlsEnabled enables TLS for the client-server communication.
+	TlsEnabled bool `json:"tlsEnabled"`
+	// Certificate is the certificate used for TLS.
+	Certificate string `json:"certificate"`
+	// CertificateKey is the certificate key used for TLS.
+	CertificateKey string `json:"certificateKey"`
 }
 
 // FirewallList contains a list of firewalls
